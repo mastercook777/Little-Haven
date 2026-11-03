@@ -19,3 +19,5 @@ jobs:
         run: npm run test:sim
       - name: Typecheck and Vite build
         run: npm run build
+      - name: GitHub Pages build
+        run: npm run build:pages
