@@ -154,6 +154,9 @@ try{
  if(river.surfaceName!=='river-water'||river.surfaceY<=.075||
   river.samples.length<5||river.samples.filter(s=>s.surfaceHit).length<5)
   throw Error('River surface geometry/projection invalid: '+JSON.stringify(river));
+ const visibleRiver=river.samples.filter(s=>s.unobstructed).length;
+ if(visibleRiver<4)throw Error('Creek remains hidden behind opaque island shell or roads: '+JSON.stringify(river.samples));
+ results.push({visibleRiverSamples:visibleRiver});
  await page.evaluate(()=>{
   const d=window.__HAVEN_DEBUG__;d.reset();
   for(let i=0;i<12&&d.getVisualState().weather!=='rain';i++)d.advance(480);
