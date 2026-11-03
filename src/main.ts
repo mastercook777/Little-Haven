@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildVillage} from './graphics/village';
 import {makePeople,updatePeople} from './graphics/people';
-import {advanceToNextSeason,advanceWorld,chapterProgress,chooseFate,createWorld,getCalendar,getClock,getDaylight,getWeather,importWorld,loadWorld,residentMotion,saveWorld,SLOT_KEYS,VILLAGERS,type Decision,type WorldState} from './simulation/world';
+import {advanceToNextSeason,advanceWorld,buildingById,chapterProgress,chooseFate,chooseOpportunity,createWorld,getCalendar,getClock,getDaylight,getWeather,importWorld,loadWorld,pendingOpportunities,residentMotion,saveWorld,SLOT_KEYS,VILLAGERS,type Decision,type WorldState} from './simulation/world';
+import {conditionOf} from './simulation/buildings';
 import {SEASON_NAMES} from './simulation/calendar';
 import {WEATHER_NAMES} from './simulation/weather';
 import './styles.css';
@@ -30,7 +31,7 @@ const ACTIVE_SLOT_KEY='little-haven-v03-active-slot';
 let activeSlot=1;
 try{activeSlot=localStorage.getItem(ACTIVE_SLOT_KEY)==='2'?2:1;}catch{}
 let world:WorldState;try{world=loadWorld(window.localStorage,Date.now(),activeSlot);}catch{world=createWorld();}
-let speed=1,paused=false,selected:number|null=null,elapsed=0,last=performance.now(),lastSave=performance.now();
+let speed=1,paused=false,selected:number|null=null,selectedBuilding:string|null=null,elapsed=0,last=performance.now(),lastSave=performance.now();
 let lastDaylight=-1,lastLightingKey='',lastDecisionKey='',lastChronicleId=0,lastTimeShown=-1;
 let toastTimer:number|undefined;let audio:AudioContext|null=null,oscillator:OscillatorNode|null=null;
 const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
@@ -48,13 +49,26 @@ function renderJournal(){
  $('journalAll').innerHTML=[...world.journal].reverse().map(e=>`<div class="event-row"><div class="event-day">DAY ${String(e.day).padStart(2,'0')} <span>· ${String(Math.floor(e.time/60)).padStart(2,'0')}:${String(e.time%60).padStart(2,'0')}</span></div><h3>${escapeHtml(e.title)}</h3><p>${escapeHtml(e.text)}</p></div>`).join('');
 }
 function renderDecision(){
- const stage=world.storyStage;const key=stage+'/'+world.choice;
+ const stage=world.storyStage,opportunity=pendingOpportunities(world)[0];
+ const key=stage+'/'+world.choice+'/'+(opportunity?.id||'-');
  if(lastDecisionKey===key)return;lastDecisionKey=key;
- const invite=stage==='stranger'&&world.choice===null;
+ const invite=stage==='stranger'&&world.choice===null&&!opportunity;
  $('choices').hidden=!invite;
- $('decisionProgress').hidden=world.choice===null||stage==='legacy';
- $('decisionResult').hidden=stage!=='legacy';
- $('letterCount').textContent=invite?'机缘 01 / 01':stage==='legacy'?'已成旧事':'流年有信';
+ $('opportunityChoices').hidden=!opportunity;
+ $('decisionProgress').hidden=!!opportunity||world.choice===null||stage==='legacy';
+ $('decisionResult').hidden=!!opportunity||stage!=='legacy';
+ $('letterCount').textContent=opportunity?'待回应 · '+pendingOpportunities(world).length:invite?'机缘初现':stage==='legacy'?'旧事仍有新声':'流年有信';
+ if(opportunity){
+  $('decisionTag').textContent=opportunity.kind==='rain-guest'?'谷中结缘 · 雨夜':'谷中庇护 · 修葺';
+  $('decisionTitle').textContent=opportunity.title;
+  const days=Math.max(0,Math.ceil((opportunity.deadlineMinutes-world.minutes)/1440));
+  $('decisionBody').textContent=opportunity.description+' · 尚有'+days+'日，可出手也可随缘。';
+  $('opportunityChoices').innerHTML=opportunity.options.map((option,i)=>
+   '<button type="button" class="opportunity-choice" data-op="'+escapeHtml(opportunity.id)+'" data-option="'+escapeHtml(option.id)+'">'+
+   '<strong>'+escapeHtml(option.label)+'</strong><small>'+escapeHtml(option.preview)+'</small>'+
+   '<span aria-hidden="true">'+(i===2?'◌':'↗')+'</span></button>').join('');
+  return;
+ }
  if(stage==='peace'){
    $('decisionTag').textContent='山中今日无事';$('decisionTitle').textContent='酒肆尚未有客';
    $('decisionBody').textContent='溪水照旧东流，阿青在练武坪挥动木剑。听闻近来有旅人要从山道经过，且看看会发生什么。';
@@ -99,9 +113,37 @@ function renderResident(){
  $('residentActivity').textContent='◌ '+residentMotion(v,world).activity;
  $('residentThought').textContent=hero&&['departed','rumor'].includes(world.storyStage)?'“江湖很远，但山谷一直在身后。”':v.thought;
 }
-function selectResident(id:number|null){
- selected=id;renderResident();const v=VILLAGERS.find(v=>v.id===id);if(v)toast(`认识了 ${v.name} · ${v.occupation}`);
+function renderBuilding(){
+ const card=$('buildingCard'),b=selectedBuilding?buildingById(world,selectedBuilding):null;
+ if(!b){card.hidden=true;return;}
+ card.hidden=false;$('buildingName').textContent=b.name;
+ const condition=conditionOf(b);
+ const labels={new:'良好',livedIn:'有人住过的痕迹',worn:'屋瓦渐旧',dilapidated:'亟待修葺'};
+ const phase={planned:'筹备中',foundation:'整理地基',construction:'施工中',occupied:'正在使用',repairing:'乡邻修葺中'};
+ $('buildingCondition').textContent=phase[b.phase]+' · '+labels[condition]+' · 屋龄 '+b.yearsOld+' 年';
+ $('buildingActivity').textContent=b.phase==='repairing'||b.phase==='construction'
+  ?'◌ 工程进度 '+Math.round(b.workProgress*100)+'% · 由村民逐日完成'
+  :'◌ 完好度 '+Math.round(b.conditionScore)+' / 100 · 使用痕迹 '+b.props.length+' 处';
+ const causes=b.causeEventIds.slice(-3).reverse().map(id=>
+  world.journal.find(entry=>'journal-'+entry.id===id)?.title||'旧日乡邻劳动');
+ $('buildingHistory').textContent='缘由可查：'+(causes.length?causes.join('、'):'屋舍随日子而缓慢改变');
 }
+function selectBuilding(id:string|null){
+ selectedBuilding=id;selected=null;renderResident();renderBuilding();
+ const b=id?buildingById(world,id):null;if(b)toast('走近了'+b.name+' · 看见岁月的痕迹');
+}
+function selectResident(id:number|null){
+ selectedBuilding=null;renderBuilding();selected=id;renderResident();
+ const v=VILLAGERS.find(v=>v.id===id);if(v)toast('认识了 '+v.name+' · '+v.occupation);
+}
+$('opportunityChoices').addEventListener('click',event=>{
+ const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-op]');
+ if(!button)return;
+ if(chooseOpportunity(world,button.dataset.op||'',button.dataset.option||'')){
+  lastDecisionKey='';renderDecision();renderJournal();renderStats();renderBuilding();village.updateStory(world);persist();
+  toast('机缘有了回响，居民会继续完成自己的事。');
+ }
+});
 for(const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.choice'))){
  button.addEventListener('click',()=>{
   const choice=button.dataset.choice as Decision;
@@ -131,14 +173,15 @@ $('resetCamera').addEventListener('click',()=>{controls.target.set(0,0,0);camera
 $('zoomIn').addEventListener('click',()=>{camera.zoom=Math.min(2.22,camera.zoom*1.18);camera.updateProjectionMatrix();});
 $('zoomOut').addEventListener('click',()=>{camera.zoom=Math.max(.72,camera.zoom/1.18);camera.updateProjectionMatrix();});
 $('closeResident').addEventListener('click',()=>selectResident(null));
+$('closeBuilding').addEventListener('click',()=>selectBuilding(null));
 $('journalExpand').addEventListener('click',()=>{$('journalModal').hidden=false;renderJournal();});
 $('closeJournal').addEventListener('click',()=>{$('journalModal').hidden=true;});
 $('journalModal').addEventListener('click',e=>{if(e.target===$('journalModal'))$('journalModal').hidden=true;});
 function refreshWorld(){
  speed=1;paused=false;elapsed=0;last=performance.now();$('pause').textContent='Ⅱ';
  document.querySelectorAll<HTMLButtonElement>('.speed-btn').forEach(el=>el.classList.toggle('active',el.dataset.speed==='1'));
- selected=null;lastDecisionKey='';lastChronicleId=0;lastLightingKey='';lastDaylight=-1;
- renderResident();renderDecision();renderJournal();renderStats();renderClock();village.updateStory(world);
+ selected=null;selectedBuilding=null;lastDecisionKey='';lastChronicleId=0;lastLightingKey='';lastDaylight=-1;
+ renderBuilding();renderResident();renderDecision();renderJournal();renderStats();renderClock();village.updateStory(world);
  $('currentSlot').textContent=activeSlot===1?'一号谷':'二号谷';
  $('saveSlot1').classList.toggle('active',activeSlot===1);
  $('saveSlot2').classList.toggle('active',activeSlot===2);
@@ -174,7 +217,7 @@ $<HTMLInputElement>('importFile').addEventListener('change',async e=>{
  if(!confirm('将导入的进度覆盖当前槽吗？请先导出现有存档备份。'))return;
  world=restored;persist();refreshWorld();$('journalModal').hidden=true;toast('山谷记录已恢复。');
 });
-window.addEventListener('keydown',e=>{if(e.key==='Escape'){$('journalModal').hidden=true;selectResident(null);}if(e.key===' '&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();$('pause').click();}});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){$('journalModal').hidden=true;selectResident(null);selectBuilding(null);}if(e.key===' '&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();$('pause').click();}});
 // Gentle sine-tone ambience is opt-in; no external audio files.
 $('sound').addEventListener('click',()=>{
  try{
@@ -190,9 +233,13 @@ canvas.addEventListener('pointerup',e=>{
  mouse.set(e.clientX/window.innerWidth*2-1,-(e.clientY/window.innerHeight)*2+1);raycaster.setFromCamera(mouse,camera);
  const candidates:THREE.Object3D[]=[];
  for(const p of people)if(p.group.visible)p.group.traverse(o=>{if(o instanceof THREE.Mesh&&o.geometry.type!=='CircleGeometry')candidates.push(o);});
- const hits=raycaster.intersectObjects(candidates,false);
- if(hits.length){let target:THREE.Object3D|null=hits[0].object;while(target&&target.userData.villagerId===undefined)target=target.parent;
-  if(target)selectResident(target.userData.villagerId as number);else selectResident(null);
+ const hits=raycaster.intersectObjects([...candidates,...village.buildingTargets],true);
+ if(hits.length){
+  let target:THREE.Object3D|null=hits[0].object;
+  while(target&&target.userData.villagerId===undefined&&target.userData.buildingId===undefined)target=target.parent;
+  if(target?.userData.villagerId!==undefined)selectResident(target.userData.villagerId as number);
+  else if(target?.userData.buildingId!==undefined)selectBuilding(target.userData.buildingId as string);
+  else selectResident(null);
  }else selectResident(null);
 });
 function lighting(daylight:number){
@@ -216,11 +263,11 @@ function tick(now:number){
   if(events.visitor)toast('山道上来了位佩剑客。');
   if(events.milestones.length){const last=events.milestones.at(-1);toast(last==='legacy'?'山谷里有了新的归处。':last==='returned'?'阿青归来了。':'谷中又传来一段江湖消息。');}
   if(events.crossedSeasons)toast('新的一季到了，山谷的景色也变了。');
-  if(events.visitor||events.milestones.length||events.crossedSeasons){lastDecisionKey='';renderDecision();renderJournal();renderStats();}
+  if(events.visitor||events.milestones.length||events.crossedSeasons||events.newDay||events.visualChanges.length){lastDecisionKey='';renderDecision();renderJournal();renderStats();renderBuilding();}
  }
  const daylight=getDaylight(world);lighting(daylight);village.updateStory(world);village.animate(elapsed,daylight);updatePeople(people,world,elapsed,selected);
  controls.update();renderer.render(scene,camera);
- if(now-lastTimeShown>260){lastTimeShown=now;renderClock();renderProgress();if(selected!==null)renderResident();}
+ if(now-lastTimeShown>260){lastTimeShown=now;renderClock();renderProgress();if(selected!==null)renderResident();if(selectedBuilding!==null)renderBuilding();}
  if(world.journal.at(-1)?.id!==lastChronicleId){lastChronicleId=world.journal.at(-1)?.id||0;renderJournal();}
  if(now-lastSave>5000){lastSave=now;persist();}
  requestAnimationFrame(tick);
@@ -229,7 +276,7 @@ let hiddenSince:number|null=null;
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden){hiddenSince=Date.now();persist();}
  else if(hiddenSince!==null){const away=Math.min(4*1440/3,Math.max(0,(Date.now()-hiddenSince)/1000));hiddenSince=null;
-  advanceWorld(world,away);lastDecisionKey='';renderDecision();renderStats();renderJournal();village.updateStory(world);last=performance.now();
+  advanceWorld(world,away);lastDecisionKey='';renderDecision();renderStats();renderJournal();renderBuilding();village.updateStory(world);last=performance.now();
  }
 });
 window.addEventListener('pagehide',persist);
@@ -243,7 +290,8 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
  choose:(choice:Decision)=>{const ok=chooseFate(world,choice);lastDecisionKey='';renderDecision();renderJournal();return ok;},
  advance:(seconds:number)=>{const result=advanceWorld(world,seconds);lastDecisionKey='';renderDecision();renderStats();renderJournal();village.updateStory(world);return result;},
  reset:()=>{world=createWorld();lastDecisionKey='';renderDecision();renderJournal();renderStats();village.updateStory(world);return true;},
- flowSeason:()=>{const result=advanceToNextSeason(world);refreshWorld();return result;},
+ flowSeason:()=>{const result=advanceToNextSeason(world);lastDecisionKey='';renderDecision();renderJournal();village.updateStory(world);return result;},
+ chooseOpportunity:(id:string,option:string)=>{const result=chooseOpportunity(world,id,option);lastDecisionKey='';renderDecision();village.updateStory(world);return result;},
  getRendererInfo:()=>({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles})
 };
 requestAnimationFrame(tick);
