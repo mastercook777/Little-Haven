@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {conditionOf,type BuildingState} from '../simulation/buildings.ts';
 import {plotFor} from '../simulation/plots.ts';
+import {batchStaticSubtree} from './batchStatic';
 
 /**
  * A small authored building-kit overlay. The actual base houses remain in village.ts,
@@ -122,6 +123,7 @@ export function makeBuildingRenderer(parent:THREE.Object3D):BuildingRenderer{
  const inn=houseKit(root,'inn-001',3.34,2.52,1.62);
  const home=houseKit(root,'home-001',2.58,1.54,.94);
  const bench=benchKit(root);
+ batchStaticSubtree(root,{disposeOriginals:false});
  let last='';
  return {root,targets:[bench.g],update(buildings){
   const signature=buildings.map(b=>[b.id,b.phase,Math.floor(b.conditionScore/5),Math.floor(b.workProgress*10),b.props.join('|')].join(':')).join(';');

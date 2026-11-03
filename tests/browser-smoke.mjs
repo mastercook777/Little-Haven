@@ -101,6 +101,39 @@ try{
  const fogDiff=pixelDifference(weatherImages.clear.pixels,weatherImages.fog.pixels);
  if(wetDiff<7.0||fogDiff<3.5)throw Error('Weather not visible enough (rain='+wetDiff+', fog='+fogDiff+')');
  results.push({weatherPixelDifferences:{rain:wetDiff,fog:fogDiff}});
+
+ // Sprint4 H1/H2: inspect actual animated vertices, not a rain-angle screenshot.
+ const river=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRiverProbe());
+ if(river.surfaceName!=='river-water'||river.surfaceY<=.26||
+  river.samples.length<5||river.samples.filter(s=>s.surfaceHit).length<5)
+  throw Error('River surface geometry/projection invalid: '+JSON.stringify(river));
+ await page.evaluate(()=>{
+  const d=window.__HAVEN_DEBUG__;d.reset();
+  for(let i=0;i<12&&d.getVisualState().weather!=='rain';i++)d.advance(480);
+ });
+ if((await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState().weather))!=='rain')
+  throw Error('Cannot find rain day to test downward motion');
+ await page.waitForTimeout(180);
+ // Browser screenshots can stall software WebGL for >1.5s, enough for full
+ // rain-wrap cycles. Sample three short rAF intervals BEFORE taking captures.
+ const [rain0,rain1,rain2]=await page.evaluate(async()=>{
+  const frames=[];
+  for(let i=0;i<3;i++){
+   for(let step=0;step<3;step++)await new Promise(resolve=>requestAnimationFrame(resolve));
+   frames.push(window.__HAVEN_DEBUG__.getRainSamples());
+  }
+  return frames;
+ });
+ await page.screenshot({path:out+'/rain-motion-0.png'});
+ await page.waitForTimeout(120);
+ await page.screenshot({path:out+'/rain-motion-1.png'});
+ await page.waitForTimeout(120);
+ await page.screenshot({path:out+'/rain-motion-2.png'});
+ const down=(a,b)=>a.filter((p,i)=>b[i].headY<p.headY-.025).length;
+ const falling=[down(rain0,rain1),down(rain1,rain2)];
+ if(falling.some(n=>n<8)||[...rain0,...rain1,...rain2].some(d=>d.headY<=d.tailY))
+  throw Error('Rain reverses or line endpoints flip: '+JSON.stringify({falling,rain0,rain1}));
+ results.push({river,fallingRainFrames:falling});
  // Evaluate visible occupational separation at two hours of the same day.
  await page.evaluate(()=>{
   const d=window.__HAVEN_DEBUG__;d.reset();
@@ -114,6 +147,14 @@ try{
   return positions.filter(p=>p.id<=8&&p.visible).map(p=>({id:p.id,activity:p.activityId,x:+p.x.toFixed(1),z:+p.z.toFixed(1)}));
  };
  const morning=await crowdAt('morning');
+ const poseA=await page.evaluate(()=>window.__HAVEN_DEBUG__.getCharacterPose(8));
+ await page.waitForTimeout(720);
+ const poseB=await page.evaluate(()=>window.__HAVEN_DEBUG__.getCharacterPose(8));
+ if(!poseA||!poseB||Math.abs(poseA.rightArmX-poseB.rightArmX)<.04)
+  throw Error('Practice motion not moving through phases: '+JSON.stringify({poseA,poseB}));
+ await page.screenshot({path:out+'/sword-practice.png'});
+ results.push({swordPoseDelta:Math.abs(poseA.rightArmX-poseB.rightArmX)});
+
  await page.evaluate(()=>window.__HAVEN_DEBUG__.advance((14-10)*60/3));
  const afternoon=await crowdAt('afternoon');
  results.push({residentRoutes:{morning,afternoon}});
@@ -154,6 +195,13 @@ try{
  const finalRender=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRendererInfo());
  if(finalRender.calls>760)throw Error('Static batch failed to cut draw calls: '+finalRender.calls);
  results.push({guestChoice:'stay',guestProp:true,repairChoice:'drainage',repairProp:true,render:finalRender});
+ await page.mouse.move(720,455);await page.mouse.down();
+ await page.mouse.move(900,479,{steps:12});await page.mouse.up();
+ await page.waitForTimeout(430);
+ await page.screenshot({path:out+'/river-orbit.png'});
+ const rotated=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRiverProbe());
+ if(rotated.samples.filter(s=>s.surfaceHit).length<5)throw Error('Creek geometry hidden after camera rotation');
+ results.push({rotatedRiver:rotated.samples.map(p=>({x:p.x,y:p.y}))});
  await context.close();
  const mobile=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true});
  const mpage=await mobile.newPage();mpage.on('pageerror',err=>errors.push('mobile: '+err.message));

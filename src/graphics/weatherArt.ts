@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type {Weather} from '../simulation/weather.ts';
+import {fallingRainY,rainSegmentY} from './weatherMotion.ts';
 
 /** Rain is a physical, camera-readable curtain with roof runoff and expanding splashes.
  * The baseline Points rain was subpixel at the orthographic camera distance.
@@ -7,7 +8,7 @@ import type {Weather} from '../simulation/weather.ts';
  */
 export interface WeatherArt{
  root:THREE.Group;setWeather(weather:Weather):void;animate(t:number):void;
- mode():Weather;streakCount:number;
+ mode():Weather;streakCount:number;sampleDrops(count:number):{headY:number;tailY:number}[];
 }
 const rnd=(n:number)=>{let x=(n+31)>>>0;x=Math.imul(x^(x>>>16),0x85ebca6b);x=Math.imul(x^(x>>>13),0xc2b2ae35);return ((x^(x>>>16))>>>0)/4294967296;};
 export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMotion=false):WeatherArt{
@@ -24,8 +25,9 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
  }
  function setStreak(i:number,y:number){
   const a=i*6,x=bases[3*i],z=bases[3*i+2];
-  vertices[a]=x;vertices[a+1]=y;vertices[a+2]=z;
-  vertices[a+3]=x-.055;vertices[a+4]=y-.58;vertices[a+5]=z+.025;
+  const [head,tail]=rainSegmentY(y);
+  vertices[a]=x;vertices[a+1]=head;vertices[a+2]=z;
+  vertices[a+3]=x-.055;vertices[a+4]=tail;vertices[a+5]=z+.025;
  }
  for(let i=0;i<count;i++)setStreak(i,bases[3*i+1]);
  geometry.setAttribute('position',new THREE.BufferAttribute(vertices,3).setUsage(THREE.DynamicDrawUsage));
@@ -76,7 +78,7 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
    if(quantized!==lastSecond){
     lastSecond=quantized;
     for(let i=0;i<count;i++){
-     const y=.30+((bases[3*i+1]+t*(6.4+rnd(i)*2))%10.6);
+     const y=fallingRainY(bases[3*i+1],t,6.4+rnd(i)*2);
      setStreak(i,y);
     }
     (geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate=true;
@@ -92,7 +94,11 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
    fogGroup.position.x=Math.sin(t*.18)*.18;
   }
  }
- return {root,streakCount:count,mode:()=>current,setWeather(weather){
+ return {root,streakCount:count,mode:()=>current,sampleDrops:(requested:number)=>{
+  const samples:{headY:number;tailY:number}[]=[];
+  for(let i=0;i<Math.min(count,Math.max(0,requested));i++)samples.push({headY:vertices[i*6+1],tailY:vertices[i*6+4]});
+  return samples;
+ },setWeather(weather){
   current=weather;rainGroup.visible=weather==='rain';fogGroup.visible=weather==='fog';
  },animate};
 }

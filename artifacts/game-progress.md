@@ -120,3 +120,37 @@
 - 住宅通用 Kit 与整村道路/地块大调整尚未全部完成，当前精修重点为酒肆周边、职业工位和季相。
 - 路径仍是确定性的手工道路节点，而不是带精细碰撞和对向避让的 A* 寻路。
 - 手机需要更多中低端设备真实帧率数据，Chromium 软件渲染不等于真机 GPU 性能。
+---
+
+# Sprint 4 · 修雨、复河与建筑/人物动作精修（2026-11-03）
+
+## 执行顺序与用户要求
+- 首先编写 docs/V04_MODEL_MOTION_RIVER.md（先于实现）；之后实施 H1/H2 和三项美术模型/动作的可玩升级。
+- 不改 world.minutes、玩家两条分支、机缘、建筑 ID、localStorage 槽位与先前已通过的自动化验收。
+
+## 发现的确定性问题
+- weatherArt.ts 的雨条位置曾为 baseY + t*speed，导致纵向运动为 +Y，确实是在向上升。
+- village.ts 旧河是 1.81 宽、地表附近的半透明窄 ribbon，河岸没有断面；旧线部分节点 x=8.5/z=±11.8 超出椭圆岛边缘，前景存在被裁剪/不明显的问题。
+
+## 实施模块
+- weatherMotion.ts：downward -Y 位移，落到底部后回卷；weatherArt.ts 调用统一位移计算并暴露世界 Y 取样供浏览器连续帧验证。
+- riverArt.ts：重新取样中心曲线并调整南北端入/出岛位置，同步河床/坡岸/浅滩/石块/沿水纹（季相配色），桥下贯通；岛前缘增加落崖瀑流与泡沫。
+- architectureKit.ts：复用屋脊、檐托、框窗/格栅、双扇木门、石阶、前廊，主酒馆和四类民居分别装配。
+- characterKit.ts：职业背包/斗笠/衣袍分层和饰物，保持原角色职业和画面规模。
+- characterMotion.ts：行走步态、双手劳动、搬运、采摘俯仰、织布、钓鱼收竿和分段练剑；关节动画以连续秒插值。
+- people.ts：保留人物点击 ID，重建可分别旋转上身/头部/膝关节的摆件式关节模型；动作从模拟 activityId 派生，暂停时不自行推进。
+- batchStatic.ts/people.ts/buildingRenderer.ts：给动态关节内部的静态几何合批，保持已被动画代码引用的 robe Mesh 独立，避免销毁共享 BufferGeometry。
+
+## Skills 应用
+- 按 .agents/skills/threejs-game-director、threejs-aaa-graphics-builder/references/authoring-recipes.md 和 technical-art.md 的剪影/用途优先原则构建。
+- 应用 threejs-debug-profiler、threejs-qa-release/references/visual-test-harness.md 实际 WebGL 动态画面与调用计数检查。
+- 读取 threejs-3d-generator 技能；本次保留原有程序化低多边形风格，不调用付费模型生成服务，也不引入不可复用的模型 URL。
+
+## 首轮实测与已知不足
+- 27 项纯逻辑测试已通过，类型构建通过；Playwright 验证河道点位在投影内/几何有交集、雨粒子连续三组中 10/12 与 10/12 在下降、阿青练剑手臂姿态差值约 0.36 弧度。
+- 早期无优化模型约 784 draw calls，人物按关节组合批后春季约 626、夏季 679、秋季 696、冬季 667；细节变多带来的预算超额仍需持续改善（Graphics Skill 桌面建议 ≤300、手机 ≤150）。
+- 视觉 H2 以小河水面和浅滩坡岸重绘为主，尚未使用布尔算法在整块地形中物理挖空；崖壁边缘用落水面表达。
+- 当前人物是程序化铰链关节、非外部皮肤骨骼动画，低端安卓真机未实测；高级 NPC 双向避让/完整村庄重新排布仍不在本轮。
+
+## 后续验收
+- 以 Sprint4 最新一次 GitHub Actions 的桌面+390px 手机、四季/雨雾、河流旋转和动作连续帧 artifact 为准；任何失败必须修复，不以前序成功取代最新结果。

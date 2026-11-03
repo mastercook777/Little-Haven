@@ -314,6 +314,23 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
   dpr:renderer.getPixelRatio(),batch:village.batchStats
  }),
  getVisualState:()=>({season:getCalendar(world).season,weather:getWeather(world),minute:world.minutes,
-  npcs:VILLAGERS.map(v=>({id:v.id,...residentMotion(v,world)}))})
+  npcs:VILLAGERS.map(v=>({id:v.id,...residentMotion(v,world)}))}),
+ getRainSamples:()=>village.rainSample(12),
+ getRiverProbe:()=>{
+  const samples=[.10,.24,.38,.55,.72,.88].map(u=>{
+   const point=village.riverAt(u).clone();point.y=village.riverSurfaceY;
+   const projected=point.clone().project(camera);
+   const x=(projected.x+1)*window.innerWidth/2,y=(1-projected.y)*window.innerHeight/2;
+   const ray=new THREE.Raycaster();
+   ray.setFromCamera(new THREE.Vector2(projected.x,projected.y),camera);
+   const visible=ray.intersectObject(village.riverSurface,false).length>0;
+   return {u,x,y,world:[point.x,point.y,point.z],surfaceHit:visible};
+  });
+  return {surfaceY:village.riverSurfaceY,surfaceName:village.riverSurface.name,samples};
+ },
+ getCharacterPose:(id:number)=>{
+  const person=people.find(p=>p.villager.id===id);
+  return person?{...person.pose,groupPosition:person.group.position.toArray(),upperPosition:person.upper.position.toArray()}:null;
+ }
 };
 requestAnimationFrame(tick);
