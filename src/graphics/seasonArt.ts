@@ -27,14 +27,14 @@ function stem(parent:THREE.Object3D,x:number,z:number,height:number,width:number
  return mesh;
 }
 function group(parent:THREE.Object3D){const g=new THREE.Group();parent.add(g);return g;}
-const rnd=(seed:number)=>{let x=Math.imul(seed+17,1013904223)>>>0;x^=x>>>15;x=Math.imul(x,2246822519);return ((x^(x>>>13))>>>0)/4294967296;};
+const rnd=(seed:number)=>{let x=(seed+17)>>>0;x=Math.imul(x^(x>>>16),0x85ebca6b);x=Math.imul(x^(x>>>13),0xc2b2ae35);return ((x^(x>>>16))>>>0)/4294967296;};
 function petals(parent:THREE.Object3D,count:number,geometry:THREE.BufferGeometry,m:THREE.Material,
- select:(i:number)=>{x:number;y:number;z:number;scale:number;rotation:number}){
+ select:(i:number)=>{x:number;y:number;z:number;scale:number;rotation:number},upright=false){
  const inst=new THREE.InstancedMesh(geometry,m,count),dummy=new THREE.Object3D();
  inst.castShadow=false;inst.receiveShadow=false;inst.frustumCulled=false;
  for(let i=0;i<count;i++){
   const p=select(i);dummy.position.set(p.x,p.y,p.z);
-  dummy.rotation.set(-Math.PI/2,0,p.rotation);dummy.scale.setScalar(p.scale);dummy.updateMatrix();
+  dummy.rotation.set(upright?0:-Math.PI/2,p.rotation*.32,upright?p.rotation:0);dummy.scale.setScalar(p.scale);dummy.updateMatrix();
   inst.setMatrixAt(i,dummy.matrix);
  }
  inst.instanceMatrix.needsUpdate=true;parent.add(inst);return inst;
@@ -116,8 +116,8 @@ export function createSeasonalArt(parent:THREE.Object3D):SeasonalArt{
  summerShade(summer,-5.85,5.0);
  const lushGeo=new THREE.ConeGeometry(.16,.65,5);
  petals(summer,135,lushGeo,vivid,i=>{
-  const p=onGround(i+431,30,20,.32);return {...p,scale:.7+rnd(i+71)*.55,rotation:rnd(i+9)*6.28};
- });
+  const p=onGround(i+431,30,20,.64);return {...p,scale:.7+rnd(i+71)*.55,rotation:rnd(i+9)*6.28};
+ },true);
  for(let i=0;i<4;i++){
   box(summer,2.3,.20,.46,-10.7,.39,7.1+i*.44,jade);
   for(let k=0;k<7;k++)sphere(summer,.17,-11.8+k*.37,.67,7.1+i*.44,summerLight,1,.75,1.3);
