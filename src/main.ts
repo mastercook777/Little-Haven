@@ -11,7 +11,7 @@ import './styles.css';
 const $=<T extends HTMLElement=HTMLElement>(id:string):T=>{const el=document.getElementById(id);if(!el)throw Error(`Missing UI element #${id}`);return el as T;};
 const canvas=$<HTMLCanvasElement>('world');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+renderer.setPixelRatio(Math.min(window.innerWidth<760?1.5:2,window.devicePixelRatio||1));
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.23;
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2('#d5dfd5',.010);
@@ -21,7 +21,7 @@ const controls=new OrbitControls(camera,canvas);controls.target.set(0,0,0);contr
 controls.minPolarAngle=.42;controls.maxPolarAngle=1.28;controls.minZoom=.72;controls.maxZoom=2.22;controls.rotateSpeed=.64;controls.zoomSpeed=.86;
 controls.mouseButtons.LEFT=THREE.MOUSE.ROTATE;controls.touches.ONE=THREE.TOUCH.ROTATE;controls.touches.TWO=THREE.TOUCH.DOLLY_ROTATE;
 const hemi=new THREE.HemisphereLight('#e5eff0','#a8a68a',2.4);scene.add(hemi);
-const sun=new THREE.DirectionalLight('#fff0d9',3.35);sun.position.set(-26,39,20);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+const sun=new THREE.DirectionalLight('#fff0d9',3.35);sun.position.set(-26,39,20);sun.castShadow=true;sun.shadow.mapSize.set(window.innerWidth<760?1024:2048,window.innerWidth<760?1024:2048);
 sun.shadow.camera.left=-30;sun.shadow.camera.right=30;sun.shadow.camera.top=26;sun.shadow.camera.bottom=-26;sun.shadow.camera.near=.1;sun.shadow.camera.far=140;sun.shadow.bias=-.00016;scene.add(sun,sun.target);
 const fill=new THREE.DirectionalLight('#b4c5cc',.60);fill.position.set(15,10,-17);scene.add(fill);
 const village=buildVillage(scene);
@@ -250,14 +250,26 @@ function lighting(daylight:number){
  const weather=getWeather(world),season=getCalendar(world).season,key=season+'/'+weather;
  if(Math.abs(daylight-lastDaylight)<.01&&lastLightingKey===key)return;
  lastDaylight=daylight;lastLightingKey=key;
- const cloud=weather==='rain'?.72:weather==='fog'?.82:1;
- hemi.intensity=(.95+daylight*1.45)*cloud;
- sun.intensity=(.22+daylight*3.10)*cloud;fill.intensity=.26+daylight*.38;
- sun.color.set(season==='winter'?'#d5e2ef':daylight<.40?'#edb890':'#fff1d5');renderer.toneMappingExposure=(.92+daylight*.39)*(weather==='fog'?.94:1);
- const night=new THREE.Color('#263449'),morning=new THREE.Color('#d9b79a'),day=new THREE.Color(season==='winter'?'#d6e4e8':season==='autumn'?'#e8dec9':'#d8e5d7');
+ const seasonal={
+  spring:{key:'#fff1df',sky:'#d7e9dc',fill:'#e5f0e0',sunset:'#edc3a7'},
+  summer:{key:'#ffedcb',sky:'#b8ddce',fill:'#d1e8d0',sunset:'#edbb87'},
+  autumn:{key:'#ffd3a0',sky:'#ead8b9',fill:'#eaddbf',sunset:'#db9e73'},
+  winter:{key:'#dbeafa',sky:'#d6e7ea',fill:'#dceaf3',sunset:'#dfb4a5'}
+ }[season];
+ const cloudy=weather==='rain',foggy=weather==='fog';
+ const ambient=cloudy?.71:foggy?.86:1;
+ hemi.color.set(seasonal.fill);hemi.intensity=(.78+daylight*1.13)*ambient;
+ sun.intensity=(.20+daylight*2.68)*(cloudy?.33:foggy?.69:1);
+ fill.intensity=.20+daylight*.31;
+ sun.color.set(daylight<.40?seasonal.sunset:seasonal.key);
+ renderer.toneMappingExposure=(.94+daylight*.28)*(cloudy?.83:foggy?.96:1);
+ const night=new THREE.Color('#263449'),morning=new THREE.Color(seasonal.sunset),day=new THREE.Color(seasonal.sky);
  const sky=daylight<.35?night.clone().lerp(morning,daylight/.35):morning.clone().lerp(day,(daylight-.35)/.65);
- document.documentElement.style.setProperty('--sky-top',`#${sky.getHexString()}`);
- document.documentElement.style.setProperty('--sky-bottom',`#${sky.clone().lerp(new THREE.Color(daylight<.4?'#8f8d97':'#f3e8d4'),.6).getHexString()}`);
+ if(cloudy)sky.lerp(new THREE.Color(daylight<.36?'#586778':'#788b94'),.64);
+ else if(foggy)sky.lerp(new THREE.Color('#c5d4ce'),.32);
+ document.documentElement.style.setProperty('--sky-top','#'+sky.getHexString());
+ document.documentElement.style.setProperty('--sky-bottom','#'+sky.clone().lerp(
+  new THREE.Color(cloudy?'#d5d9d2':daylight<.4?'#8f8d97':'#f3e8d4'),.52).getHexString());
  scene.fog!.color.copy(sky);
 }
 function tick(now:number){
@@ -296,6 +308,12 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
  reset:()=>{world=createWorld();lastDecisionKey='';renderDecision();renderJournal();renderStats();village.updateStory(world);return true;},
  flowSeason:()=>{const result=advanceToNextSeason(world);lastDecisionKey='';renderDecision();renderJournal();village.updateStory(world);return result;},
  chooseOpportunity:(id:string,option:string)=>{const result=chooseOpportunity(world,id,option);lastDecisionKey='';renderDecision();village.updateStory(world);return result;},
- getRendererInfo:()=>({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles})
+ getRendererInfo:()=>({
+  calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
+  geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,
+  dpr:renderer.getPixelRatio(),batch:village.batchStats
+ }),
+ getVisualState:()=>({season:getCalendar(world).season,weather:getWeather(world),minute:world.minutes,
+  npcs:VILLAGERS.map(v=>({id:v.id,...residentMotion(v,world)}))})
 };
 requestAnimationFrame(tick);
