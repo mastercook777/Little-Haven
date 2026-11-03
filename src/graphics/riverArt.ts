@@ -98,10 +98,50 @@ function stones(parent:THREE.Group){
  }
  reeds.instanceMatrix.needsUpdate=true;parent.add(reeds);
 }
+
+/** A visible exit from the raised island: falling water replaces the former
+ * abrupt turquoise rectangle over the edge. Its crest shares the creek spline.
+ */
+function waterfall(parent:THREE.Group){
+ const u=.987,half=1.35,cols=12,rows=7;
+ const t=curve.getTangent(u).normalize(),positions:number[]=[],indices:number[]=[];
+ for(let j=0;j<=rows;j++){
+  const v=j/rows,y=CENTER_Y-(v*1.74),outward=v*.26;
+  for(let i=0;i<=cols;i++){
+   const off=-half+(2*half*i/cols),base=riverSample(u,off,y);
+   const ripple=Math.sin(i*1.71+j*.8)*.045*v;
+   positions.push(base.x+t.x*outward+ripple,base.y,base.z+t.z*outward+ripple);
+   if(i<cols&&j<rows){
+    const a=j*(cols+1)+i,b=a+(cols+1);
+    indices.push(a,a+1,b,b,a+1,b+1);
+   }
+  }
+ }
+ const geo=new THREE.BufferGeometry();
+ geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.setIndex(indices);geo.computeVertexNormals();
+ const fallsMat=new THREE.MeshStandardMaterial({
+  color:'#7ebcc1',roughness:.43,transparent:true,opacity:.88,depthWrite:false,side:THREE.DoubleSide
+ });
+ const falls=new THREE.Mesh(geo,fallsMat);falls.name='cliff-waterfall';
+ falls.castShadow=false;falls.receiveShadow=false;falls.frustumCulled=false;parent.add(falls);
+ const foam=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),
+  new THREE.MeshBasicMaterial({color:'#e3f1e8',transparent:true,opacity:.74,depthWrite:false}),16);
+ const dummy=new THREE.Object3D();
+ for(let i=0;i<16;i++){
+  const o=-half+i/15*half*2,p=riverSample(u,o,.36);
+  dummy.position.copy(p);dummy.position.add(new THREE.Vector3(t.x*.15,0,t.z*.15));
+  dummy.scale.set(.06+rand(i*13)*.12,.028+rand(i*7)*.028,.09+rand(i*9)*.09);
+  dummy.rotation.y=rand(i)*Math.PI;dummy.updateMatrix();foam.setMatrixAt(i,dummy.matrix);
+ }
+ foam.instanceMatrix.needsUpdate=true;foam.name='river-cliff-foam';parent.add(foam);
+ return fallsMat;
+}
+
 export function buildRiverArt(parent:THREE.Object3D):RiverArt{
  const root=new THREE.Group();root.name='living-creek';parent.add(root);
  const surface=addWater(root);
  stones(root);
+ const waterfallMat=waterfall(root);
  // Thin mobile-friendly sunlight ripples moving along the actual current.
  const flowGeo=new THREE.PlaneGeometry(1,1),count=40;
  const flow=new THREE.InstancedMesh(flowGeo,flowMat,count);flow.name='creek-flow-highlights';
@@ -123,8 +163,9 @@ export function buildRiverArt(parent:THREE.Object3D):RiverArt{
   flow.instanceMatrix.needsUpdate=true;
  };
  animate(0);
- return {root,surface,waterMeshCount:8,setSeason:(s)=>{
+ return {root,surface,waterMeshCount:9,setSeason:(s)=>{
   waterMat.color.set(palette[s]);
+  waterfallMat.color.copy(waterMat.color).lerp(new THREE.Color('#d2e9db'),.24);
   flowMat.opacity=s==='winter'?.24:s==='summer'?.40:.31;
  },animate,pointAt:(u)=>curve.getPoint(safeU(u)),getSurfaceHeight:()=>CENTER_Y};
 }
