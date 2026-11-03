@@ -13,7 +13,16 @@ export interface ArchitecturePair{
 }
 export interface VillageCoreGrowth{
  update(growth:VillageGrowthState):void;signature():string;
- stage():number;centerBounds():THREE.Box3;
+ stage():number;centerBounds():THREE.Box3;deferredExpansions():string[];
+}
+/** Drawn volume (not just wall dimensions) is the safety envelope. */
+export function modelOverlapXZ(a:THREE.Object3D,b:THREE.Object3D,minArea=.10):boolean{
+ a.updateWorldMatrix(true,true);b.updateWorldMatrix(true,true);
+ const x=new THREE.Box3().setFromObject(a),y=new THREE.Box3().setFromObject(b);
+ if(x.isEmpty()||y.isEmpty())return false;
+ const dx=Math.max(0,Math.min(x.max.x,y.max.x)-Math.max(x.min.x,y.min.x));
+ const dz=Math.max(0,Math.min(x.max.z,y.max.z)-Math.max(x.min.z,y.min.z));
+ return dx*dz>minArea&&Math.min(x.max.y,y.max.y)-Math.max(x.min.y,y.min.y)>.22;
 }
 export function maturityTier(g:VillageGrowthState):number{
  if(!g.choice)return 0;
@@ -96,17 +105,38 @@ export function makeVillageCoreGrowth(parent:THREE.Object3D,
    const place=court(root,dir,grown);place.visible=false;courts.set(key,place);
   }
  const bounds=new THREE.Box3();
- let signature='';let tier=0;
+ let signature='';let tier=0;let deferred:string[]=[];
  function update(g:VillageGrowthState){
   const next=maturityTier(g);
   const key=(g.choice||'none')+':'+next+':'+g.phase;
   if(signature===key)return;
   signature=key;tier=next;
   // Complete form replacement: no base box under a new decorative roof.
-  tavern.original.visible=tier<3;tavern.renovated.visible=tier>=3;
+  // Start with every pre-growth shape. An upgrade can replace its original
+  // only when its complete rendered roof/porch volume does not introduce a
+  // NEW collision with its neighbors. Existing accidental proximity remains
+  // visible for art rework; growth is not permitted to make it worse.
+  deferred=[];
+  const slots=[tavern,...homes],active=slots.map(slot=>slot.original);
+  function attempt(slotIndex:number){
+   const slot=slots[slotIndex],original=slot.original,expanded=slot.renovated;
+   for(let j=0;j<active.length;j++){
+    if(j===slotIndex)continue;
+    const already=modelOverlapXZ(original,active[j]);
+    const proposed=modelOverlapXZ(expanded,active[j]);
+    if(proposed&&!already){
+     deferred.push(slot.name);return;
+    }
+   }
+   active[slotIndex]=expanded;
+  }
+  if(tier>=3)attempt(0);
   homes.forEach((slot,i)=>{
-   const renovated=tier>=[2,3,4,4,3][i]!;
-   slot.original.visible=!renovated;slot.renovated.visible=renovated;
+   if(tier>=[2,3,4,4,3][i]!)attempt(i+1);
+  });
+  slots.forEach((slot,i)=>{
+   slot.original.visible=active[i]===slot.original;
+   slot.renovated.visible=active[i]===slot.renovated;
   });
   courts.forEach((place,name)=>{
    const wants=g.choice!==null&&name.startsWith(g.choice);
@@ -120,7 +150,7 @@ export function makeVillageCoreGrowth(parent:THREE.Object3D,
   automatic:false,workDays:0,lastDayProcessed:0,wood:0,food:0,trade:0,prosperity:0,completedStages:[],
   plannerSeed:0,settlementLots:[],lastPlotAttemptDay:0,lastMigrationDay:0});
  return {
-  update,signature:()=>signature,stage:()=>tier,
+  update,signature:()=>signature,stage:()=>tier,deferredExpansions:()=>[...deferred],
   centerBounds:()=>{
    bounds.makeEmpty();
    const active=tavern.original.visible?tavern.original:tavern.renovated;
