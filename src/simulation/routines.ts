@@ -52,7 +52,8 @@ export function dailyResidentMotion(v:Villager,minutes:number,weather:Weather):L
  const local=localRain?work:plan.local;
  const walking=(route:Point[],start:number,end:number,label:string):LifeMotion=>{
   const at=alongLane(route,(hour-start)/(end-start));
-  return {...at,walking:route.length>1,activity:label,activityId:'walk',interactionTargetId:null};
+  return {...at,walking:route.length>1&&Math.hypot(route.at(-1)![0]-route[0][0],route.at(-1)![1]-route[0][1])>.10,
+   activity:label,activityId:'walk',interactionTargetId:null};
  };
  const still=(point:Point,id:ActivityId,label:string,target:string|null):LifeMotion=>
   ({x:point[0],z:point[1],heading:((v.id*7)%9)*.42,walking:false,activity:label,activityId:id,interactionTargetId:target});
