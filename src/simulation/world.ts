@@ -150,7 +150,9 @@ export function advanceWorld(s:WorldState,realSeconds:number):AdvanceResult{
  return out;
 }
 export function advanceToNextSeason(s:WorldState):AdvanceResult{
- return advanceWorld(s,(nextSeasonBoundary(s.minutes)-s.minutes)/MINUTES_PER_REAL_SECOND);
+ // Keep the local time of day so the player can actually see a seasonal vista.
+ const target=nextSeasonBoundary(s.minutes)+(s.minutes%DAY_MINUTES);
+ return advanceWorld(s,(target-s.minutes)/MINUTES_PER_REAL_SECOND);
 }
 export function chapterProgress(s:WorldState):number{
  if(s.storyStage==='legacy')return 1;
