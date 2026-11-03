@@ -77,15 +77,19 @@ function renderUI(){
  $('pioneerWood').textContent=amount(w.wood);$('pioneerFood').textContent=amount(w.food);
  $('pioneerWater').textContent=amount(w.water);
  $('pioneerStatus').textContent=pioneerSummary(world);
+ $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
+  world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
  const intent=world.intent;
- const cause=world.buildings.length?
-  '已由三名乡邻完成施工，遮蔽真实入户，木料从林地扣除。':
+ const cause=world.buildings.length&&!intent?
+  '有 '+world.buildings.filter(b=>b.kind==='cottage').length+
+  ' 座山居、'+world.buildings.filter(b=>b.kind==='garden').length+
+  ' 片菜圃；房屋随着岁月磨损，乡邻也会自行修葺。':
   intent?.phase==='foundation'||intent?.phase==='frame'?
   '搭棚工时 '+amount(intent.workDone)+' / '+amount(intent.workRequired)+'；'+
    '已实际消耗木料 '+amount(intent.woodCommitted)+' 份。':
   intent?.pauseReason??'营火旁尚无住屋，乡邻正筹划安全的避雨处。';
  $('pioneerReason').textContent=cause;
- $('founderTasks').innerHTML=world.founders.map(f=>
+ $('founderTasks').innerHTML=world.founders.slice(0,6).map(f=>
   '<div class="founder-task"><b>'+safe(f.name)+'</b><span>'+safe(labels[f.activity])+'</span></div>').join('');
  for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]')))
   btn.classList.toggle('active',btn.dataset.policy===world.policy);
@@ -200,9 +204,10 @@ function lighting(){
 function tick(now:number){
  const dt=Math.max(0,Math.min(.09,(now-last)/1000));last=now;
  if(!paused){
-  const previous=world.buildings.length,events=world.journal.length;
+  const previous=world.buildings.length,previousPopulation=world.founders.length,events=world.journal.length;
   advancePioneerWorld(world,dt*speed);
-  if(world.buildings.length>previous)toast('新屋已成！三位乡邻有了真正的避雨处。');
+  if(world.buildings.length>previous)toast('村民亲手完成了新设施，山谷里又添了一处生活痕迹。');
+  else if(world.founders.length>previousPopulation)toast('山谷添了新邻居，住进了真正空出的屋舍。');
   else if(world.journal.length>events&&world.intent?.phase==='frame')
    toast('木梁已经搭起，工地出现了新的变化。');
  }
