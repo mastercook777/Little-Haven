@@ -4,8 +4,17 @@ import {getCalendar,getWeather,type ActivityId,type Villager,type WorldState,res
 const fabric=new Map<string,THREE.MeshStandardMaterial>();
 const mat=(color:string)=>{let m=fabric.get(color);if(!m){m=new THREE.MeshStandardMaterial({color,roughness:1});fabric.set(color,m);}return m;};
 const skinColors=['#e7be9f','#d4a484','#eac6a6','#cfa18a'];
+const modelGeometries=new Map<string,THREE.BufferGeometry>();
+const shadowGeometry=new THREE.CircleGeometry(.35,14);
+const shadowMaterial=new THREE.MeshBasicMaterial({color:'#304637',transparent:true,opacity:.18,depthWrite:false});
+
 function piece(parent:THREE.Object3D,geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number){
- const o=new THREE.Mesh(geometry,material);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;
+ const params=(geometry as THREE.BufferGeometry&{parameters?:Record<string,unknown>}).parameters;
+ const key=geometry.type+':'+JSON.stringify(params||{});
+ let shared=modelGeometries.get(key);
+ if(!shared){shared=geometry;modelGeometries.set(key,shared);}
+ else if(shared!==geometry)geometry.dispose();
+ const o=new THREE.Mesh(shared,material);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;
 }
 export interface PersonModel {
  villager:Villager;group:THREE.Group;legs:THREE.Group[];arms:THREE.Group[];
@@ -98,7 +107,7 @@ export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]
   piece(winterGear,new THREE.CylinderGeometry(.257,.25,.13,11),mat('#d7c4a5'),0,1.17,0);
   const scarf=piece(winterGear,new THREE.BoxGeometry(.18,.34,.11),mat(v.id%2===0?'#b46b5a':'#9baead'),.20,.97,.20);
   scarf.rotation.z=-.14;winterGear.visible=false;
-  const shadow=new THREE.Mesh(new THREE.CircleGeometry(.35,14),new THREE.MeshBasicMaterial({color:'#304637',transparent:true,opacity:.18,depthWrite:false}));
+  const shadow=new THREE.Mesh(shadowGeometry,shadowMaterial);
   shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;g.add(shadow);
   return {villager:v,group:g,legs,arms,grownGear,winterGear,gear,robe,head,lastT:0,heading:0};
  });
