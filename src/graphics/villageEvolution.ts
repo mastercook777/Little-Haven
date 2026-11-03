@@ -235,7 +235,7 @@ function routeObjects(parent:THREE.Group,direction:VillageDirection){
   stoneBridge(landmarkStage,7.85,-2.38);
   tradeCourt(landmarkStage,10.75,4.85);
   house(landmarkStage,11.4,.10,3.5,3.1,2.55,'merchant');
-  silkTent(landmarkStage,11.65,4.25,M.canvas,.93);
+  // Market courtyard owns its own stalls and awnings.
   house(thrivingStage,12.30,6.3,3.85,2.9,3.30,'guest');
   silkTent(thrivingStage,10.2,4.65,M.cloth,.86);
  }else if(direction==='ferry'){
@@ -245,9 +245,9 @@ function routeObjects(parent:THREE.Group,direction:VillageDirection){
   timberDock(landmarkStage,6.7,-1.55,2.7);
   fishingBoat(landmarkStage,7.0,-5.20,1.0);
   fishingBoat(landmarkStage,7.5,-1.05,.80);
-  fisherYard(landmarkStage,4.65,-3.75);
+  fisherYard(landmarkStage,10.8,-2.55);
   house(landmarkStage,10.4,-6.1,3.40,2.72,2.12,'riverside');
-  silkTent(landmarkStage,11.35,-2.45,M.blue,.96);
+  // The communal riverside drying yard replaces the generic sale tent.
   house(thrivingStage,11.45,-8.2,3.1,2.40,1.92,'riverside');
   fishingBoat(thrivingStage,8.2,-3.85,.76);
   silkTent(thrivingStage,9.8,-1.6,M.cloth,.72);
@@ -255,7 +255,7 @@ function routeObjects(parent:THREE.Group,direction:VillageDirection){
   foundation(foundationStage,-10.7,-7.9,3.8,2.6);
   farmland(constructionStage,-11.0,-7.45,3.25,2.25);
   house(landmarkStage,-5.6,-8.1,3.50,2.96,2.18,'cottage');
-  orchardCourt(landmarkStage,-7.0,-2.85);
+  orchardCourt(landmarkStage,-3.4,8.25);
   farmland(landmarkStage,-10.75,-7.45,3.4,2.20);
   for(const [tx,tz,size] of [[-12.2,-3.15,.77],[-14.0,-1.4,.82],
     [-13.0,-5.25,.9],[-8.3,-8.40,.80]] as const)orchardTree(landmarkStage,tx,tz,size);
