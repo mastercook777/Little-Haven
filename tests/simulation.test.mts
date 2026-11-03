@@ -8,6 +8,8 @@ import {PLOTS,validatePlots} from '../src/simulation/plots.ts';
 import {conditionOf} from '../src/simulation/buildings.ts';
 import {dailyRoutePoints,dailyHash} from '../src/simulation/routines.ts';
 import {proposeVillageParcel,validateVillageParcel,reservedParcels,parcelOverlaps,parcelCorners,type VillageParcel} from '../src/simulation/villagePlanning.ts';
+import {makeSettlementRenderer} from '../src/graphics/plannedSettlement.ts';
+import {modelOverlapXZ} from '../src/graphics/villageCoreGrowth.ts';
 import {fallingRainY,rainSegmentY} from '../src/graphics/weatherMotion.ts';
 import {REST_POSE,sampleCharacterPose,interpolatePose} from '../src/graphics/characterMotion.ts';
 import {buildRiverArt,RIVER_WAYPOINTS} from '../src/graphics/riverArt.ts';
@@ -720,4 +722,39 @@ test('sprint7: fast and incremental multi-year development preserve identical ge
  assert.deepEqual(a.villageGrowth,b.villageGrowth);
  assert.equal(a.population,b.population);
  assert.equal(a.houses,b.houses);
+});
+
+
+test('sprint7: final rendered roof, awning and porch must fit the saved zoning envelope',()=>{
+ const world=createWorld(0);
+ to(world,24*DAY_MINUTES+600);assert.ok(chooseVillageDevelopment(world,'grove'));
+ to(world,235*DAY_MINUTES+600);
+ const lots=world.villageGrowth.settlementLots;
+ assert.ok(lots.length>0,'Expected real houses after population demand');
+ const root=new THREE.Group();
+ const visuals=makeSettlementRenderer(root,[],[]);
+ visuals.update(world.villageGrowth);
+ assert.equal(visuals.stages().length,lots.length);
+ for(const lot of lots){
+  const group=visuals.root.getObjectByName('resident-built-'+lot.id)!;
+  assert.ok(group,'no model for '+lot.id);
+  group.updateWorldMatrix(true,true);
+  const bound=new THREE.Box3().setFromObject(group),size=bound.getSize(new THREE.Vector3());
+  const turned=Math.abs(Math.sin(lot.rotation))>.5;
+  const w=turned?size.z:size.x,d=turned?size.x:size.z;
+  assert.ok(w<=lot.width+lot.clearance*2+.09,'roof eave exceeds reserved width: '+lot.id);
+  assert.ok(d<=lot.depth+lot.clearance*2+.09,'roof porch exceeds reserved depth: '+lot.id);
+ }
+});
+
+test('sprint7: old-house renovation overlap audit distinguishes true colliders from separate roofs',()=>{
+ const root=new THREE.Group();
+ const make=(x:number,z:number)=>{
+  const g=new THREE.Group();g.position.set(x,0,z);root.add(g);
+  const cube=new THREE.Mesh(new THREE.BoxGeometry(2.5,2.1,2.5));
+  cube.position.y=1.2;g.add(cube);return g;
+ };
+ const first=make(-2,1),blocked=make(-.4,1.5),free=make(4.2,-3);
+ assert.ok(modelOverlapXZ(first,blocked));
+ assert.equal(modelOverlapXZ(first,free),false);
 });
