@@ -15,6 +15,9 @@ import {creekDistance,CREEK_WATER_Y} from '../src/graphics/riverArt.ts';
 import {terrainHeightAt,terrainChannelProbe,buildCarvedTerrain} from '../src/graphics/carvedTerrain.ts';
 import {createVillageGrowth,advanceVillageGrowthDay,DEVELOPMENT_OPTIONS} from '../src/simulation/villageGrowth.ts';
 import {makeHeroClips,createHeroAnimator,SWORD_FORM_KEYFRAMES} from '../src/graphics/heroClips.ts';
+import {createMountainHome,createMountainTavern,buildMountainRoof} from '../src/graphics/villageBuildings.ts';
+import {maturityTier,makeVillageCoreGrowth} from '../src/graphics/villageCoreGrowth.ts';
+import {dressCharacter} from '../src/graphics/characterKit.ts';
 
 const to=(s:ReturnType<typeof createWorld>,minute:number)=>advanceWorld(s,(minute-s.minutes)/3);
 const arrived=()=>{const s=createWorld(0);to(s,STORY_VISITOR_AT);return s;};
@@ -549,4 +552,79 @@ test('sprint5: island surface conforms exactly to outer cliff outline with no mi
  }
  const bottom=terrainChannelProbe(8.35,2.2);
  assert.ok(bottom.groundY<bottom.waterY,'river must remain an actual recessed channel');
+});
+
+
+test('sprint6: mountainside roof is one coherent upturned mesh, not duplicate stacked rooftops',()=>{
+ const g=new THREE.Group(),material=new THREE.MeshStandardMaterial({color:'#485961',side:THREE.DoubleSide});
+ buildMountainRoof(g,{width:4.6,depth:3.5,eave:2.7,rise:.96,style:'tile',material});
+ const roofs=g.children.filter(x=>x.name==='one-piece-upturned-roof');
+ assert.equal(roofs.length,1);
+ const roof=roofs[0] as THREE.Mesh;
+ const pos=roof.geometry.getAttribute('position');
+ assert.ok(pos.count>=200,'integrated curved roof should have enough authored silhouette vertices');
+ const bounds=new THREE.Box3().setFromObject(roof);
+ assert.ok(bounds.max.y>3.5&&bounds.min.y>2.6);
+ assert.ok(g.children.filter(x=>x.name==='continuous-eave-fascia').length===2);
+});
+
+test('sprint6: main tavern and homes have distinct authored massing instead of the old additive model kit',()=>{
+ const parent=new THREE.Group(),windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],swings:THREE.Group[]=[];
+ const ctx={windows,emissive,swings,createLantern:(p:THREE.Object3D)=>{
+  const g=new THREE.Group();p.add(g);return g;
+ },createSign:(p:THREE.Object3D)=>{
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(1,1));p.add(g);return g;
+ }};
+ const original=createMountainTavern(parent,ctx,false);
+ const renovated=createMountainTavern(parent,ctx,true);
+ const a=new THREE.Box3().setFromObject(original).getSize(new THREE.Vector3());
+ const b=new THREE.Box3().setFromObject(renovated).getSize(new THREE.Vector3());
+ assert.ok(b.x>a.x+.2&&b.y>a.y+.2,'renovation must change the actual building skyline');
+ const h0=createMountainHome(parent,-9,-5,2.8,2.4,1.8,0,windows,emissive);
+ const h1=createMountainHome(parent,3,-5,3.1,2.6,2.1,1,windows,emissive);
+ const sizes=[h0,h1].map(x=>new THREE.Box3().setFromObject(x).getSize(new THREE.Vector3()));
+ assert.ok(Math.abs(sizes[0].y-sizes[1].y)>.25,'homes should have distinct full-body proportions');
+ assert.ok(windows.length>0,'windows still need the original day/night material hook');
+});
+
+test('sprint6: village center itself rebuilds over years, including the tavern and multiple old homes',()=>{
+ const root=new THREE.Group();
+ const makePair=(name:string,oldWidth:number,newWidth:number)=>{
+  const wrapper=new THREE.Group();root.add(wrapper);
+  const original=new THREE.Group();original.name=name+'-original';wrapper.add(original);
+  const renovated=new THREE.Group();renovated.name=name+'-renovated';wrapper.add(renovated);
+  const makeCube=(parent:THREE.Group,w:number)=>{
+   const m=new THREE.Mesh(new THREE.BoxGeometry(w,2,2),new THREE.MeshStandardMaterial());
+   parent.add(m);
+  };
+  makeCube(original,oldWidth);makeCube(renovated,newWidth);
+  return {name,original,renovated};
+ };
+ const tavern=makePair('tavern',4,6);
+ const homes=Array.from({length:5},(_,i)=>makePair('house'+i,2,3));
+ const core=makeVillageCoreGrowth(root,tavern,homes);
+ assert.equal(core.stage(),0);assert.ok(tavern.original.visible&&!tavern.renovated.visible);
+ const g=createVillageGrowth(500);
+ g.choice='grove';g.phase='foundation';g.workDays=6;core.update(g);
+ assert.equal(core.stage(),1);assert.ok(tavern.original.visible);
+ g.workDays=16;g.phase='construction';core.update(g);
+ assert.equal(core.stage(),2);assert.ok(!homes[0].original.visible&&homes[0].renovated.visible);
+ g.workDays=37;g.phase='landmark';core.update(g);
+ assert.equal(core.stage(),3);assert.ok(!tavern.original.visible&&tavern.renovated.visible);
+ assert.ok(homes[1].renovated.visible&&homes[4].renovated.visible);
+ g.workDays=78;g.phase='thriving';core.update(g);
+ assert.equal(core.stage(),4);assert.ok(homes.every(x=>x.renovated.visible));
+ assert.notEqual(core.signature(),'');
+ assert.equal(maturityTier({...g,choice:null}),0);
+});
+
+test('sprint6: character costume uses draped cloth surfaces and soft volumes rather than rectangular wood-panel garments',()=>{
+ const upper=new THREE.Group(),costume=dressCharacter(upper,VILLAGERS[1]);
+ assert.equal(costume.hems.length,2);
+ const meshes:THREE.Mesh[]=[];
+ upper.traverse(o=>{if(o instanceof THREE.Mesh)meshes.push(o)});
+ assert.ok(meshes.some(m=>m.geometry instanceof THREE.BufferGeometry&&
+  m.geometry.type==='BufferGeometry'&&m.geometry.getAttribute('position').count>=40),'expect authored cloth strips');
+ assert.ok(meshes.every(m=>m.geometry.type!=='BoxGeometry'),'costume must not be made of rectangular planks');
+ assert.ok(costume.hems.every(x=>x.parent===upper),'new fabric hem pivots remain linked to existing animation');
 });
