@@ -13,3 +13,14 @@ export const VALLEY_ROUTES:readonly (readonly GroundPoint[])[]=[
  [[-4.4,-.3],[-5.3,-4],[-8.8,-5.3]]
 ];
 export const VALLEY_BOUNDS={radiusX:16.8,radiusZ:12.2} as const;
+
+/** Major silhouettes survive until an explicit tree-clearing action exists. */
+export const VALLEY_PINES:readonly (readonly [number,number,number])[]=[
+ [-14,-6,1],[-13,8,1.2],[-6,8.7,1.12],[4.7,10.2,.8],
+ [11.3,-7,1.0],[14.5,7,1.25],[5.3,-8.3,1.0]
+];
+export const VALLEY_BAMBOO:readonly (readonly [number,number,number])[]=[
+ [-13.8,3.1,1.12],[-13.2,5.4,.95],[-7,8.0,1.08],
+ [-4.2,8.8,1.12],[-1.3,9.6,1.0],[5.3,10.1,.76],
+ [12,8.4,1.1],[14.5,4.8,1.05],[13,-5.8,.85],[10.5,-8.8,.88]
+];
