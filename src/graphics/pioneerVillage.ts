@@ -215,8 +215,10 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({
   color:'#c7dee2',transparent:true,opacity:.42,depthWrite:false}));
  rain.frustumCulled=false;root.add(rain);
- let lastBuildSig='',lastSeason='',lastWeather='',lastProgressIndex=-1,renderedStructures=0;
+ let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
+ let latestWorld=world;
  function update(s:PioneerWorld,seconds:number){
+  latestWorld=s;
   const phase=s.intent?.phase??'none';
   const progress=s.intent?.workDone??0;
   const progressIndex=Math.floor(progress*2);
@@ -240,7 +242,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    grass.color.set({spring:'#8eae7d',summer:'#79a270',
     autumn:'#c4b07d',winter:'#c8d0bc'}[season]);
   }
-  lastWeather=weather;rain.visible=weather==='rain';
+  rain.visible=weather==='rain';
   if(rain.visible){
    for(let i=0;i<270;i++){
     const y=fallingRainY(rainSeed[3*i+1],seconds,6.2);
@@ -288,8 +290,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  }
  update(world,0);
  return {root,update,signatures:()=>({
-  buildings:world.buildings.length,renderedStructures,
-  phase:world.intent?.phase??(world.buildings.length?'complete':'none'),
+  buildings:latestWorld.buildings.length,renderedStructures,
+  phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
   people:people.length
  })};
 }
