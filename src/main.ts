@@ -358,7 +358,7 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
   const b=village.coreBounds(),size=b.getSize(new THREE.Vector3());
   return {state:structuredClone(world.villageGrowth),signature:village.growthVisualSignature(),
    core:{stage:village.coreMaturity(),signature:village.coreVisualSignature(),
-    width:size.x,depth:size.z,height:size.y,deferred:village.coreDeferredExpansions()},
+    width:size.x,depth:size.z,height:size.y,deferred:village.coreDeferredExpansions(),collisions:village.coreCollisionPairs()},
    plannedSettlement:village.settlementStages()};
  },
  getTerrainProbe:(x:number,z:number)=>village.groundProbe(x,z),
