@@ -21,3 +21,13 @@
 .choices .choice-illustration{color:#a37457}
 .speed-btn[data-speed="48"]{color:#9f7d53}
 @media(max-width:760px){.speed-btn[data-speed="48"]{min-width:34px;font-size:10px;padding:0 3px}}
+
+/* v0.3 — compact archive controls remain below the reading area, even on phones. */
+.save-tools{border-top:1px solid #e3e7dc;padding-top:13px;margin-top:6px;display:flex;flex-direction:column;gap:8px}
+.save-tools-heading{font-size:11px;color:#617a62;font-weight:700}
+.save-tools-heading span{color:#9a7857}
+.slot-buttons,.save-actions{display:flex;gap:7px;flex-wrap:wrap}
+.slot-button,.save-actions button{border:1px solid #dce4d7;background:#f5f6ee;color:#54725a;border-radius:8px;padding:7px 11px;font-size:11px;min-height:36px}
+.slot-button.active{background:#dcead9;border-color:#86a887;color:#355d44;font-weight:700}
+.save-actions .reset-game{font-size:11px;color:#a07867;text-decoration:none;background:#fcf5ef;border-color:#ecdcd1}
+@media(max-width:760px){.save-tools{gap:6px;padding-top:9px}.slot-button,.save-actions button{padding:5px 8px;min-height:34px;font-size:10px}.modal-card{padding:19px;height:min(630px,92dvh)}}
