@@ -111,7 +111,11 @@ function renderResident(){
  const hero=v.id===8;
  $('residentRole').textContent=`${hero&&['returned','legacy'].includes(world.storyStage)?'归乡剑客':v.occupation}  ·  ${v.personality}`;
  $('residentActivity').textContent='◌ '+residentMotion(v,world).activity;
- $('residentThought').textContent=hero&&['departed','rumor'].includes(world.storyStage)?'“江湖很远，但山谷一直在身后。”':v.thought;
+ const influences=world.buildings.filter(b=>b.ownerId===v.id||b.occupantIds.includes(v.id));
+ const latestEventId=influences.flatMap(b=>b.causeEventIds).at(-1);
+ const latest=world.journal.find(e=>'journal-'+e.id===latestEventId);
+ const thought=hero&&['departed','rumor'].includes(world.storyStage)?'“江湖很远，但山谷一直在身后。”':v.thought;
+ $('residentThought').textContent=thought+(latest?' · 留下的痕迹：'+latest.title:'');
 }
 function renderBuilding(){
  const card=$('buildingCard'),b=selectedBuilding?buildingById(world,selectedBuilding):null;
