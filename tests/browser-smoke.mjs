@@ -68,8 +68,14 @@ try{
  const captures=[];
  for(const [i,season] of ['spring','summer','autumn','winter'].entries()){
   if(i>0)await page.evaluate(()=>window.__HAVEN_DEBUG__.flowSeason());
-  const calendar=await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState());
+  let calendar=await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState());
   if(calendar.season!==season)throw Error('Calendar did not reach '+season+': '+calendar.season);
+  for(let attempt=0;attempt<12&&calendar.weather!=='clear';attempt++){
+   await page.evaluate(()=>window.__HAVEN_DEBUG__.advance(480));
+   calendar=await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState());
+  }
+  if(calendar.season!==season||calendar.weather!=='clear')
+   throw Error('No fair-weather day to compare '+season);
   const capture=await snapshotValley(page,season);
   captures.push(capture);
   results.push({season,minute:calendar.minute,bytes:capture.bytes,render:await page.evaluate(()=>window.__HAVEN_DEBUG__.getRendererInfo())});
@@ -95,7 +101,23 @@ try{
  const fogDiff=pixelDifference(weatherImages.clear.pixels,weatherImages.fog.pixels);
  if(wetDiff<7.0||fogDiff<3.5)throw Error('Weather not visible enough (rain='+wetDiff+', fog='+fogDiff+')');
  results.push({weatherPixelDifferences:{rain:wetDiff,fog:fogDiff}});
- // Return to a clear first spring for reproducible simulation event checks.
+ // Evaluate visible occupational separation at two hours of the same day.
+ await page.evaluate(()=>{
+  const d=window.__HAVEN_DEBUG__;d.reset();
+  d.advance((2*1440+10*60-500)/3);
+ });
+ const crowdAt=async(label)=>{
+  const positions=await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState().npcs);
+  const crowd=positions.filter(p=>p.id<=8&&p.visible&&Math.hypot(p.x+3.2,p.z-3.1)<1.3);
+  if(crowd.length>2)throw Error('Residents still crowd tavern: '+label+JSON.stringify(crowd));
+  await snapshotValley(page,'villagers-'+label);
+  return positions.filter(p=>p.id<=8&&p.visible).map(p=>({id:p.id,activity:p.activityId,x:+p.x.toFixed(1),z:+p.z.toFixed(1)}));
+ };
+ const morning=await crowdAt('morning');
+ await page.evaluate(()=>window.__HAVEN_DEBUG__.advance((14-10)*60/3));
+ const afternoon=await crowdAt('afternoon');
+ results.push({residentRoutes:{morning,afternoon}});
+ // Return to the first encounter for reproducible story regression.
  await page.evaluate(()=>window.__HAVEN_DEBUG__.reset());
  const visitor=await page.evaluate(()=>window.__HAVEN_DEBUG__.advance(30));
  if(!visitor.visitor)throw Error('Visitor encounter failed in browser');
