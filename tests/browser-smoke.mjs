@@ -137,6 +137,8 @@ try{
    const fullyGrown=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual());
    if(fullyGrown.core.stage!==4||fullyGrown.state.phase!=='thriving')
     throw Error('Core village never reached fully grown stage: '+JSON.stringify(fullyGrown));
+   if(fullyGrown.core.collisions.length>coreBefore.collisions.length)
+    throw Error('House renovations created new inter-building clipping: '+JSON.stringify({before:coreBefore,after:fullyGrown.core}));
    await captureLandscape('four-years-grown-town-center');
    results.push({coreRenovation:{base:coreBefore,landmark:visual.core,thriving:fullyGrown.core}});
   }
@@ -150,7 +152,32 @@ try{
   developmentContrast[key]=pixelDifference(futureImages[futures[i]].pixels,futureImages[futures[j]].pixels);
   if(developmentContrast[key]<2.0)throw Error('Two-year futures too visually similar: '+key+' diff '+developmentContrast[key]);
  }
+
  results.push({developmentPixelDifferences:developmentContrast});
+ // Sprint7: a third-generation house must emerge from housing need and a
+ // safe parcel search, NOT another hard-coded bridge/ferry/grove prefab.
+ await page.evaluate(()=>{
+  const d=window.__HAVEN_DEBUG__;d.reset();
+  d.advance((24*1440+600-500)/3);
+  if(!d.chooseVillage('grove'))throw Error('Unable to set autonomous grove direction');
+  d.advance((235-24)*1440/3);
+ });
+ await page.waitForTimeout(550);
+ const residentsGrowth=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual());
+ const lots=residentsGrowth.state.settlementLots,drawn=residentsGrowth.plannedSettlement;
+ if(!Array.isArray(lots)||lots.length===0||drawn.length!==lots.length)
+  throw Error('Housing demand did not produce visible, persisted houses: '+
+   JSON.stringify({lots,drawn}));
+ for(const lot of drawn){
+  const matching=lots.find(p=>p.id===lot.id);
+  if(!matching||Math.abs(matching.x-lot.x)>.01||Math.abs(matching.z-lot.z)>.01)
+   throw Error('Visible home does not use its saved collision-safe parcel');
+ }
+ if(residentsGrowth.core.deferred.some(name=>typeof name!=='string'))
+  throw Error('Core collision-gate diagnostics failed');
+ await captureLandscape('resident-planned-homes-after-four-years');
+ results.push({livingSettlement:{count:lots.length,stages:drawn,coreDeferred:residentsGrowth.core.deferred}});
+
  // Independent fair-weather, visible-rain and valley-fog captures at identical spring clock times.
  const weatherImages={};
  for(const weather of ['clear','rain','fog']){

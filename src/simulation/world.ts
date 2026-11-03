@@ -64,7 +64,7 @@ export const VILLAGERS:Villager[]=[
 export function createWorld(now=Date.now()):WorldState{
  return {version:3,minutes:8*60+20,seed:20261103,population:8,happiness:82,houses:6,renown:0,
  choice:null,storyStage:'peace',storyStarted:null,autoChosen:false,lastDayLogged:1,lastSeasonLogged:0,lastSavedAt:now,
- buildings:createBuildings(),opportunities:[],guardianMemories:[],villageGrowth:createVillageGrowth(8*60+20),
+ buildings:createBuildings(),opportunities:[],guardianMemories:[],villageGrowth:createVillageGrowth(8*60+20,now),
  journal:[{id:1,day:1,time:500,title:'山谷无名',text:'深山中只有几户人家、一间酒肆。少年阿青每日到竹林旁练剑，还不知外面有多大的江湖。'}]};
 }
 export function getCalendar(s:WorldState):CalendarView{return getCalendarFromMinutes(s.minutes);}
@@ -244,7 +244,7 @@ export function advanceWorld(s:WorldState,realSeconds:number):AdvanceResult{
     }
     out.visualChanges.push(change.buildingId+':'+change.tag);
    }
-   for(const milestone of advanceVillageGrowthDay(s.villageGrowth,s.minutes,getCalendar(s).season,getWeather(s))){
+   for(const milestone of advanceVillageGrowthDay(s.villageGrowth,s.minutes,getCalendar(s).season,getWeather(s),s.population)){
     chronicle(s,milestone.title,milestone.text);
     s.houses+=milestone.housesDelta;s.population+=milestone.populationDelta;
     s.renown+=milestone.renownDelta;
@@ -310,7 +310,7 @@ function hydrateWorld(s:WorldState):WorldState{
   ['available','resolved'].includes(o.state)&&Number.isFinite(o.deadlineMinutes)).slice(-48):[];
  const guardianMemories=Array.isArray(s.guardianMemories)?s.guardianMemories.filter(m=>
   m&&typeof m.opportunityId==='string'&&Array.isArray(m.producedEventIds)).slice(-120):[];
- return {...s,buildings,opportunities,guardianMemories,villageGrowth:hydrateVillageGrowth(s.villageGrowth,s.minutes)};
+ return {...s,buildings,opportunities,guardianMemories,villageGrowth:hydrateVillageGrowth(s.villageGrowth,s.minutes,s.lastSavedAt)};
 }
 export function importWorld(raw:string):WorldState|null{
  try{
@@ -326,7 +326,7 @@ function migrateV2(raw:string,now:number):WorldState|null{
   if(old.version!==2||!Number.isFinite(old.minutes)||!Array.isArray(old.journal)
    ||!old.storyStage||!(old.storyStage in stageIndex)||![null,'host','observe'].includes(old.choice??null))return null;
   const fresh=createWorld(now);
-  return {...fresh,...old,version:3,seed:fresh.seed,buildings:createBuildings(),opportunities:[],guardianMemories:[],villageGrowth:createVillageGrowth(old.minutes||0),
+  return {...fresh,...old,version:3,seed:fresh.seed,buildings:createBuildings(),opportunities:[],guardianMemories:[],villageGrowth:createVillageGrowth(old.minutes||0,now),
    lastSeasonLogged:Math.floor((old.minutes||0)/SEASON_MINUTES),lastSavedAt:now};
  }catch{return null;}
 }

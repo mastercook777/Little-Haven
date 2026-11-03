@@ -132,6 +132,18 @@ function renderResident(){
 function renderBuilding(){
  const card=$('buildingCard'),b=selectedBuilding?buildingById(world,selectedBuilding):null;
  if(!b){
+  const lot=world.villageGrowth.settlementLots.find(p=>p.id===selectedBuilding);
+  if(lot){
+   const age=Math.max(0,world.villageGrowth.lastDayProcessed-lot.builtAt);
+   const phase=age<4?'地基准备':age<12?'木构施工':'入住使用';
+   const label=lot.kind==='workshop'?'乡邻工坊':lot.kind==='store'?'商旅店铺':'新落成的民居';
+   card.hidden=false;$('buildingName').textContent=label;
+   $('buildingCondition').textContent=phase+' · 建设第 '+age+' 日';
+   $('buildingActivity').textContent='◌ 真实地块 '+lot.x.toFixed(1)+' / '+lot.z.toFixed(1)+
+    ' · 面向可通行乡路';
+   $('buildingHistory').textContent='缘由可查：乡邻需要新的工作与住处，先核对河岸、屋檐与道路净空，再决定在这里建屋。';
+   return;
+  }
   const direction=selectedBuilding?.startsWith('valley-')?selectedBuilding.slice(7):'';
   const growth=world.villageGrowth,option=DEVELOPMENT_OPTIONS.find(x=>x.id===direction);
   if(!option||growth.choice!==direction){card.hidden=true;return;}
@@ -158,6 +170,7 @@ function selectBuilding(id:string|null){
  selectedBuilding=id;selected=null;renderResident();renderBuilding();
  const b=id?buildingById(world,id):null;if(b)toast('走近了'+b.name+' · 看见岁月的痕迹');
  else if(id?.startsWith('valley-'))toast('走近了正在改变的村庄 · '+villageGrowthLabel(world.villageGrowth));
+ else if(id?.startsWith('living-'))toast('走近了乡邻自行选址的新屋');
 }
 function selectResident(id:number|null){
  selectedBuilding=null;renderBuilding();selected=id;renderResident();
@@ -345,7 +358,8 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
   const b=village.coreBounds(),size=b.getSize(new THREE.Vector3());
   return {state:structuredClone(world.villageGrowth),signature:village.growthVisualSignature(),
    core:{stage:village.coreMaturity(),signature:village.coreVisualSignature(),
-    width:size.x,depth:size.z,height:size.y}};
+    width:size.x,depth:size.z,height:size.y,deferred:village.coreDeferredExpansions(),collisions:village.coreCollisionPairs()},
+   plannedSettlement:village.settlementStages()};
  },
  getTerrainProbe:(x:number,z:number)=>village.groundProbe(x,z),
  getRendererInfo:()=>({

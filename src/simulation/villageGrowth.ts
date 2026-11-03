@@ -6,6 +6,7 @@
 import type {Weather} from './weather.ts';
 import type {Season} from './calendar.ts';
 import {DAY_MINUTES} from './calendar.ts';
+import {proposeVillageParcel,validateVillageParcel,reservedParcels,type VillageParcel} from './villagePlanning.ts';
 
 export type VillageDirection='bridge'|'ferry'|'grove';
 export type VillagePhase='quiet'|'invitation'|'foundation'|'construction'|'landmark'|'thriving';
@@ -15,6 +16,8 @@ export interface VillageGrowthState{
  workDays:number;lastDayProcessed:number;
  wood:number;food:number;trade:number;prosperity:number;
  completedStages:VillagePhase[];
+ plannerSeed:number;settlementLots:VillageParcel[];
+ lastPlotAttemptDay:number;lastMigrationDay:number;
 }
 export interface VillageGrowthEvent{
  stage:VillagePhase;title:string;text:string;
@@ -30,15 +33,17 @@ const PHASES=['quiet','invitation','foundation','construction','landmark','thriv
 const clamp=(value:number,min:number,max:number)=>Math.min(max,Math.max(min,value));
 
 /** Existing v3 saves receive a future invitation rather than a retroactive decision. */
-export function createVillageGrowth(startMinute=500):VillageGrowthState{
+export function createVillageGrowth(startMinute=500,creationSeed=20261103):VillageGrowthState{
  const day=Math.floor(Math.max(0,startMinute)/DAY_MINUTES);
  const decisionDay=Math.max(24,day+12);
  return {choice:null,phase:'quiet',decisionAt:decisionDay*DAY_MINUTES,
   deadlineAt:(decisionDay+12)*DAY_MINUTES,chosenAt:null,automatic:false,
-  workDays:0,lastDayProcessed:day,wood:14,food:18,trade:5,prosperity:20,completedStages:[]};
+  workDays:0,lastDayProcessed:day,wood:14,food:18,trade:5,prosperity:20,completedStages:[],
+  plannerSeed:Math.abs(Math.floor(creationSeed))%2147483647,settlementLots:[],
+  lastPlotAttemptDay:day,lastMigrationDay:day};
 }
-export function hydrateVillageGrowth(raw:unknown,currentMinutes:number):VillageGrowthState{
- const fresh=createVillageGrowth(currentMinutes);
+export function hydrateVillageGrowth(raw:unknown,currentMinutes:number,creationSeed=20261103):VillageGrowthState{
+ const fresh=createVillageGrowth(currentMinutes,creationSeed);
  if(!raw||typeof raw!=='object')return fresh;
  const a=raw as Partial<VillageGrowthState>;
  if(!PHASES.includes(a.phase as VillagePhase)||a.choice!==null&&!DIRECTIONS.includes(a.choice as VillageDirection)
@@ -48,11 +53,29 @@ export function hydrateVillageGrowth(raw:unknown,currentMinutes:number):VillageG
   ||!(a.chosenAt===null||Number.isFinite(a.chosenAt)))return fresh;
  if(a.deadlineAt!<a.decisionAt!||a.decisionAt!<0||a.lastDayProcessed!<0)return fresh;
  if((a.choice===null)!==(a.chosenAt===null))return fresh;
+ const rawLots=Array.isArray(a.settlementLots)?a.settlementLots:[];
+ const lots:VillageParcel[]=[];
+ if(a.choice!==null)for(const item of rawLots.slice(0,24)){
+  if(!item||typeof item!=='object')continue;
+  const q=item as VillageParcel;
+  if(!/^living-\d+-\d+$/.test(String(q.id))||!['dwelling','workshop','store'].includes(q.kind)
+   ||!['x','z','width','depth','rotation','clearance','accessX','accessZ','builtAt']
+    .every(key=>Number.isFinite(q[key as keyof VillageParcel]))
+   ||q.width<.8||q.width>5||q.depth<.8||q.depth>5
+   ||q.builtAt<0||q.builtAt>Math.floor(currentMinutes/DAY_MINUTES))continue;
+  const candidate={...q};
+  if(validateVillageParcel(candidate,[...reservedParcels(a.choice??null),...lots]).ok)
+   lots.push(candidate);
+ }
  return {...fresh,...a,wood:clamp(Number(a.wood)||0,0,500),
   food:clamp(Number(a.food)||0,0,500),trade:clamp(Number(a.trade)||0,0,500),
   prosperity:clamp(Number(a.prosperity)||0,0,100),
   workDays:clamp(a.workDays!,0,100_000),lastDayProcessed:Math.floor(a.lastDayProcessed!),
-  completedStages:[...new Set(a.completedStages)]};
+  completedStages:[...new Set(a.completedStages)],
+  plannerSeed:Number.isSafeInteger(a.plannerSeed)&&a.plannerSeed!>=0?a.plannerSeed!:fresh.plannerSeed,
+  settlementLots:lots,
+  lastPlotAttemptDay:Number.isSafeInteger(a.lastPlotAttemptDay)?Math.floor(a.lastPlotAttemptDay!):fresh.lastPlotAttemptDay,
+  lastMigrationDay:Number.isSafeInteger(a.lastMigrationDay)?Math.floor(a.lastMigrationDay!):fresh.lastMigrationDay};
 }
 const label=(id:VillageDirection)=>DEVELOPMENT_OPTIONS.find(x=>x.id===id)!;
 const event=(stage:VillagePhase,title:string,text:string,housesDelta=0,populationDelta=0,renownDelta=0):VillageGrowthEvent=>
@@ -68,7 +91,7 @@ export function chooseVillageDirection(g:VillageGrowthState,direction:VillageDir
 }
 const nextPhase=(days:number):VillagePhase=>days>=78?'thriving':days>=37?'landmark':days>=15?'construction':'foundation';
 /** Called once per chronological day boundary, not per frame. */
-export function advanceVillageGrowthDay(g:VillageGrowthState,minute:number,season:Season,weather:Weather):VillageGrowthEvent[]{
+export function advanceVillageGrowthDay(g:VillageGrowthState,minute:number,season:Season,weather:Weather,population=8):VillageGrowthEvent[]{
  const day=Math.floor(minute/DAY_MINUTES);
  if(day<=g.lastDayProcessed)return [];
  const events:VillageGrowthEvent[]=[];
@@ -94,14 +117,17 @@ export function advanceVillageGrowthDay(g:VillageGrowthState,minute:number,seaso
    // Foundation/erection requires actual neighbors and finite labor. At least
    // one workday is performed on every day after the decision.
    if(at>g.chosenAt!){
-    const cost=g.choice==='bridge'?3:g.choice==='ferry'?2:2;
-    // Construction cannot advance on an empty timber pile or without food.
-    // Residents keep collecting naturally; the player never has to click a resource.
+    // The original project was charged construction materials forever, even
+    // after all its buildings were finished. Free workers after completion.
+    const stillBuilding=g.workDays<78;
+    const cost=stillBuilding?(g.choice==='bridge'?3:2):0;
     if(g.wood<cost||g.food<1)continue;
-    g.workDays++;
-    g.wood=clamp(g.wood-cost,0,500);
-    if(g.workDays%4===0)g.food=clamp(g.food-1,0,500);
-    g.prosperity=clamp(g.prosperity+(g.choice==='bridge'?.14:g.choice==='ferry'?.12:.10),0,100);
+    if(stillBuilding){
+     g.workDays++;
+     g.wood=clamp(g.wood-cost,0,500);
+     if(g.workDays%4===0)g.food=clamp(g.food-1,0,500);
+     g.prosperity=clamp(g.prosperity+(g.choice==='bridge'?.14:g.choice==='ferry'?.12:.10),0,100);
+    }
     const stage=nextPhase(g.workDays);
     if(stage!==g.phase){
      g.phase=stage;g.completedStages.push(stage);
@@ -117,6 +143,41 @@ export function advanceVillageGrowthDay(g:VillageGrowthState,minute:number,seaso
       events.push(event(stage,'村庄有了自己的模样',
        label(g.choice).landmark+'日渐兴盛，旧日空地成了人们工作、往来和生活的新地方。',
        g.choice==='grove'?2:1,g.choice==='bridge'?3:2,g.choice==='bridge'?8:3));
+     }
+    }
+    if(g.phase==='thriving'){
+     // Houses arise from real population demand, not a finite authored scene
+     // sequence. Their positions are computed by the parcel planner and saved.
+     const completed=g.settlementLots.filter(l=>current-l.builtAt>=12).length;
+     const capacity=10+completed*2+2; // initial homes + village landmark
+     const unfinished=g.settlementLots.some(l=>current-l.builtAt<12);
+     if(population>=capacity&&!unfinished&&g.settlementLots.length<12
+      &&current-g.lastPlotAttemptDay>=20&&g.wood>=13&&g.food>=8){
+      g.lastPlotAttemptDay=current;
+      const kind=g.choice==='bridge'&&g.settlementLots.length%3===0?'store':
+       g.choice==='ferry'&&g.settlementLots.length%3===0?'workshop':'dwelling';
+      const lot=proposeVillageParcel({direction:g.choice,seed:g.plannerSeed,
+       sequence:g.settlementLots.length,builtAt:current,kind,occupied:g.settlementLots});
+      if(lot){
+       g.settlementLots.push(lot);g.wood-=11;g.food-=5;
+       events.push(event('construction','乡邻为新屋选址',
+        '新居民需要住处。乡邻勘察坡地、河岸和路口，避开了已有房屋，开始打地基。'));
+      }else{
+       events.push(event('thriving','村中可用土地渐少',
+        '乡邻勘察过河岸、道路与老屋之间的空地，暂时没有找到足够安全的建房位置。'));
+      }
+     }
+     for(const lot of g.settlementLots)
+      if(current===lot.builtAt+12){
+       events.push(event('landmark','一座新屋真正落成',
+        '这不是预先定好位置的屋子：它根据邻里需求与土地条件找到落脚点，并留下永久的建筑记录。',1,0,1));
+      }
+     const completeCapacity=10+g.settlementLots.filter(l=>current-l.builtAt>=12).length*2+2;
+     if(current-g.lastMigrationDay>=34&&population<completeCapacity
+      &&g.food>=22&&g.prosperity>=45){
+      g.lastMigrationDay=current;g.food=Math.max(0,g.food-4);
+      events.push(event('thriving','山谷迎来新邻居',
+       '有了住处和稳定的生计，新的家庭来到山谷定居。',0,1,1));
      }
     }
    }
