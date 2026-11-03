@@ -46,7 +46,7 @@ export interface PersonModel{
  pose:CharacterPose;lastT:number;heading:number;heroAnimator:HeroAnimator|null;
 }
 export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]{
- const models=villagers.map(v=>{
+ const models:PersonModel[]=villagers.map(v=>{
   const g=new THREE.Group();g.userData.villagerId=v.id;g.name='villager-'+v.id;scene.add(g);
   const cloth=mat(v.color),hair=mat(v.hair),skin=mat(skinColors[(v.id-1)%4]),dark=mat('#4e4a46');
   const upper=new THREE.Group();upper.position.y=UPPER_Y;upper.name='articulated-torso';g.add(upper);
