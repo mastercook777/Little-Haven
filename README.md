@@ -1,8 +1,16 @@
-# 守望谷 · 江湖一隅 | Little Haven v0.2
+# 守望谷 | Little Haven — v0.3 经典观察 / v0.4 开荒预览
 
 > 山外是江湖，山里有故人。守望一座以无名酒肆为中心的微缩武侠山谷，看看它如何悄悄生出故事。
 
 这是一个基于 **Three.js + TypeScript + Vite** 的观察型武侠放置网页游戏原型。程序化 Low-poly 中国山居、酒肆、竹林、练武坪、石桥；居民会按照作息行动，一名少年和一位旅人拥有可见的两结局故事链。**无需账号、素材生成 API 或后端服务器。**
+
+## v0.4 开荒纪元 · Phase A 预览（独立模式）
+
+- [进入开荒纪元](https://mastercook777.github.io/Little-Haven/pioneer.html)：荒谷、三位开荒居民、临时营火和零永久建筑开局；旧谷入口仍是首页。
+- 三名乡邻会从真实有限资源点取材/取食/取水，因露宿需求提出第一张搭棚申请；经过 SAT 安全地块、物资扣除、地基/梁架/落成三阶段后，三人入住。停工理由与因果见右侧营地手记及守望录。
+- 支持 1×/4×/12×、流年、方向性建议（先筑遮蔽/先备口粮/自治）、独立双槽开荒存档、JSON 导入导出和有上限的离线结算。
+- 直接打开 `/pioneer.html`；GitHub Pages 仅在该分支经 PR 合并并成功部署后才有此入口。此次 Phase A 是**可玩的工程预览**，未通过浏览器验收前不应视为正式发布。
+- Phase B 动态路网、家庭迁入、第二类建筑及全面生产级人物绑定尚未实施。v0.3 原有酒馆、旅人与阿青故事绝不在开荒模式后台启动。
 
 ## 本地运行
 
@@ -49,9 +57,9 @@ AGENTS.md                      Codex 等开发代理的约束
 ## 测试与开发技能
 
 ```bash
-npm run test:sim      # 9 项独立逻辑测试
+npm run test:sim      # v0.3 + v0.4 模拟层逻辑回归
 npm run check         # TypeScript 类型检查
-npm run build:pages   # Pages 生产构建
+npm run build:pages   # Pages 生产构建（同时输出 index.html 和 pioneer.html）
 ```
 
 使用已经放进仓库的 [threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) 时，从 `.agents/skills/threejs-game-director/SKILL.md` 开始，按实际需求使用 gameplay / graphics / UI / QA 同级能力。Skills 只用于帮助开发，不是玩家运行依赖，详见 `docs/SKILLS.md`。
