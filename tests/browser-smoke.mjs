@@ -95,6 +95,13 @@ try{
  if(contrasts.some(x=>x<5.0))throw Error('Adjacent seasons still too visually similar: '+contrasts.join(', '));
  results.push({seasonPixelDifferences:contrasts});
 
+ // Sprint6: measure the actual original town-center architecture before growth,
+ // not just whether extra buildings appeared in the outskirts.
+ await page.evaluate(()=>window.__HAVEN_DEBUG__.reset());
+ const coreBefore=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual().core);
+ if(coreBefore.stage!==0)throw Error('Town center should start as an unchanged village');
+ await captureLandscape('old-town-before-renovation');
+ results.push({coreBefore});
  // Sprint5: prove three different futures under one seed, at the same world
  // minute, camera, time-of-day, weather and initial story autopilot.
  const futureImages={};
@@ -119,7 +126,20 @@ try{
   if(visual.state.choice!==direction||!['landmark','thriving'].includes(visual.state.phase)||
      visual.signature!==direction+'/'+visual.state.phase)
    throw Error('Village silhouette did not evolve: '+JSON.stringify(visual));
+  if(!visual.core||visual.core.stage<3||
+     visual.core.height<=coreBefore.height+.17)
+   throw Error('Existing village skyline did not rebuild: '+JSON.stringify({coreBefore,after:visual.core}));
   futureImages[direction]=await captureLandscape('two-years-'+direction);
+  if(direction==='bridge'){
+   // The final long-run step must renovate all five original houses and
+   // grow the public court, not only the branch market.
+   await page.evaluate(()=>window.__HAVEN_DEBUG__.advance((124-96)*1440/3));
+   const fullyGrown=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual());
+   if(fullyGrown.core.stage!==4||fullyGrown.state.phase!=='thriving')
+    throw Error('Core village never reached fully grown stage: '+JSON.stringify(fullyGrown));
+   await captureLandscape('four-years-grown-town-center');
+   results.push({coreRenovation:{base:coreBefore,landmark:visual.core,thriving:fullyGrown.core}});
+  }
   results.push({branch:direction,phase:visual.state.phase,workDays:visual.state.workDays,prosperity:visual.state.prosperity,
    population:(await page.evaluate(()=>window.__HAVEN_DEBUG__.getState().population)),
    render:await page.evaluate(()=>window.__HAVEN_DEBUG__.getRendererInfo())});
