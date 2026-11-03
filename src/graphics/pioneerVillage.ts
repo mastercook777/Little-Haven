@@ -283,7 +283,7 @@ function drawFootpaths(parent:THREE.Group,roads:readonly PioneerRoad[]){
 }
 export interface PioneerGraphics{
  root:THREE.Group;update(s:PioneerWorld,seconds:number):void;
- signatures():{buildings:number;renderedStructures:number;phase:string;people:number};
+ signatures():{buildings:number;renderedStructures:number;phase:string;people:number;roads:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
