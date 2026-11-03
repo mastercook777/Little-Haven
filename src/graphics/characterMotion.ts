@@ -109,7 +109,10 @@ export function sampleCharacterPose(action:ActivityId,t:number,id:number,walking
  return p;
 }
 export function interpolatePose(previous:CharacterPose,target:CharacterPose,alpha:number):CharacterPose{
- const out={...previous},factor=clamp(alpha);
+ const factor=clamp(alpha);
+ if(factor===0)return {...previous};
+ if(factor===1)return {...target};
+ const out={...previous};
  for(const k of Object.keys(out) as (keyof CharacterPose)[])out[k]+= (target[k]-out[k])*factor;
  return out;
 }
