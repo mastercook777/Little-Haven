@@ -341,7 +341,12 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
  flowSeason:()=>{const result=advanceToNextSeason(world);lastDecisionKey='';renderDecision();renderJournal();village.updateStory(world);return result;},
  chooseOpportunity:(id:string,option:string)=>{const result=chooseOpportunity(world,id,option);lastDecisionKey='';renderDecision();village.updateStory(world);return result;},
  chooseVillage:(direction:'bridge'|'ferry'|'grove')=>{const result=chooseVillageDevelopment(world,direction);lastDecisionKey='';renderDecision();renderJournal();renderStats();village.updateStory(world);return result;},
- getGrowthVisual:()=>({state:structuredClone(world.villageGrowth),signature:village.growthVisualSignature()}),
+ getGrowthVisual:()=>{
+  const b=village.coreBounds(),size=b.getSize(new THREE.Vector3());
+  return {state:structuredClone(world.villageGrowth),signature:village.growthVisualSignature(),
+   core:{stage:village.coreMaturity(),signature:village.coreVisualSignature(),
+    width:size.x,depth:size.z,height:size.y}};
+ },
  getTerrainProbe:(x:number,z:number)=>village.groundProbe(x,z),
  getRendererInfo:()=>({
   calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
