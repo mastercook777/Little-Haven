@@ -18,6 +18,7 @@ import {makeHeroClips,createHeroAnimator,SWORD_FORM_KEYFRAMES} from '../src/grap
 import {createMountainHome,createMountainTavern,buildMountainRoof} from '../src/graphics/villageBuildings.ts';
 import {maturityTier,makeVillageCoreGrowth} from '../src/graphics/villageCoreGrowth.ts';
 import {dressCharacter} from '../src/graphics/characterKit.ts';
+import {BRIDGE_DISTRICT_PARCELS} from '../src/graphics/villageEvolution.ts';
 
 const to=(s:ReturnType<typeof createWorld>,minute:number)=>advanceWorld(s,(minute-s.minutes)/3);
 const arrived=()=>{const s=createWorld(0);to(s,STORY_VISITOR_AT);return s;};
@@ -627,4 +628,16 @@ test('sprint6: character costume uses draped cloth surfaces and soft volumes rat
   m.geometry.type==='BufferGeometry'&&m.geometry.getAttribute('position').count>=40),'expect authored cloth strips');
  assert.ok(meshes.every(m=>m.geometry.type!=='BoxGeometry'),'costume must not be made of rectangular planks');
  assert.ok(costume.hems.every(x=>x.parent===upper),'new fabric hem pivots remain linked to existing animation');
+});
+
+test('sprint6: bridge district building footprints preserve the river and island edge',()=>{
+ for(const [name,s] of Object.entries(BRIDGE_DISTRICT_PARCELS)){
+  for(const sx of [-1,1])for(const sz of [-1,1]){
+   const x=s.x+sx*s.w/2,z=s.z+sz*s.d/2;
+   const water=creekDistance(x,z);
+   assert.ok(water>2.35,name+' footprint intrudes on river: '+water);
+   const inside=x*x/(16.8*16.8)+z*z/(12.2*12.2);
+   assert.ok(inside<.97,name+' building extends beyond island lip: '+inside);
+  }
+ }
 });
