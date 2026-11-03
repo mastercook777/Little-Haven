@@ -64,7 +64,7 @@ export function hydrateVillageGrowth(raw:unknown,currentMinutes:number,creationS
    ||q.width<.8||q.width>5||q.depth<.8||q.depth>5
    ||q.builtAt<0||q.builtAt>Math.floor(currentMinutes/DAY_MINUTES))continue;
   const candidate={...q};
-  if(validateVillageParcel(candidate,[...reservedParcels(a.choice),...lots]).ok)
+  if(validateVillageParcel(candidate,[...reservedParcels(a.choice??null),...lots]).ok)
    lots.push(candidate);
  }
  return {...fresh,...a,wood:clamp(Number(a.wood)||0,0,500),
