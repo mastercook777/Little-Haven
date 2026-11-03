@@ -8,6 +8,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 export interface BatchStats{before:number;after:number;merged:number;groups:number;}
 export function batchStaticSubtree(root:THREE.Group):BatchStats{
  const result:BatchStats={before:0,after:0,merged:0,groups:0};
+ const removedGeometries=new Set<THREE.BufferGeometry>();
  const visit=(parent:THREE.Group)=>{
   const nested=[...parent.children].filter((o):o is THREE.Group=>o instanceof THREE.Group);
   for(const child of nested)visit(child);
@@ -34,11 +35,13 @@ export function batchStaticSubtree(root:THREE.Group):BatchStats{
    m.name='batched-'+parent.name;
    m.castShadow=bin[0].castShadow;m.receiveShadow=bin[0].receiveShadow;
    parent.add(m);
-   for(const old of bin){parent.remove(old);old.geometry.dispose();}
+   for(const old of bin){parent.remove(old);removedGeometries.add(old.geometry);}
    result.merged+=bin.length;result.groups++;
   }
  };
  visit(root);
- root.traverse(o=>{if(o instanceof THREE.Mesh)result.after++;});
+ const activeGeometries=new Set<THREE.BufferGeometry>();
+ root.traverse(o=>{if(o instanceof THREE.Mesh){result.after++;activeGeometries.add(o.geometry);}});
+ for(const geo of removedGeometries)if(!activeGeometries.has(geo))geo.dispose();
  return result;
 }
