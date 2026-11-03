@@ -225,7 +225,7 @@ export function advanceWorld(s:WorldState,realSeconds:number):AdvanceResult{
     const building=buildingById(s,change.buildingId);
     if(building&&!building.causeEventIds.includes(id))building.causeEventIds.push(id);
     if(change.tag==='repair-completed'&&change.buildingId==='inn-001'){
-     const memory=[...s.guardianMemories].reverse().find(m=>m.opportunityId.startsWith('roof-repair-')&&!m.producedEventIds.some(id=>id.startsWith('journal-')&&id===id+'-complete'));
+     const memory=[...s.guardianMemories].reverse().find(m=>m.opportunityId.startsWith('roof-repair-')&&m.producedEventIds.length===1);
      if(memory&&!memory.producedEventIds.includes(id))memory.producedEventIds.push(id);
     }
     out.visualChanges.push(change.buildingId+':'+change.tag);
