@@ -368,7 +368,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    if(!b||!['shelter','garden','cottage','wood-yard'].includes(b.kind)||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
     !(b.materialsSpent.wood>=0)||b.materialsSpent.wood>20||
     !Number.isFinite(b.parcel.x)||!Number.isFinite(b.parcel.z)||
-    !validateVillageParcel(b.parcel,occupied,3.75).ok)return null;
+    !validateVillageParcel(b.parcel,occupied,4.25).ok)return null;
    ids.add(b.id);occupied.push(b.parcel);
   }
   if(s.intent){
