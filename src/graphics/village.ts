@@ -4,6 +4,7 @@ import {makeBuildingRenderer} from './buildingRenderer';
 import {createSeasonalArt} from './seasonArt';
 import {buildVillageWorkplaces} from './lifeDetails';
 import {buildRiverArt} from './riverArt';
+import {detailTavern,detailHome} from './architectureKit';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -97,6 +98,7 @@ function home(p:THREE.Object3D,x:number,z:number,w=2.9,d=2.5,h=1.9,variation=0,w
   for(let i=0;i<5;i++){const herb=sphere(g,.18,(i-2)*.36,.85,-d/2-.25,C.bambooDark);herb.scale.y=.6;}
  }
  if(variation===3){lantern(g,-w*.38,h+.4,d*.40,emissive);}
+ detailHome(g,w,d,h,variation);
  return g;
 }
 function tavern(p:THREE.Object3D,windows:THREE.MeshStandardMaterial[],emissive:THREE.MeshStandardMaterial[],swings:THREE.Group[]){
@@ -135,6 +137,7 @@ function tavern(p:THREE.Object3D,windows:THREE.MeshStandardMaterial[],emissive:T
  }
  const flag=group(g,3.08,2.85,2.2);box(flag,.075,2.85,.075,0,.32,0,C.wood);
  const banner=box(flag,.08,.96,.74,-.02,.15,.40,mat('#b87058'));banner.rotation.y=.12;swings.push(flag);
+ detailTavern(g);
  return g;
 }
 function pine(p:THREE.Object3D,x:number,z:number,s:number){
