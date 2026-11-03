@@ -7,6 +7,7 @@ import {getWeatherForMinutes} from '../src/simulation/weather.ts';
 import {PLOTS,validatePlots} from '../src/simulation/plots.ts';
 import {conditionOf} from '../src/simulation/buildings.ts';
 import {dailyRoutePoints,dailyHash} from '../src/simulation/routines.ts';
+import {proposeVillageParcel,validateVillageParcel,reservedParcels,parcelOverlaps,parcelCorners,type VillageParcel} from '../src/simulation/villagePlanning.ts';
 import {fallingRainY,rainSegmentY} from '../src/graphics/weatherMotion.ts';
 import {REST_POSE,sampleCharacterPose,interpolatePose} from '../src/graphics/characterMotion.ts';
 import {buildRiverArt,RIVER_WAYPOINTS} from '../src/graphics/riverArt.ts';
@@ -640,4 +641,83 @@ test('sprint6: bridge district building footprints preserve the river and island
    assert.ok(inside<.97,name+' building extends beyond island lip: '+inside);
   }
  }
+});
+
+
+test('sprint7: rotated roof footprints use SAT and do not pretend gaps are collisions',()=>{
+ const parcel=(id:string,x:number,z:number,angle=0):VillageParcel=>({
+  id,kind:'dwelling',x,z,width:2,depth:2,rotation:angle,clearance:.18,
+  accessX:0,accessZ:0,builtAt:0
+ });
+ const a=parcel('a',0,0),near=parcel('b',1.1,.35,Math.PI/4);
+ const far=parcel('far',3.8,3.8,Math.PI/4);
+ assert.ok(parcelOverlaps(a,near));
+ assert.equal(parcelOverlaps(a,far),false);
+ assert.equal(parcelCorners(a).length,4);
+});
+
+test('sprint7: every generated residence has a road, avoids creek and remains inside the island',()=>{
+ for(const direction of ['bridge','ferry','grove'] as const){
+  const placed:VillageParcel[]=[];
+  for(let sequence=0;sequence<3;sequence++){
+   const candidate=proposeVillageParcel({
+    direction,seed:20261103,sequence,builtAt:120+sequence*23,kind:'dwelling',occupied:placed
+   });
+   assert.ok(candidate,'No legal '+direction+' parcel for building '+sequence);
+   const check=validateVillageParcel(candidate!,[...reservedParcels(direction),...placed]);
+   assert.equal(check.reason,'ok',JSON.stringify({direction,candidate,check}));
+   assert.ok(check.nearRoad<=4.15);
+   for(const older of placed)assert.equal(parcelOverlaps(candidate!,older),false);
+   placed.push(candidate!);
+  }
+ }
+});
+
+test('sprint7: repeated seeds produce identical plot choices but new worlds can grow differently',()=>{
+ const make=(seed:number)=>proposeVillageParcel({
+  direction:'grove',seed,sequence:0,builtAt:120,kind:'dwelling',occupied:[]
+ });
+ const same=make(1234),sameAgain=make(1234),different=make(4319);
+ assert.ok(same&&sameAgain&&different);
+ assert.deepEqual(same,sameAgain);
+ assert.notDeepEqual([same?.x,same?.z],[different?.x,different?.z]);
+});
+
+test('sprint7: no safe land means explicitly declining construction, never clipping buildings',()=>{
+ const direction='grove' as const;
+ const request={direction,seed:888,sequence:2,builtAt:120,kind:'dwelling' as const};
+ // Blanket the buildable island with parcels to simulate land exhaustion.
+ const saturated:VillageParcel[]=[];
+ for(let x=-15;x<=15;x+=3)for(let z=-12;z<=12;z+=3){
+  saturated.push({id:'obstacle-'+x+'-'+z,kind:'protected',x,z,width:3.1,depth:3.1,
+   rotation:0,clearance:.3,accessX:x,accessZ:z,builtAt:0});
+ }
+ assert.equal(proposeVillageParcel({...request,occupied:saturated}),null);
+});
+
+test('sprint7: population and land availability drive ongoing visible house plans after the fixed landmark',()=>{
+ const world=createWorld(0);
+ to(world,24*DAY_MINUTES+600);
+ assert.equal(chooseVillageDevelopment(world,'grove'),true);
+ to(world,235*DAY_MINUTES+600);
+ const lots=world.villageGrowth.settlementLots;
+ assert.ok(lots.length>=1,'Mature village did not search for new housing');
+ assert.ok(lots.every(l=>l.id.startsWith('living-')));
+ assert.equal(new Set(lots.map(l=>l.id)).size,lots.length);
+ for(const [i,l] of lots.entries())assert.equal(validateVillageParcel(l,
+  [...reservedParcels('grove'),...lots.filter((_,j)=>j!==i)]).ok,true);
+ const raw=JSON.stringify(world);
+ const imported=importWorld(raw)!;
+ assert.deepEqual(imported.villageGrowth.settlementLots,lots,'parcel IDs/geometry changed after reload');
+});
+
+test('sprint7: fast and incremental multi-year development preserve identical generated buildings',()=>{
+ const a=createWorld(0),b=createWorld(0);
+ to(a,24*DAY_MINUTES+600);to(b,24*DAY_MINUTES+600);
+ assert.ok(chooseVillageDevelopment(a,'grove'));assert.ok(chooseVillageDevelopment(b,'grove'));
+ to(a,180*DAY_MINUTES+600);
+ for(let day=25;day<=180;day++)to(b,day*DAY_MINUTES+600);
+ assert.deepEqual(a.villageGrowth,b.villageGrowth);
+ assert.equal(a.population,b.population);
+ assert.equal(a.houses,b.houses);
 });
