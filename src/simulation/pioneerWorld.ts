@@ -2,7 +2,7 @@ import {DAY_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.
 import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,reservedParcels,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
-import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import {agePioneerBuildings,completePioneerProject,considerPioneerMigration,
  pioneerHasFacility,pioneerHousingCapacity,pioneerBuildingLabel,
  registerPioneerTrip,schedulePioneerProject} from './pioneerGrowth.ts';
@@ -81,16 +81,33 @@ function log(s:PioneerWorld,title:string,text:string,causeId:string|null=null){
  if(s.journal.length>=160)s.journal.shift();
  s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId});
 }
-function resourceSites(seed:number):PioneerResourceSite[]{
+function resourceSites(seed:number,camp:{x:number;z:number}):PioneerResourceSite[]{
  const jitter=(n:number)=>(hash(seed+n)-.5)*1.05;
- return [
+ const sites:PioneerResourceSite[]=[
   {id:'forest-west',kind:'forest',x:round(-11.2+jitter(1)),z:round(-5.7+jitter(2)),
    stock:20,capacity:24,renewPerDay:1.15,totalGathered:0},
-  {id:'forage-north',kind:'forage',x:round(-8.5+jitter(3)),z:round(6.8+jitter(4)),
+  {id:'forage-north',kind:'forage',x:round(-8.5+jitter(3)),z:round(4.9+jitter(4)),
    stock:17,capacity:19,renewPerDay:4.4,totalGathered:0},
   {id:'spring-east',kind:'spring',x:round(4.1+jitter(5)),z:round(-3.0+jitter(6)),
    stock:30,capacity:30,renewPerDay:12,totalGathered:0}
  ];
+ // A visible resource is only real when a resident can reach it. Older
+ // prototypes accidentally put the forage node *inside* a protected grove.
+ const obstacles=landscape(),start:WalkPoint=[camp.x,camp.z];
+ for(const site of sites){
+  const center={x:site.x,z:site.z};
+  const options:{x:number;z:number;score:number}[]=[];
+  for(let dx=-5;dx<=5;dx++)for(let dz=-5;dz<=5;dz++){
+   const x=round(center.x+dx*.50),z=round(center.z+dz*.50);
+   if(!pioneerWalkable([x,z],obstacles))continue;
+   options.push({x,z,score:Math.hypot(dx,dz)+hash(seed+dx*13+dz*29)*.10});
+  }
+  options.sort((a,b)=>a.score-b.score);
+  const legal=options.find(o=>findPioneerWalk(start,[o.x,o.z],obstacles));
+  if(!legal)throw new Error('No reachable '+site.kind+' source in this valley');
+  site.x=legal.x;site.z=legal.z;
+ }
+ return sites;
 }
 export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
  const camp=choosePioneerCamp(seed);
@@ -104,7 +121,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
    {id:3,name:'阿禾',role:'山野采集者',color:'#8a9b64',activity:'rest',
     target:point(camp.x,camp.z+.9),homeBuildingId:null}
   ],
-  resources:{wood:1,food:5,water:5},sites:resourceSites(seed),
+  resources:{wood:1,food:5,water:5},sites:resourceSites(seed,camp),
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
   roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0
  };
