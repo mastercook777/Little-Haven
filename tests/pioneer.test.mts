@@ -54,7 +54,7 @@ test('Real work and gathered wood must create and occupy the first shelter',()=>
  assert.ok(s.journal.some(e=>e.title==='商量搭棚'));
  assert.ok(s.journal.some(e=>e.title==='工材送达'));
  assert.ok(s.journal.some(e=>e.title==='梁架起身'));
- assert.ok(s.journal.some(e=>e.title==='第一间棚子落成'));
+ assert.ok(s.journal.some(e=>e.title==='避雨棚落成'));
 });
 
 test('Scarcity stalls shelter construction instead of spawning a building',()=>{
