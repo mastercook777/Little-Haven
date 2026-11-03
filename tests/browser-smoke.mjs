@@ -114,13 +114,20 @@ try{
  if((await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState().weather))!=='rain')
   throw Error('Cannot find rain day to test downward motion');
  await page.waitForTimeout(180);
- const rain0=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRainSamples());
+ // Browser screenshots can stall software WebGL for >1.5s, enough for full
+ // rain-wrap cycles. Sample three short rAF intervals BEFORE taking captures.
+ const [rain0,rain1,rain2]=await page.evaluate(async()=>{
+  const frames=[];
+  for(let i=0;i<3;i++){
+   for(let step=0;step<3;step++)await new Promise(resolve=>requestAnimationFrame(resolve));
+   frames.push(window.__HAVEN_DEBUG__.getRainSamples());
+  }
+  return frames;
+ });
  await page.screenshot({path:out+'/rain-motion-0.png'});
- await page.waitForTimeout(160);
- const rain1=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRainSamples());
+ await page.waitForTimeout(120);
  await page.screenshot({path:out+'/rain-motion-1.png'});
- await page.waitForTimeout(160);
- const rain2=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRainSamples());
+ await page.waitForTimeout(120);
  await page.screenshot({path:out+'/rain-motion-2.png'});
  const down=(a,b)=>a.filter((p,i)=>b[i].headY<p.headY-.025).length;
  const falling=[down(rain0,rain1),down(rain1,rain2)];
