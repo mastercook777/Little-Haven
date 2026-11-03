@@ -78,7 +78,9 @@ export function advanceVillageGrowthDay(g:VillageGrowthState,minute:number,seaso
   const at=current*DAY_MINUTES;
   const woods=weather==='rain'?1:season==='winter'?2:3;
   const harvest=season==='winter'?1:season==='autumn'?4:3;
-  g.wood=clamp(g.wood+woods,0,500);g.food=clamp(g.food+harvest-2,0,500);
+  const fishBonus=g.choice==='ferry'&&weather==='rain'?1:0;
+  const orchardBonus=g.choice==='grove'&&season==='autumn'?2:0;
+  g.wood=clamp(g.wood+woods,0,500);g.food=clamp(g.food+harvest+fishBonus+orchardBonus-2,0,500);
   g.trade=clamp(g.trade+(g.choice==='bridge'?3:g.choice==='ferry'?2:1),0,500);
   if(g.phase==='quiet'&&at>=g.decisionAt){
    g.phase='invitation';
@@ -92,10 +94,14 @@ export function advanceVillageGrowthDay(g:VillageGrowthState,minute:number,seaso
    // Foundation/erection requires actual neighbors and finite labor. At least
    // one workday is performed on every day after the decision.
    if(at>g.chosenAt!){
-    g.workDays++;
     const cost=g.choice==='bridge'?3:g.choice==='ferry'?2:2;
+    // Construction cannot advance on an empty timber pile or without food.
+    // Residents keep collecting naturally; the player never has to click a resource.
+    if(g.wood<cost||g.food<1)continue;
+    g.workDays++;
     g.wood=clamp(g.wood-cost,0,500);
     if(g.workDays%4===0)g.food=clamp(g.food-1,0,500);
+    g.prosperity=clamp(g.prosperity+(g.choice==='bridge'?.14:g.choice==='ferry'?.12:.10),0,100);
     const stage=nextPhase(g.workDays);
     if(stage!==g.phase){
      g.phase=stage;g.completedStages.push(stage);
