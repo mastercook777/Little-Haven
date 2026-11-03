@@ -593,8 +593,8 @@ test('sprint6: main tavern and homes have distinct authored massing instead of t
 
 test('sprint6: village center itself rebuilds over years, including the tavern and multiple old homes',()=>{
  const root=new THREE.Group();
- const makePair=(name:string,oldWidth:number,newWidth:number)=>{
-  const wrapper=new THREE.Group();root.add(wrapper);
+ const makePair=(name:string,oldWidth:number,newWidth:number,x:number)=>{
+  const wrapper=new THREE.Group();wrapper.position.x=x;root.add(wrapper);
   const original=new THREE.Group();original.name=name+'-original';wrapper.add(original);
   const renovated=new THREE.Group();renovated.name=name+'-renovated';wrapper.add(renovated);
   const makeCube=(parent:THREE.Group,w:number)=>{
@@ -604,8 +604,10 @@ test('sprint6: village center itself rebuilds over years, including the tavern a
   makeCube(original,oldWidth);makeCube(renovated,newWidth);
   return {name,original,renovated};
  };
- const tavern=makePair('tavern',4,6);
- const homes=Array.from({length:5},(_,i)=>makePair('house'+i,2,3));
+ // Legitimate same-neighborhood buildings get distinct sites instead of
+ // all occupying one origin as the legacy animation-only test fixture did.
+ const tavern=makePair('tavern',4,6,0);
+ const homes=[-11,-7,5,9,13].map((x,i)=>makePair('house'+i,2,3,x));
  const core=makeVillageCoreGrowth(root,tavern,homes);
  assert.equal(core.stage(),0);assert.ok(tavern.original.visible&&!tavern.renovated.visible);
  const g=createVillageGrowth(500);
