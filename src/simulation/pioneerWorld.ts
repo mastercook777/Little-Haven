@@ -327,17 +327,24 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    !Number.isInteger(s.nextEventId)||s.nextEventId<1||
    !['balanced','shelter','food'].includes(s.policy)||
    !s.camp||!Number.isFinite(s.camp.x)||!Number.isFinite(s.camp.z)||
-   !Array.isArray(s.founders)||s.founders.length!==3||
-   !s.founders.every(f=>[1,2,3].includes(f.id)&&Number.isFinite(f.target?.[0])&&Number.isFinite(f.target?.[1]))||
+   !Array.isArray(s.founders)||s.founders.length<3||s.founders.length>9||
+   !s.founders.every(f=>Number.isInteger(f.id)&&f.id>=1&&Number.isFinite(f.target?.[0])&&Number.isFinite(f.target?.[1]))||
+   new Set(s.founders.map(f=>f.id)).size!==s.founders.length||
    !s.resources||!['wood','food','water'].every(k=>Number.isFinite(s.resources[k as keyof typeof s.resources])&&s.resources[k as keyof typeof s.resources]>=0)||
-   !Array.isArray(s.sites)||s.sites.length!==3||
+   !Array.isArray(s.sites)||s.sites.length<3||s.sites.length>12||
    !s.sites.every(site=>Number.isFinite(site.stock)&&site.stock>=0&&Number.isFinite(site.capacity)&&site.capacity>=site.stock&&Number.isFinite(site.totalGathered))||
-   !Array.isArray(s.buildings)||s.buildings.length>10||
+   !Array.isArray(s.buildings)||s.buildings.length>12||
    !Array.isArray(s.journal)||s.journal.length>160)return null;
+  s.roads??=[];s.nextResidentId??=Math.max(...s.founders.map(f=>f.id))+1;
+  s.nextSurveyAt??=0;s.lastArrivalAt??=0;
+  if(!Array.isArray(s.roads)||s.roads.length>12||
+   !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||
+   !Number.isFinite(s.nextSurveyAt)||!Number.isFinite(s.lastArrivalAt))return null;
   const ids=new Set<string>();
   const occupied=[...landscape(),campParcel(s)];
   for(const b of s.buildings){
-   if(!b||b.kind!=='shelter'||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||b.materialsSpent.wood!==SHELTER_WOOD||
+   if(!b||!['shelter','garden','cottage','wood-yard'].includes(b.kind)||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
+    !(b.materialsSpent.wood>=0)||b.materialsSpent.wood>20||
     !Number.isFinite(b.parcel.x)||!Number.isFinite(b.parcel.z)||
     !validateVillageParcel(b.parcel,occupied,3.75).ok)return null;
    ids.add(b.id);occupied.push(b.parcel);
@@ -345,9 +352,10 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   if(s.intent){
    if(!['survey','materials','foundation','frame'].includes(s.intent.phase)||
     !Number.isFinite(s.intent.woodCommitted)||!Number.isFinite(s.intent.workDone)||
-    s.intent.woodCommitted<0||s.intent.woodCommitted>SHELTER_WOOD||
-    s.intent.workDone<0||s.intent.workDone>SHELTER_WORK)return null;
-   if(s.intent.parcel&&!validateVillageParcel(s.intent.parcel,occupied,3.75).ok)return null;
+    s.intent.woodCommitted<0||s.intent.woodCommitted>20||
+    s.intent.workDone<0||s.intent.workDone>30)return null;
+   if(s.intent.parcel&&s.intent.kind!=='repair'&&
+    !validateVillageParcel(s.intent.parcel,occupied,4.25).ok)return null;
   }
   return s;
  }catch{return null;}
@@ -364,9 +372,16 @@ export function loadPioneerWorld(storage:Pick<Storage,'getItem'>,now=Date.now(),
  return s;
 }
 export function pioneerSummary(s:PioneerWorld){
- if(s.buildings.length)return '棚屋已落成 · 乡邻有了遮雨归处';
- if(!s.intent)return '营火初起 · 乡邻正在商量如何落脚';
- if(s.intent.phase==='survey')return s.intent.pauseReason||'梁伯正在寻找安全屋址';
- if(s.intent.phase==='materials')return s.intent.pauseReason||'正在备木料';
- return s.intent.phase==='foundation'?'工地正在整地':'木梁搭起 · 正在封顶';
+ const project=s.intent;
+ if(project){
+  const label=project.kind==='repair'?'修缮旧屋':pioneerBuildingLabel(project.kind??'shelter');
+  if(project.phase==='survey')return project.pauseReason||'正在寻找安全可达的屋址';
+  if(project.phase==='materials')return '筹建'+label+' · '+(project.pauseReason||'正在备料');
+  if(project.phase==='foundation')return label+' · 地基施工中';
+  return label+' · 木梁施工中';
+ }
+ if(!s.buildings.length)return '营火初起 · 乡邻正在商量如何落脚';
+ return '山谷生长中 · '+s.buildings.length+' 处建筑 · '+s.founders.length+' 位常住乡邻';
 }
+export function pioneerPopulation(s:PioneerWorld){return s.founders.length;}
+export function pioneerHousing(s:PioneerWorld){return pioneerHousingCapacity(s);}
