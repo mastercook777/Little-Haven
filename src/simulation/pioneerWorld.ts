@@ -164,14 +164,16 @@ function requestShelter(s:PioneerWorld){
 function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:PioneerResourceSite){
  const task=s.intent;
  const home=s.buildings.find(b=>b.id===f.homeBuildingId);
+ const fieldBuilding=site?.kind==='field'?
+  s.buildings.find(b=>site.id==='field-'+b.id):undefined;
  const shelter=activity==='shelter'?home:undefined;
  const targetBuilding=activity==='build'||activity==='repair'?
   s.buildings.find(b=>b.id===task?.targetBuildingId):shelter;
  const jobRoute=(activity==='build'||activity==='repair')?
   task?.path&&task.path.length?task.path:
   s.roads.find(r=>r.buildingId===targetBuilding?.id)?.points:undefined;
- const builtRoad=s.roads.find(r=>r.buildingId===targetBuilding?.id);
- const goal:WalkPoint=site?[site.x,site.z]:
+ const builtRoad=s.roads.find(r=>r.buildingId===(targetBuilding??fieldBuilding)?.id);
+ const goal:WalkPoint=fieldBuilding?pioneerEntrance(fieldBuilding.parcel):site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
   shelter?pioneerEntrance(shelter.parcel):
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
@@ -179,7 +181,8 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  if(isSame&&f.commute?.length)return;
  const from:WalkPoint=home?pioneerEntrance(home.parcel):[s.camp.x,s.camp.z];
  const obstacles=[...landscape(),...s.buildings.map(b=>b.parcel)].filter(p=>
-  p.id!==home?.parcel.id&&p.id!==task?.parcel?.id&&p.id!==shelter?.parcel.id);
+  p.id!==home?.parcel.id&&p.id!==task?.parcel?.id&&
+  p.id!==shelter?.parcel.id&&p.id!==fieldBuilding?.parcel.id);
  let commute:WalkPoint[]|null;
  if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
@@ -198,6 +201,7 @@ function gather(s:PioneerWorld,f:PioneerFounder,kind:PioneerResourceSite['kind']
  const site=s.sites.find(x=>x.kind===kind);if(!site)return false;
  allocate(s,f,activity,site);
  if(f.activity==='rest')return false;
+ registerPioneerTrip(s,f.pathRoadId);
  const cap=kind==='forest'?48:36;
  const held=kind==='forest'?s.resources.wood:kind==='spring'?s.resources.water:s.resources.food;
  const gathered=Math.max(0,Math.min(site.stock,amount,cap-held));
@@ -211,6 +215,7 @@ function work(s:PioneerWorld,f:PioneerFounder){
  if(!s.intent||!s.intent.parcel||s.intent.phase==='materials'||s.intent.phase==='survey')return false;
  allocate(s,f,s.intent.kind==='repair'?'repair':'build');
  if(f.activity==='rest')return false;
+ registerPioneerTrip(s,f.pathRoadId);
  const weather=getPioneerWeather(s);const effort=weather==='rain'?.7:1;
  s.intent.workDone=round(Math.min(s.intent.workRequired,s.intent.workDone+effort));
  if(s.intent.workDone>=2&&s.intent.phase==='foundation'){
