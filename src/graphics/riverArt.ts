@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type {Season} from '../simulation/calendar.ts';
+import {VALLEY_RIVER} from '../simulation/valleyGeography.ts';
+export {VALLEY_RIVER as RIVER_WAYPOINTS} from '../simulation/valleyGeography.ts';
 
 /**
  * A physical, contiguous micro-diorama creek. The previous nearly-invisible
@@ -7,10 +9,6 @@ import type {Season} from '../simulation/calendar.ts';
  * This waterway has an opaque color field, authored banks, shore stones and
  * traveling highlights. All cross-sections use one and the same center spline.
  */
-export const RIVER_WAYPOINTS:readonly (readonly [number,number])[]=[
- [3.8,-12.2],[4.8,-10.5],[6.85,-6.1],[7.5,-2.2],
- [8.35,2.2],[8.72,7.2],[8.05,9.2],[4.35,12.1]
-];
 export interface RiverArt {
  root:THREE.Group;surface:THREE.Mesh;waterMeshCount:number;
  setSeason(season:Season):void;animate(time:number):void;
@@ -30,7 +28,7 @@ const flowMat=new THREE.MeshBasicMaterial({color:'#d0e9dc',transparent:true,opac
 const stoneMat=new THREE.MeshStandardMaterial({color:'#a1aa9e',roughness:1});
 const stoneDarkMat=new THREE.MeshStandardMaterial({color:'#747d73',roughness:1});
 const stemMat=new THREE.MeshStandardMaterial({color:'#5b8070',roughness:1});
-const curve=new THREE.CatmullRomCurve3(RIVER_WAYPOINTS.map(([x,z])=>new THREE.Vector3(x,0,z)),false,'centripetal',.45);
+const curve=new THREE.CatmullRomCurve3(VALLEY_RIVER.map(([x,z])=>new THREE.Vector3(x,0,z)),false,'centripetal',.45);
 const rand=(n:number)=>{let k=(n+17)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;};
 const safeU=(u:number)=>Math.max(0,Math.min(1,u));
 /** The terrain channel and water geometry share exactly this spline. */
