@@ -61,7 +61,7 @@ const labels:Record<PioneerWork,string>={
 };
 const safe=(input:string)=>input.replace(/[&<>"']/g,c=>
  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
-const amount=(n:number)=>n.toFixed(1).replace(/\\.0$/,'');
+const amount=(n:number)=>n.toFixed(1).replace(/\.0$/,'');
 function toast(message:string){
  const el=$('pioneerToast');el.textContent=message;el.classList.add('show');
  const key=++lastToast;
