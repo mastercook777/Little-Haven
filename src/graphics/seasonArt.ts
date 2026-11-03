@@ -120,8 +120,12 @@ export function createSeasonalArt(parent:THREE.Object3D):SeasonalArt{
  }
  summerShade(summer,-5.85,5.0);
  const lushGeo=new THREE.ConeGeometry(.16,.65,5);
- petals(summer,135,lushGeo,vivid,i=>{
-  const p=onGround(i+431,30,20,.64);return {...p,scale:.7+rnd(i+71)*.55,rotation:rnd(i+9)*6.28};
+ const summerBeds:[[number,number],[number,number],[number,number],[number,number],[number,number],[number,number]]=
+  [[-13.2,-6.1],[-13.3,1.1],[-7.9,8.8],[3.8,-8.8],[5.1,8.8],[13.2,5.1]];
+ petals(summer,84,lushGeo,vivid,i=>{
+  const bed=summerBeds[i%summerBeds.length];
+  return {x:bed[0]+(rnd(i*19+4)-.5)*2.1,z:bed[1]+(rnd(i*23+6)-.5)*1.7,
+   y:.56,scale:.45+rnd(i+71)*.45,rotation:rnd(i+9)*6.28};
  },true);
  for(let i=0;i<4;i++){
   box(summer,2.3,.20,.46,-10.7,.39,7.1+i*.44,jade);
