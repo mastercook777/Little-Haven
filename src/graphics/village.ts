@@ -8,6 +8,7 @@ import {buildCarvedTerrain,terrainChannelProbe} from './carvedTerrain';
 import {buildVillageEvolution} from './villageEvolution';
 import {createMountainHome,createMountainTavern} from './villageBuildings';
 import {makeVillageCoreGrowth} from './villageCoreGrowth';
+import {makeSettlementRenderer} from './plannedSettlement';
 import {VALLEY_ROUTES} from '../simulation/valleyGeography.ts';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
@@ -195,7 +196,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;coreVisualSignature():string;coreMaturity():number;coreBounds():THREE.Box3;groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;coreVisualSignature():string;coreMaturity():number;coreBounds():THREE.Box3;settlementStages():{id:string;age:number;phase:'foundation'|'frame'|'complete';x:number;z:number}[];groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -302,15 +303,17 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
   typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const buildingRenderer=makeBuildingRenderer(root);
  const growthArt=buildVillageEvolution(root);
+ const livingSettlement=makeSettlementRenderer(root,windows,emissive);
  root.traverse(o=>{if(o.userData.seasonalRoofSnow)seasonallyFrostedRoofs.push(o);});
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets],growthVisualSignature:()=>growthArt.visualSignature(),coreVisualSignature:()=>coreGrowth.signature(),coreMaturity:()=>coreGrowth.stage(),coreBounds:()=>coreGrowth.centerBounds(),groundProbe:terrainChannelProbe,
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets,livingSettlement.root],settlementStages:()=>livingSettlement.stages(),growthVisualSignature:()=>growthArt.visualSignature(),coreVisualSignature:()=>coreGrowth.signature(),coreMaturity:()=>coreGrowth.stage(),coreBounds:()=>coreGrowth.centerBounds(),groundProbe:terrainChannelProbe,
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
    growthArt.update(s.villageGrowth);
    coreGrowth.update(s.villageGrowth);
+   livingSettlement.update(s.villageGrowth);
    const calendar=getCalendar(s),weather=getWeather(s);
    const id=`${s.storyStage}/${s.choice}/${calendar.season}/${weather}`;
    if(lastStage===id)return;lastStage=id;
