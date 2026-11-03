@@ -8,7 +8,7 @@ import {fallingRainY,rainSegmentY} from './weatherMotion.ts';
  */
 export interface WeatherArt{
  root:THREE.Group;setWeather(weather:Weather):void;animate(t:number):void;
- mode():Weather;streakCount:number;
+ mode():Weather;streakCount:number;sampleDrops(count:number):{headY:number;tailY:number}[];
 }
 const rnd=(n:number)=>{let x=(n+31)>>>0;x=Math.imul(x^(x>>>16),0x85ebca6b);x=Math.imul(x^(x>>>13),0xc2b2ae35);return ((x^(x>>>16))>>>0)/4294967296;};
 export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMotion=false):WeatherArt{
@@ -94,7 +94,11 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
    fogGroup.position.x=Math.sin(t*.18)*.18;
   }
  }
- return {root,streakCount:count,mode:()=>current,setWeather(weather){
+ return {root,streakCount:count,mode:()=>current,sampleDrops:(requested:number)=>{
+  const samples:{headY:number;tailY:number}[]=[];
+  for(let i=0;i<Math.min(count,Math.max(0,requested));i++)samples.push({headY:vertices[i*6+1],tailY:vertices[i*6+4]});
+  return samples;
+ },setWeather(weather){
   current=weather;rainGroup.visible=weather==='rain';fogGroup.visible=weather==='fog';
  },animate};
 }
