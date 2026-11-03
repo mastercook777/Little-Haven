@@ -70,6 +70,11 @@ try{
  const roof=await page.evaluate(()=>window.__HAVEN_DEBUG__.getState().opportunities.find(o=>o.kind==='roof-repair'&&o.state==='available'));
  if(!roof)throw Error('Repair opportunity never appeared');
  await page.screenshot({path:out+'/roof-before.png'});
+ await page.evaluate(()=>{
+  const d=window.__HAVEN_DEBUG__;
+  for(const o of d.getState().opportunities.filter(o=>o.state==='available'&&o.kind==='rain-guest'))
+   d.chooseOpportunity(o.id,'observe');
+ });
  await page.locator('#opportunityChoices .opportunity-choice[data-option="drainage"]').click();
  await page.screenshot({path:out+'/roof-scaffold.png'});
  await page.evaluate(()=>window.__HAVEN_DEBUG__.advance(480*10));
