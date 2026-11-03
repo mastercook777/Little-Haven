@@ -159,42 +159,65 @@ function requestShelter(s:PioneerWorld){
  log(s,'商量搭棚',location?'梁伯勘察河岸、山径和林缘，选定安全地块，乡邻开始备木。':
   '梁伯反复勘地，尚无不碰河岸、树根与山径的合法屋址。',id);
 }
+/** Each assignment resolves one safe resident commute, which the renderer
+ * samples at any frame rate. Cached until the job or worksite changes. */
 function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:PioneerResourceSite){
- f.activity=activity;
- f.target=site?point(site.x,site.z):activity==='build'&&s.intent?.parcel?
-  point(s.intent.parcel.x,s.intent.parcel.z+.9):
-  activity==='shelter'&&s.buildings.length?
-  point(s.buildings[0].parcel.x,s.buildings[0].parcel.z+.7):
-  point(s.camp.x+(f.id-2)*.65,s.camp.z+(f.id%2?.65:-.5));
+ const task=s.intent;
+ const home=s.buildings.find(b=>b.id===f.homeBuildingId);
+ const shelter=activity==='shelter'?home:undefined;
+ const targetBuilding=activity==='build'||activity==='repair'?
+  s.buildings.find(b=>b.id===task?.targetBuildingId):shelter;
+ const jobRoute=(activity==='build'||activity==='repair')?
+  task?.path&&task.path.length?task.path:
+  s.roads.find(r=>r.buildingId===targetBuilding?.id)?.points:undefined;
+ const builtRoad=s.roads.find(r=>r.buildingId===targetBuilding?.id);
+ const goal:WalkPoint=site?[site.x,site.z]:
+  (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
+  shelter?pioneerEntrance(shelter.parcel):
+  [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
+ const isSame=f.activity===activity&&f.target[0]===goal[0]&&f.target[1]===goal[1];
+ if(isSame&&f.commute?.length)return;
+ const from:WalkPoint=home?pioneerEntrance(home.parcel):[s.camp.x,s.camp.z];
+ const obstacles=[...landscape(),...s.buildings.map(b=>b.parcel)].filter(p=>
+  p.id!==home?.parcel.id&&p.id!==task?.parcel?.id&&p.id!==shelter?.parcel.id);
+ let commute:WalkPoint[]|null;
+ if(home&&shelter?.id===home.id)commute=[from,goal];
+ else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
+ else commute=findPioneerWalk(from,goal,obstacles);
+ if(!commute){
+  // Never award work or gathered stock to somebody who cannot reach the place.
+  f.activity='rest';f.target=point(from[0],from[1]);f.commute=[from,from];f.pathRoadId=undefined;
+  return;
+ }
+ f.activity=activity;f.target=point(goal[0],goal[1]);f.commute=commute;
+ f.pathRoadId=builtRoad?.id??
+  (activity==='build'?s.roads.find(r=>r.buildingId===task?.parcel?.id)?.id:undefined);
+ registerPioneerTrip(s,f.pathRoadId);
 }
 function gather(s:PioneerWorld,f:PioneerFounder,kind:PioneerResourceSite['kind'],amount:number,activity:PioneerWork){
- const site=s.sites.find(x=>x.kind===kind)!;
+ const site=s.sites.find(x=>x.kind===kind);if(!site)return false;
  allocate(s,f,activity,site);
- const gathered=Math.min(site.stock,amount);
+ if(f.activity==='rest')return false;
+ const cap=kind==='forest'?48:36;
+ const held=kind==='forest'?s.resources.wood:kind==='spring'?s.resources.water:s.resources.food;
+ const gathered=Math.max(0,Math.min(site.stock,amount,cap-held));
  site.stock=round(site.stock-gathered);site.totalGathered=round(site.totalGathered+gathered);
- if(kind==='forest')s.resources.wood=round(Math.min(32,s.resources.wood+gathered));
- else if(kind==='forage')s.resources.food=round(Math.min(30,s.resources.food+gathered));
- else s.resources.water=round(Math.min(30,s.resources.water+gathered));
+ if(kind==='forest')s.resources.wood=round(s.resources.wood+gathered);
+ else if(kind==='spring')s.resources.water=round(s.resources.water+gathered);
+ else s.resources.food=round(s.resources.food+gathered);
  return gathered>0;
 }
 function work(s:PioneerWorld,f:PioneerFounder){
  if(!s.intent||!s.intent.parcel||s.intent.phase==='materials'||s.intent.phase==='survey')return false;
- allocate(s,f,'build');
+ allocate(s,f,s.intent.kind==='repair'?'repair':'build');
+ if(f.activity==='rest')return false;
  const weather=getPioneerWeather(s);const effort=weather==='rain'?.7:1;
  s.intent.workDone=round(Math.min(s.intent.workRequired,s.intent.workDone+effort));
  if(s.intent.workDone>=2&&s.intent.phase==='foundation'){
-  s.intent.phase='frame';log(s,'梁架起身','地基稳住，木梁被真正搭起，遮雨棚渐渐有了轮廓。',s.intent.id);
+  s.intent.phase='frame';log(s,s.intent.kind==='repair'?'修缮起梁':'梁架起身',
+    '地基已稳住，木梁和施工细节逐渐有了轮廓。',s.intent.id);
  }
  return true;
-}
-function completeShelter(s:PioneerWorld){
- const intent=s.intent;if(!intent||!intent.parcel)return;
- const b:PioneerBuilding={id:'shelter-'+s.nextEventId,kind:'shelter',
-  parcel:intent.parcel,completedAt:s.minutes,causeId:intent.id,
-  occupants:s.founders.map(f=>f.id),materialsSpent:{wood:intent.woodCommitted},workHours:intent.workDone};
- s.buildings.push(b);s.intent=null;s.comfort=80;
- for(const f of s.founders){f.homeBuildingId=b.id;allocate(s,f,'shelter');}
- log(s,'第一间棚子落成','梁伯与陆娘搭起木梁，阿禾把吃食搬进新棚。三人终于有了避雨归处。',b.causeId);
 }
 /** One authoritative hourly settlement step. Work assignments are exclusive and
  * consume one person's hour; day/month fast-forward uses these same steps. */
