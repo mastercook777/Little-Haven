@@ -404,7 +404,7 @@ export function residentMotion(v:Villager,s:WorldState):ResidentMotion{
    activity:outbound||returning?'往返山外茶亭':'煮茶，招待山道过客',
    activityId:outbound||returning?'walk':'serve',interactionTargetId:'tea-pavilion'};
  }
- const life=dailyResidentMotion(v,s.minutes,getWeather(s));
+ const life=dailyResidentMotion(v,s.minutes,getWeather(s),s.villageGrowth);
  const practice=life.activityId==='train'&&!life.walking;
  return {...life,visible:h>6.4&&h<21,practicing:practice};
 }
