@@ -44,7 +44,10 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   clearance:.24,accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
  const occupied=[...taken,camp];
  const field=s.sites.find(site=>site.kind==='field');
- const center=kind==='garden'?{x:s.camp.x-3.8,z:s.camp.z+3.5}:
+ const center=kind==='garden'?(s.policy==='food'?
+  {x:s.camp.x-2.1,z:s.camp.z+5.0}:s.policy==='shelter'?
+  {x:s.camp.x-5.4,z:s.camp.z+2.0}:
+  {x:s.camp.x+2.7,z:s.camp.z+3.0}):
   kind==='wood-yard'?{x:s.camp.x-4.6,z:s.camp.z-2.4}:
   s.policy==='food'?{x:s.camp.x-4.0,z:s.camp.z+3.3}:
   s.policy==='shelter'?{x:s.camp.x-3.5,z:s.camp.z-3.2}:
@@ -70,7 +73,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
     s.policy==='food'?Math.hypot(x-(s.camp.x-4),z-(s.camp.z+4))*.12:0;
-   const score=proximity*.24+distance({x,z},s.camp)*.11+
+   const score=proximity*.57+distance({x,z},s.camp)*.11+
     road.distance*.12+policy+hash(s.seed+i*719+j*991+salt*533+rotation*80)*.81;
    choices.push({parcel,score});
   }
