@@ -7,13 +7,14 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen хо
 ## Source of truth
 
 1. `ROADMAP.md`: release phases, priorities and acceptance criteria.
-2. `docs/V03_WORLD_FRAMEWORK.md`: planned calendar, season, weather and save contracts (**design only**).
-3. `docs/V03_VILLAGE_GROWTH.md`: planned building state, plots and growth contracts (**design only**).
-4. `docs/V03_PLAYER_AGENCY.md`: planned guardian interventions and replay safety (**design only**).
-5. `docs/V03_ART_DIRECTION.md`: planned art, animation and performance contracts (**design only**).
-6. `docs/V02_*.md`: current shipped v0.2 brief, scene and story baseline.
-7. `src/simulation/world.ts`: authoritative testable current state; no Three.js here.
-8. `src/graphics/`: visuals only; no save/clock/decision mutations.
+2. `docs/V04_PIONEER_ERA.md`: **v0.4 design-only** specification for an independent zero-building pioneer mode; it supersedes prebuilt-town assumptions only inside this new mode.
+3. `docs/V03_WORLD_FRAMEWORK.md`: planned calendar, season, weather and save contracts (**design only**).
+4. `docs/V03_VILLAGE_GROWTH.md`: planned building state, plots and growth contracts (**design only**).
+5. `docs/V03_PLAYER_AGENCY.md`: planned guardian interventions and replay safety (**design only**).
+6. `docs/V03_ART_DIRECTION.md`: planned art, animation and performance contracts (**design only**).
+7. `docs/V02_*.md`: current shipped v0.2 brief, scene and story baseline.
+8. `src/simulation/world.ts`: authoritative testable current state; no Three.js here.
+9. `src/graphics/`: visuals only; no save/clock/decision mutations.
 
 ## Hard rules
 
@@ -28,6 +29,10 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen хо
 - v0.3: one authoritative clock, stable building IDs, causal player opportunities, recoverable offline hazards.
 - v0.3: distinguish day-scale activity from multi-year life milestones; do not regress to the v0.2 four-day life arc.
 - Treat all v0.3 markdown as planned contracts, not as code already in production; develop substantial changes on feature branches.
+- v0.4 Pioneer Era **is currently a design, not shipped code**. Never claim it is already playable solely because the document is merged.
+- Pioneer mode must initialize with **no permanent buildings**, exactly three founders and a temporary campfire; legacy v0.3 must stay independently playable with untouched save slots.
+- Do not hide a prebuilt village and call it construction. A new permanent structure must have a causal resident need, materials, workers, a collision-safe reachable parcel, visible construction and durable IDs.
+- Tavern/dojo/wuxia storylets in pioneer mode are conditioned on real facilities and people; never use old v0.3 hardcoded initial minutes or phantom `inn-001` references for the new mode.
 
 ## Skills
 
@@ -40,4 +45,5 @@ Read `.agents/skills/threejs-game-director/SKILL.md` and relevant siblings under
 - `npm run build:pages`
 - Real desktop/browser smoke: initial vista, visitor arrival, player choice, both ending buildings, persistence/reload, no canvas blank/error. Mobile viewport when possible.
 - For v0.3: verify season/year boundaries, building wear/repair, guardian opportunities, migrations and representative real-browser captures.
+- For v0.4: test pioneer zero-building initial state, resident resources/tasks, legitimate first shelter, dynamic routes, safe plots, season fast-forward equivalence, old/new save isolation, and actual desktop/mobile WebGL progression.
 - Avoid commits of `node_modules`, `dist`, generated reports, or credentials. Document unverified items plainly.

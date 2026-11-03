@@ -103,9 +103,9 @@
 - [x] 桌面与手机、旋转镜头、三帧落雨和角色动作、四季双分支完整视觉验收；CI/Pages 发布（Sprint 4）
 - [ ] 真正的河床地形切削与完整地块重新排布；A* 与 NPC 双向避让（后续深化）
 
-### 延后至 v0.4
+### v0.4 之后仍暂缓
 
-复杂门派生态、真实战斗、官府与匪患完整危机、广泛 storylets、大模型实时剧情；优先验证平凡生活能否留下痕迹。
+复杂门派生态、真实战斗、官府与匪患完整危机、广泛 storylets、大模型实时剧情继续暂缓；v0.4 聚焦真正从零开始的村落形成与居民自治。
 
 ### v0.3 验收门槛
 
@@ -115,6 +115,28 @@
 4. 守谷人出手/不出手都形成长期、可反查的因果变化。
 5. 多倍率、离线恢复、存档迁移、场景性能、移动布局通过验收。
 
+## v0.4 — 开荒纪元 / Pioneer Era（设计完成，尚未开发）
+
+**核心转型：从「已有酒肆的村庄继续扩建」变为「三人一火，在荒谷自然建出家园」。** [正式设计与分阶段验收](docs/V04_PIONEER_ERA.md)。
+
+- [x] **P0 设计基线**：初始零永久建筑、三名开荒居民、临时营火、真实资源来源、需求驱动首个避雨棚。
+- [x] **技术与兼容契约**：v3 旧谷保留，v4 独立开荒存档；所有永久屋舍/路径经统一地块与可达性校验，复用 Sprint 7 SAT/河坡/树木保护。
+- [x] **玩法闭环和体验节奏**：居民自主生产/消费/施工；守谷人仅影响方向；无操作可运行；前 10–15 分钟有明确从无到有的可见转变。
+- [x] **江湖融入边界**：茶棚、酒肆、练武坪与阿青/沈问舟剧情必须由真实的生产、道路、住户与访客条件解锁。
+- [ ] **Phase A（P0）荒谷第一间棚子**：模式/存档隔离、营火、三人分工、合法选址、可视施工、居民使用、实时与流年回归。
+- [ ] **Phase B（P1）自主建村**：资源采集/再生、住户和工作、动态路径、新屋及修缮迁址；同 seed 不同决策可长出不同聚落。
+- [ ] **Phase C（P2）烟火招来江湖**：基于真实茶棚/酒肆/训练场的剧情门槛和原江湖双分支。
+- [ ] **Phase D（P3）美术与长寿命**：高品质绑定角色、长期气候/衰老/迁居、性能与移动端真机审核。
+
+### v0.4 的发布门槛
+
+1. 开荒新档永久建筑数必须为 0；不能仅隐藏 v0.3 旧村建筑 Mesh。
+2. 正常资源/天气下，1× 前 10–15 分钟看到营火、分工、真实施工和第一处可使用遮蔽。
+3. 房屋有居民需求、物资与时间、合法地块与接入道路、可追溯原因；无操作能自治，缺料不能凭空施工。
+4. 1×、流年、离线恢复（安全上限内）与导入后的同 seed 行为确定一致。
+5. 旧谷模式及旧存档不破坏；Chromium 桌面/手机 WebGL 与模型穿插验收通过。
+6. 阶段验收须区分「技术可运行」与「美术质量合格」，不得把程序化分件模型冒称专业绑定角色。
+
 ## Design guardrail
 
-Maintain the visual center: an ordinary tavern and ordinary lives. No elaborate martial arts combat, distant open-world rendering, AI API or faction simulator until the first life arc is enjoyable to **watch**.
+Keep ordinary lives as the visual and simulation center. In **v0.3 classic mode**, the tavern is the visual center; in **v0.4 pioneer mode**, it must emerge from authentic resident needs and available building plots, never exist at game start. No elaborate martial arts combat, distant open-world rendering, AI API or faction simulator until the first life arc is enjoyable to **watch**.
