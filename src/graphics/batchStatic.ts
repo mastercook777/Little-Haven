@@ -6,7 +6,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
  * This reduces per-mesh draw calls without freezing dynamic world state.
  */
 export interface BatchStats{before:number;after:number;merged:number;groups:number;}
-export function batchStaticSubtree(root:THREE.Group):BatchStats{
+export function batchStaticSubtree(root:THREE.Group,options:{disposeOriginals?:boolean}={}):BatchStats{
  const result:BatchStats={before:0,after:0,merged:0,groups:0};
  const removedGeometries=new Set<THREE.BufferGeometry>();
  const visit=(parent:THREE.Group)=>{
@@ -14,7 +14,7 @@ export function batchStaticSubtree(root:THREE.Group):BatchStats{
   for(const child of nested)visit(child);
   const bins=new Map<string,THREE.Mesh[]>();
   for(const child of parent.children){
-   if(!(child instanceof THREE.Mesh)||child instanceof THREE.InstancedMesh)continue;
+   if(!(child instanceof THREE.Mesh)||child instanceof THREE.InstancedMesh||child.userData.keepDynamicMesh)continue;
    result.before++;
    if(Array.isArray(child.material)||child.material.transparent||child.material.opacity<1)continue;
    const geo=child.geometry as THREE.BufferGeometry;
@@ -42,6 +42,6 @@ export function batchStaticSubtree(root:THREE.Group):BatchStats{
  visit(root);
  const activeGeometries=new Set<THREE.BufferGeometry>();
  root.traverse(o=>{if(o instanceof THREE.Mesh){result.after++;activeGeometries.add(o.geometry);}});
- for(const geo of removedGeometries)if(!activeGeometries.has(geo))geo.dispose();
+ if(options.disposeOriginals!==false)for(const geo of removedGeometries)if(!activeGeometries.has(geo))geo.dispose();
  return result;
 }
