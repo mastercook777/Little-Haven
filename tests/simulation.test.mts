@@ -7,6 +7,10 @@ import {getWeatherForMinutes} from '../src/simulation/weather.ts';
 import {PLOTS,validatePlots} from '../src/simulation/plots.ts';
 import {conditionOf} from '../src/simulation/buildings.ts';
 import {dailyRoutePoints,dailyHash} from '../src/simulation/routines.ts';
+import {fallingRainY,rainSegmentY} from '../src/graphics/weatherMotion.ts';
+import {REST_POSE,sampleCharacterPose,interpolatePose} from '../src/graphics/characterMotion.ts';
+import {buildRiverArt,RIVER_WAYPOINTS} from '../src/graphics/riverArt.ts';
+import * as THREE from 'three';
 
 const to=(s:ReturnType<typeof createWorld>,minute:number)=>advanceWorld(s,(minute-s.minutes)/3);
 const arrived=()=>{const s=createWorld(0);to(s,STORY_VISITOR_AT);return s;};
@@ -308,4 +312,63 @@ test('sprint3: changing rain and fog alters activity without teleports or forced
   return;
  }
  assert.fail('Expected at least one rainy day in first year');
+});
+
+
+test('sprint4 H1: rain drops descend in -Y, wrap only on floor, and each streak points down',()=>{
+ const base=6.8,speed=7.25,y0=fallingRainY(base,0,speed);
+ const y1=fallingRainY(base,.04,speed),y2=fallingRainY(base,.08,speed);
+ assert.ok(y0>y1&&y1>y2,'rain must move down rather than up');
+ assert.ok(Math.abs((y0-y2)-speed*.08)<1e-5,'rain speed should be time-parametric');
+ const [head,tail]=rainSegmentY(y2,.58);
+ assert.ok(head>tail,'rain shaft tail must always be below head');
+ const bottom=.30,almost=fallingRainY(.45,.01,7.25);
+ const wrapped=fallingRainY(.45,.03,7.25);
+ assert.ok(almost>bottom&&wrapped>almost,'only ground crossing may wrap to roof');
+ for(const t of [0,1.4,32.7,403]){
+  const y=fallingRainY(1.25,t,7.25);
+  assert.ok(y>=.30&&y<10.9,'wrapped rain outside allowed vertical range');
+ }
+});
+test('sprint4 H2: creek is a broad continuous surface whose center crosses below bridge',()=>{
+ const root=new THREE.Group(),river=buildRiverArt(root);
+ const bridge=new THREE.Vector3(8.35,0,2.2);
+ assert.ok(RIVER_WAYPOINTS.length>=7);
+ const closest=Math.min(...Array.from({length:101},(_,i)=>river.pointAt(i/100).distanceTo(bridge)));
+ assert.ok(closest<.24,'river center misses the bridge crossing by '+closest);
+ assert.ok(river.getSurfaceHeight()>.26&&river.getSurfaceHeight()<.5);
+ assert.equal(river.surface.name,'river-water');
+ const riverMeshes:THREE.Mesh[]=[];
+ root.traverse(o=>{if(o instanceof THREE.Mesh)riverMeshes.push(o);});
+ assert.ok(riverMeshes.some(m=>m.name==='river-bed'));
+ assert.ok(riverMeshes.filter(m=>m.name==='river-shore').length>=4);
+ const bounds=new THREE.Box3().setFromObject(river.surface);
+ assert.ok(bounds.max.z-bounds.min.z>20,'river does not span the island');
+ assert.ok(bounds.max.x-bounds.min.x>4,'river must bend rather than be a straight decal');
+ const u0=river.pointAt(.2),u1=river.pointAt(.21);
+ assert.ok(u0.distanceTo(u1)<1.5,'river spline discontinuity');
+ river.animate(0);river.animate(3);river.setSeason('winter');
+ assert.ok(river.root.parent===root);
+});
+test('sprint4: procedural work poses have deliberate cycles, not a shared fixed arm swing',()=>{
+ const sweep=sampleCharacterPose('sweep',1,2,false,false);
+ const gather=sampleCharacterPose('gather',1,3,false,false);
+ const fish=sampleCharacterPose('fish',1,7,false,false);
+ const walk=sampleCharacterPose('walk',1,7,true,false);
+ const train=sampleCharacterPose('train',1,8,false,false);
+ assert.notDeepEqual(sweep,gather);assert.notDeepEqual(fish,train);
+ assert.notDeepEqual(walk,fish);
+ assert.ok(walk.leftLegX!==walk.rightLegX,'walk must alternate legs');
+ assert.ok(train.leftKnee>0&&train.rightKnee>0,'swordsman needs a stable stance');
+ const deepWork=Array.from({length:21},(_,i)=>sampleCharacterPose('gather',i*.23,4,false,false).torsoX);
+ assert.ok(Math.max(...deepWork)-Math.min(...deepWork)>.18,'gathering lacks bend-and-rise phase');
+});
+test('sprint4: contact poses blend smoothly without snapping on interrupted actions',()=>{
+ const first=sampleCharacterPose('walk',2,1,true,false);
+ const second=sampleCharacterPose('train',2.02,8,false,false);
+ const blended=interpolatePose(first,second,.18);
+ assert.ok(Math.abs(blended.rightArmX-first.rightArmX)<=Math.abs(second.rightArmX-first.rightArmX)*.19);
+ assert.ok(Math.abs(blended.torsoX-first.torsoX)<=Math.abs(second.torsoX-first.torsoX)*.19);
+ assert.deepEqual(interpolatePose(REST_POSE,second,0),REST_POSE);
+ assert.deepEqual(interpolatePose(first,second,1),second);
 });
