@@ -8,6 +8,7 @@ import {buildCarvedTerrain,terrainChannelProbe} from './carvedTerrain';
 import {buildVillageEvolution} from './villageEvolution';
 import {createMountainHome,createMountainTavern} from './villageBuildings';
 import {makeVillageCoreGrowth} from './villageCoreGrowth';
+import {VALLEY_ROUTES} from '../simulation/valleyGeography.ts';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -226,15 +227,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  // A readable watercourse with bank slopes, stones, and real under-bridge continuity.
  const riverArt=buildRiverArt(root);
  const pathMat=new THREE.MeshStandardMaterial({color:'#c4b396',side:THREE.DoubleSide});
- const routes:[number,number][][]=[
-  [[-12,-5],[-9,-3.9],[-6,-2.7],[-4,2.7],[-3,3.2],[-1,3.1],[3,2.2],[6.3,2.2],[8.3,2.2],[11.2,2.2],[15.9,2.2]],
-  [[-2.6,3.0],[-.2,4.5],[1.6,6.1],[4.1,8.5]],
-  [[-6.8,-3.0],[-9.2,1.1],[-10.7,5.8]],
-  [[-4.1,3.0],[-5.9,5.1],[-9.3,4.0]],
-  [[-2,2.8],[1,-2.0],[3.4,-5.5]],
-  [[-4.4,-.3],[-5.3,-4],[-8.8,-5.3]]
- ];
- routes.forEach((points,i)=>ribbon(root,points,i===0?1.08:.72,pathMat,.26));
+ VALLEY_ROUTES.forEach((points,i)=>ribbon(root,points.map(p=>[p[0],p[1]]),i===0?1.08:.72,pathMat,.26));
  bridge(root);archedGate(root);
  // A working village center actually rebuilds over the years. The stable
  // picking wrappers survive when whole building volumes are replaced.
