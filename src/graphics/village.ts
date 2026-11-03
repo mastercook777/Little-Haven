@@ -284,9 +284,10 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  // Seasonal props are physical scene geometry, not a full-screen color filter.
  const winterTrim=group(root,0,0,0);
  const frost=mat('#d7e6dc');
- box(winterTrim,3.45,.055,.18,-3.4,5.81,-.52,frost);
- box(winterTrim,2.3,.052,.17,-9,3.03,-5.5,frost);
- box(winterTrim,2.35,.052,.17,-9.8,3.09,3.1,frost);
+ // Roof snow now derives from the actual mesh profile, not old absolute Y
+ // coordinates that floated above the rebuilt tavern and home rooftops.
+ const seasonallyFrostedRoofs:THREE.Object3D[]=[];
+ root.traverse(o=>{if(o.userData.seasonalRoofSnow)seasonallyFrostedRoofs.push(o);});
  for(const [x,z] of [[-13.0,-4.2],[-12.7,1.9],[.4,-8.7],[3.3,9.3],[11.8,5.1]] as const){
   const patch=sphere(winterTrim,.52,x,.225,z,frost);patch.scale.set(1,.07,.76);
  }
@@ -325,6 +326,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
    riverArt.setSeason(calendar.season);pathMat.color.set(palette.path);
    seasonalArt.setSeason(calendar.season);weatherArt.setWeather(weather);
    winterTrim.visible=calendar.season==='winter';
+   for(const mesh of seasonallyFrostedRoofs)mesh.visible=calendar.season==='winter';
    puddles.visible=weather==='rain';
    if(scene.fog instanceof THREE.FogExp2)scene.fog.density=weather==='fog'?.018:weather==='rain'?.0095:.0075;
    legacyHost.visible=s.storyStage==='legacy'&&s.choice==='host';
