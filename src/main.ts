@@ -84,8 +84,8 @@ function renderProgress(){
 }
 function renderStats(){ $('population').textContent=String(world.population);$('houses').textContent=String(world.houses);$('renown').textContent=String(world.renown);}
 function renderClock(){
- const c=getClock(world),h=c.hour;$('clock').textContent=c.text;
- const cal=getCalendar(world);$('period').textContent='第'+cal.year+'年 · '+SEASON_NAMES[cal.season]+cal.dayOfSeason+'日 · '+WEATHER_NAMES[getWeather(world)];
+ const c=getClock(world),h=c.hour;$('clock').textContent=c.text;$('dayLabel').textContent=formatDay();
+ const cal=getCalendar(world);$('period').textContent=window.innerWidth<760?cal.year+'年'+SEASON_NAMES[cal.season]+cal.dayOfSeason+'·'+WEATHER_NAMES[getWeather(world)]:'第'+cal.year+'年 · '+SEASON_NAMES[cal.season]+cal.dayOfSeason+'日 · '+WEATHER_NAMES[getWeather(world)];
  $('dayIcon').textContent=h<6||h>=19?'☾':h<10?'☼':'☀';
 }
 function renderResident(){
