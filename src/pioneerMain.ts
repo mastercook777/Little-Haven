@@ -57,7 +57,8 @@ let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
 const labels:Record<PioneerWork,string>={
  rest:'照看营地', 'collect-wood':'林缘拾柴','forage':'入林采食',
- 'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火','shelter':'棚屋休息'
+ 'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
+ 'shelter':'回家休息','farm':'耕作收菜','repair':'修屋补梁'
 };
 const safe=(input:string)=>input.replace(/[&<>"']/g,c=>
  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
