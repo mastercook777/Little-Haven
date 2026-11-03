@@ -13,17 +13,22 @@ const bark=material('#705849'),pink=material('#eaa9b3'),petal=material('#f5ced1'
  vivid=material('#649855'),summerLight=material('#9bb75b'),straw=material('#ceb076'),
  snow=material('#e8f1e9'),snowBlue=material('#cfdfdf'),terracotta=material('#9c6548'),
  roofRed=material('#ac6e55'),warm=material('#ecd5a7');
+const boxGeo=new THREE.BoxGeometry(1,1,1);
+const canopyGeo=new THREE.IcosahedronGeometry(1,1);
+const stemGeo=new THREE.CylinderGeometry(.65,1,1,6);
+const barrelGeo=new THREE.CylinderGeometry(.33,.30,.60,10);
+const awningGeo=new THREE.ConeGeometry(1,1,8);
 function box(parent:THREE.Object3D,w:number,h:number,d:number,x:number,y:number,z:number,m:THREE.Material){
- const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
- mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
+ const mesh=new THREE.Mesh(boxGeo,m);
+ mesh.scale.set(w,h,d);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
 function sphere(parent:THREE.Object3D,r:number,x:number,y:number,z:number,m:THREE.Material,sx=1,sy=1,sz=1){
- const mesh=new THREE.Mesh(new THREE.IcosahedronGeometry(r,1),m);
- mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);mesh.castShadow=true;parent.add(mesh);return mesh;
+ const mesh=new THREE.Mesh(canopyGeo,m);
+ mesh.position.set(x,y,z);mesh.scale.set(r*sx,r*sy,r*sz);mesh.castShadow=true;parent.add(mesh);return mesh;
 }
 function stem(parent:THREE.Object3D,x:number,z:number,height:number,width:number,m=bark){
- const mesh=new THREE.Mesh(new THREE.CylinderGeometry(width*.65,width,height,6),m);
- mesh.position.set(x,.20+height/2,z);mesh.castShadow=true;parent.add(mesh);
+ const mesh=new THREE.Mesh(stemGeo,m);
+ mesh.scale.set(width,height,width);mesh.position.set(x,.20+height/2,z);mesh.castShadow=true;parent.add(mesh);
  return mesh;
 }
 function group(parent:THREE.Object3D){const g=new THREE.Group();parent.add(g);return g;}
@@ -54,7 +59,7 @@ function blossomTree(parent:THREE.Object3D,x:number,z:number,season:'spring'|'au
  sphere(g,.66,0,3.15,0,season==='spring'?pink:gold,1.0,.75,.95);
 }
 function barrel(parent:THREE.Object3D,x:number,y:number,z:number,s=1){
- const c=new THREE.Mesh(new THREE.CylinderGeometry(.33,.30,.6,10),straw);
+ const c=new THREE.Mesh(barrelGeo,straw);
  c.position.set(x,y+.3*s,z);c.scale.setScalar(s);parent.add(c);
  box(parent,.75*s,.09*s,.75*s,x,y+.63*s,z,bark);
 }
@@ -75,8 +80,8 @@ function layHarvest(parent:THREE.Object3D){
 function summerShade(parent:THREE.Object3D,x:number,z:number){
  const g=new THREE.Group();g.position.set(x,.25,z);parent.add(g);
  stem(g,0,0,2.1,.09,bark);
- const awning=new THREE.Mesh(new THREE.ConeGeometry(1.72,.45,8),roofRed);
- awning.position.y=2.34;awning.rotation.y=Math.PI/8;g.add(awning);
+ const awning=new THREE.Mesh(awningGeo,roofRed);
+ awning.scale.set(1.72,.45,1.72);awning.position.y=2.34;awning.rotation.y=Math.PI/8;g.add(awning);
  box(g,2.7,.12,.75,0,.49,0,bark);
  for(const dx of [-.93,.93])box(g,.10,.59,.10,dx,.28,0,bark);
  barrel(g,-1.0,.21,1.08,.77);
