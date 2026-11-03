@@ -3,6 +3,7 @@ import {getCalendar,getWeather,type ActivityId,type Villager,type WorldState,res
 import {dressCharacter,type CharacterCostume} from './characterKit';
 import {REST_POSE,sampleCharacterPose,interpolatePose,type CharacterPose} from './characterMotion';
 import {batchStaticSubtree} from './batchStatic';
+import {createHeroAnimator,type HeroAnimator} from './heroClips';
 
 /** An articulated workshop-doll body with a real upper-body and head pivot. */
 const fabric=new Map<string,THREE.MeshStandardMaterial>();
@@ -42,7 +43,7 @@ export interface PersonModel{
  grownGear:THREE.Group|null;winterGear:THREE.Group;
  gear:Partial<Record<ActivityId,THREE.Group>>;
  robe:THREE.Mesh;costume:CharacterCostume;
- pose:CharacterPose;lastT:number;heading:number;
+ pose:CharacterPose;lastT:number;heading:number;heroAnimator:HeroAnimator|null;
 }
 export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]{
  const models=villagers.map(v=>{
@@ -89,9 +90,13 @@ export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]
    cylinder(headRig,.14,.27,.30,0,.48,0,mat('#b7a175'));
   }
   if(v.id===8){
-   const sword=new THREE.Group();arms[1].add(sword);sword.name='training-sword';
-   piece(sword,new THREE.BoxGeometry(.056,.95,.067),mat('#b99c73'),0,-.81,.20);
-   piece(sword,new THREE.BoxGeometry(.30,.075,.10),mat('#7a5949'),0,-.40,.20);
+   // Hand-gripped blade follows the wrist pivot, not an unrelated static body block.
+   const wrist=new THREE.Group();wrist.name='sword-wrist';wrist.position.set(0,-.50,.035);
+   arms[1].add(wrist);
+   const sword=new THREE.Group();wrist.add(sword);sword.name='training-sword';
+   piece(sword,new THREE.BoxGeometry(.065,.065,1.05),mat('#c0a179'),0,0,.62);
+   piece(sword,new THREE.BoxGeometry(.31,.085,.10),mat('#755749'),0,0,.13);
+   piece(sword,new THREE.CylinderGeometry(.058,.067,.28,7),mat('#9b7558'),0,0,-.05).rotation.x=Math.PI/2;
   }
   if(v.id===9){
    const straw=mat('#9f9070');
@@ -149,9 +154,12 @@ export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]
   const shadow=new THREE.Mesh(contactGeometry,contactMaterial);
   shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;shadow.name='contact-shadow';g.add(shadow);
   return {villager:v,group:g,upper,headRig,legs,knees,arms,grownGear,winterGear,gear,robe,
-   costume,pose:{...REST_POSE},lastT:0,heading:0};
+   costume,pose:{...REST_POSE},lastT:0,heading:0,heroAnimator:null};
  });
- for(const person of models)batchStaticSubtree(person.group,{disposeOriginals:false});
+ for(const person of models){
+  batchStaticSubtree(person.group,{disposeOriginals:false});
+  if(person.villager.id===8)person.heroAnimator=createHeroAnimator(person.group);
+ }
  return models;
 }
 export function updatePeople(people:PersonModel[],state:WorldState,t:number,selected:number|null){
@@ -163,14 +171,19 @@ export function updatePeople(people:PersonModel[],state:WorldState,t:number,sele
   const dt=Math.min(.06,Math.max(0,t-person.lastT));person.lastT=t;
   const alpha=1-Math.exp(-dt*8.5);
   const action=movement.activityId,walking=movement.walking;
-  const target=sampleCharacterPose(action,t,v.id,walking,rain);
-  person.pose=interpolatePose(person.pose,target,alpha);
+  const hero=person.heroAnimator;
+  if(hero)hero.update(dt,walking?'walk':action==='train'?'sword-form':'idle');
+  else{
+   const target=sampleCharacterPose(action,t,v.id,walking,rain);
+   person.pose=interpolatePose(person.pose,target,alpha);
+  }
   const p=person.pose;
-  g.position.set(movement.x,.19+p.bob,movement.z);
+  g.position.set(movement.x,.19+(hero?0:p.bob),movement.z);
   const angleDiff=Math.atan2(Math.sin(movement.heading-person.heading),
    Math.cos(movement.heading-person.heading));
   person.heading+=angleDiff*alpha;
   g.rotation.y=person.heading;
+  if(!hero){
   person.upper.rotation.set(p.torsoX,0,p.torsoZ);
   person.headRig.rotation.set(-p.torsoX*.16,p.headY,0);
   person.legs[0].rotation.x=p.leftLegX;person.legs[1].rotation.x=p.rightLegX;
@@ -181,6 +194,14 @@ export function updatePeople(people:PersonModel[],state:WorldState,t:number,sele
   person.costume.hems[1].rotation.x=p.hem;
   if(person.costume.cape)person.costume.cape.rotation.x=-p.hem*.35;
   person.robe.rotation.z=p.torsoZ*.3;
+  }else{
+   // The mixer has already authored all named joint rotations. Never overwrite
+   // them with the old procedural sine-pose system in the same render frame.
+   person.pose={...person.pose,rightArmX:person.arms[1].rotation.x,
+    rightArmZ:person.arms[1].rotation.z,leftArmX:person.arms[0].rotation.x,
+    torsoX:person.upper.rotation.x,torsoZ:person.upper.rotation.z,
+    leftLegX:person.legs[0].rotation.x,rightLegX:person.legs[1].rotation.x};
+  }
   person.winterGear.visible=winter;
   for(const [key,tool] of Object.entries(person.gear))if(tool)tool.visible=key===action;
   const grown=v.id===8&&(state.storyStage==='returned'||state.storyStage==='legacy');
