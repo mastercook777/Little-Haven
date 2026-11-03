@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {getCalendar,getWeather,type WorldState} from '../simulation/world';
+import {makeBuildingRenderer} from './buildingRenderer';
 
 /** Wuxia valley: all meshes, silhouettes, materials and lights are locally procedural. */
 const cache=new Map<string,THREE.MeshStandardMaterial>();
@@ -229,7 +230,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -263,13 +264,13 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  routes.forEach((points,i)=>ribbon(root,points,i===0?1.08:.72,pathMat,.26));
  bridge(root);archedGate(root);
  // Village structures orbit one social hub rather than a generic marketplace.
- tavern(root,windows,emissive,swing);
- home(root,-9,-5.5,2.85,2.4,1.86,0,windows,emissive);
+ const innModel=tavern(root,windows,emissive,swing);innModel.userData.buildingId='inn-001';
+ const homeModel=home(root,-9,-5.5,2.85,2.4,1.86,0,windows,emissive);homeModel.userData.buildingId='home-001';
  home(root,-9.8,3.1,2.8,2.5,1.95,2,windows,emissive);
  home(root,3.4,-5.6,3.15,2.6,2.12,1,windows,emissive);
  home(root,-.7,-7.9,2.5,2.2,1.68,3,windows,emissive);
  home(root,-11.6,-.4,2.4,2.1,1.70,0,windows,emissive);
- gardenHerbs(root);trainingGround(root);
+ gardenHerbs(root);const yardModel=trainingGround(root);yardModel.userData.buildingId='yard-001';
  // Old wine well, tea baskets and drying poles.
  cylinder(root,.62,.66,.69,-6.4,.53,3.6,C.slate,12);
  cylinder(root,.44,.45,.07,-6.4,.90,3.6,mat('#526d70'),12);
@@ -321,11 +322,13 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
   winter:{grass:'#a8b3a1',bamboo:'#718878',light:'#a7b7a8',dark:'#566e64',water:'#8da9b0'}
  } as const;
  let raining=false;
+ const buildingRenderer=makeBuildingRenderer(root);
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,
+ return {root,buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
   updateStory(s:WorldState){
+   buildingRenderer.update(s.buildings);
    const calendar=getCalendar(s),weather=getWeather(s);
    const id=`${s.storyStage}/${s.choice}/${calendar.season}/${weather}`;
    if(lastStage===id)return;lastStage=id;
