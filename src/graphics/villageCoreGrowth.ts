@@ -34,8 +34,9 @@ const S={
 function polygon(p:THREE.Object3D,pts:readonly (readonly [number,number])[],
  y:number,m:THREE.Material){
  const shape=new THREE.Shape();
- shape.moveTo(pts[0][0],pts[0][1]);
- for(let i=1;i<pts.length;i++)shape.lineTo(pts[i][0],pts[i][1]);
+ // XY to XZ with rotation -PI/2: invert source Y to preserve world +Z.
+ shape.moveTo(pts[0][0],-pts[0][1]);
+ for(let i=1;i<pts.length;i++)shape.lineTo(pts[i][0],-pts[i][1]);
  shape.closePath();
  const geo=new THREE.ShapeGeometry(shape);
  // A ShapeGeometry uses XY coordinates; rotate onto the ground XZ plane.
