@@ -1,7 +1,7 @@
 {
   "name": "little-haven-prototype",
   "private": true,
-  "version": "0.3.0-preview.7",
+  "version": "0.4.0-alpha.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -9,8 +9,8 @@
     "build:pages": "tsc --noEmit && vite build --mode pages",
     "preview": "vite preview --host 0.0.0.0",
     "check": "tsc --noEmit",
-    "test:sim": "node --experimental-strip-types --test tests/simulation.test.mts",
-    "test:browser": "node tests/browser-smoke.mjs"
+    "test:sim": "node --experimental-strip-types --test tests/simulation.test.mts tests/pioneer.test.mts",
+    "test:browser": "node tests/browser-smoke.mjs && node tests/pioneer-browser-smoke.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"
