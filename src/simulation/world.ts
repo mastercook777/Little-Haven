@@ -7,6 +7,9 @@ import {getWeatherForMinutes,type Weather} from './weather.ts';
 import {advanceBuildingsDay,createBuildings,startRepair,type BuildingState} from './buildings.ts';
 import {rainGuestOpportunity,roofRepairOpportunity,type Opportunity,type GuardianMemory} from './opportunities.ts';
 import {validatePlots} from './plots.ts';
+import {advanceVillageGrowthDay,chooseVillageDirection as makeVillageChoice,createVillageGrowth,hydrateVillageGrowth,type VillageDirection,type VillageGrowthState} from './villageGrowth.ts';
+export {DEVELOPMENT_OPTIONS,villageGrowthLabel} from './villageGrowth.ts';
+export type {VillageDirection,VillageGrowthState} from './villageGrowth.ts';
 import {alongLane,dailyResidentMotion,type ActivityId} from './routines.ts';
 export type {ActivityId} from './routines.ts';
 export type {BuildingState,BuildingCondition,BuildingPhase} from './buildings.ts';
@@ -28,7 +31,7 @@ export interface WorldState{
  population:number;happiness:number;houses:number;renown:number;
  choice:Decision|null;storyStage:StoryStage;storyStarted:number|null;autoChosen:boolean;
  lastDayLogged:number;lastSeasonLogged:number;journal:ChronicleEntry[];lastSavedAt:number;
- buildings:BuildingState[];opportunities:Opportunity[];guardianMemories:GuardianMemory[];
+ buildings:BuildingState[];opportunities:Opportunity[];guardianMemories:GuardianMemory[];villageGrowth:VillageGrowthState;
 }
 export const MINUTES_PER_REAL_SECOND=3;
 export const STORAGE_KEY='little-haven-living-v03-slot-1';
@@ -61,7 +64,7 @@ export const VILLAGERS:Villager[]=[
 export function createWorld(now=Date.now()):WorldState{
  return {version:3,minutes:8*60+20,seed:20261103,population:8,happiness:82,houses:6,renown:0,
  choice:null,storyStage:'peace',storyStarted:null,autoChosen:false,lastDayLogged:1,lastSeasonLogged:0,lastSavedAt:now,
- buildings:createBuildings(),opportunities:[],guardianMemories:[],
+ buildings:createBuildings(),opportunities:[],guardianMemories:[],villageGrowth:createVillageGrowth(8*60+20),
  journal:[{id:1,day:1,time:500,title:'山谷无名',text:'深山中只有几户人家、一间酒肆。少年阿青每日到竹林旁练剑，还不知外面有多大的江湖。'}]};
 }
 export function getCalendar(s:WorldState):CalendarView{return getCalendarFromMinutes(s.minutes);}
@@ -85,6 +88,15 @@ function chronicle(s:WorldState,title:string,text:string,at=s.minutes){
 /** Pending opportunities are not instructions to NPCs; they are optional guardian interventions. */
 export function pendingOpportunities(s:WorldState):Opportunity[]{
  return s.opportunities.filter(o=>o.state==='available').slice(0,2);
+}
+/** A single valley-wide choice, independent from the hero's two story branches. */
+export function chooseVillageDevelopment(s:WorldState,direction:VillageDirection,automatic=false):boolean{
+ const decision=makeVillageChoice(s.villageGrowth,direction,s.minutes,automatic);
+ if(!decision)return false;
+ const id=chronicle(s,decision.title,decision.text);
+ s.villageGrowth.prosperity=Math.min(100,s.villageGrowth.prosperity+2);
+ // Keep a causal event in the existing journal. The phase state is the visual source.
+ return id.startsWith('journal-');
 }
 export function buildingById(s:WorldState,id:string):BuildingState|undefined{
  return s.buildings.find(b=>b.id===id);
@@ -232,6 +244,13 @@ export function advanceWorld(s:WorldState,realSeconds:number):AdvanceResult{
     }
     out.visualChanges.push(change.buildingId+':'+change.tag);
    }
+   for(const milestone of advanceVillageGrowthDay(s.villageGrowth,s.minutes,getCalendar(s).season,getWeather(s))){
+    chronicle(s,milestone.title,milestone.text);
+    s.houses+=milestone.housesDelta;s.population+=milestone.populationDelta;
+    s.renown+=milestone.renownDelta;
+    s.happiness=Math.min(100,s.happiness+(milestone.stage==='landmark'||milestone.stage==='thriving'?2:0));
+    out.visualChanges.push('valley:'+milestone.stage+':'+(s.villageGrowth.choice||'none'));
+   }
    addOpportunitiesForDay(s);
   }
   if(nextSeason===next){
@@ -291,7 +310,7 @@ function hydrateWorld(s:WorldState):WorldState{
   ['available','resolved'].includes(o.state)&&Number.isFinite(o.deadlineMinutes)).slice(-48):[];
  const guardianMemories=Array.isArray(s.guardianMemories)?s.guardianMemories.filter(m=>
   m&&typeof m.opportunityId==='string'&&Array.isArray(m.producedEventIds)).slice(-120):[];
- return {...s,buildings,opportunities,guardianMemories};
+ return {...s,buildings,opportunities,guardianMemories,villageGrowth:hydrateVillageGrowth(s.villageGrowth,s.minutes)};
 }
 export function importWorld(raw:string):WorldState|null{
  try{
@@ -307,7 +326,7 @@ function migrateV2(raw:string,now:number):WorldState|null{
   if(old.version!==2||!Number.isFinite(old.minutes)||!Array.isArray(old.journal)
    ||!old.storyStage||!(old.storyStage in stageIndex)||![null,'host','observe'].includes(old.choice??null))return null;
   const fresh=createWorld(now);
-  return {...fresh,...old,version:3,seed:fresh.seed,buildings:createBuildings(),opportunities:[],guardianMemories:[],
+  return {...fresh,...old,version:3,seed:fresh.seed,buildings:createBuildings(),opportunities:[],guardianMemories:[],villageGrowth:createVillageGrowth(old.minutes||0),
    lastSeasonLogged:Math.floor((old.minutes||0)/SEASON_MINUTES),lastSavedAt:now};
  }catch{return null;}
 }
