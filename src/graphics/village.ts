@@ -238,7 +238,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -324,7 +324,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
    const calendar=getCalendar(s),weather=getWeather(s);
