@@ -20,7 +20,7 @@ const rolePlan=(v:Villager,day:number):RolePlan=>{
   }
   case 7:return {route:[home,[3.7,5.7],[4.6,3.2],[6,2.2],work],job:'fish',description:'在河畔静静垂钓',local:day%2===0?[6.6,-3.1]:[6.9,.4],errand:'fish',errandText:'查看河岸边的鱼篓',target:'river'};
   case 8:return {route:[home,[-9,-3.9],[-6,-2.7],[-4,2.7],[-.2,4.5],work],job:'train',description:'在练武坪练剑',local:day%2===0?[1.4,6.4]:[3.7,8.2],errand:'train',errandText:'在竹荫中练习步法',target:'yard-001'};
-  default:return {route:[home,[-2,2.8],[-.2,4.5],work],job:'train',description:'在竹林练剑',local:[3.8,8.6],errand:'train',errandText:'擦拭剑架',target:'yard-001'};
+  default:return {route:[home,[-2,2.8],[-.2,4.5],work],job:'train',description:'在剑庐里练习基本功',local:[3.8,8.6],errand:'train',errandText:'擦拭剑架',target:'yard-001'};
  }
 };
 export function dailyHash(id:number,day:number,salt=0){
