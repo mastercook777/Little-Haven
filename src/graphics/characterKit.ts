@@ -79,7 +79,7 @@ export function dressCharacter(upper:THREE.Group,v:Villager):CharacterCostume{
   block(upper,sx*.235,1.07,.085,.11,.19,.19,base);
   block(upper,sx*.245,.94,.17,.11,.075,.11,trim);
  }
- const hat=new THREE.Group();hat.position.set(0,1.73-Y,0);upper.add(hat);hat.visible=false;
+ const hat=new THREE.Group();hat.name='profession-headwear';upper.add(hat);hat.visible=false;
  let workStrap:THREE.Group|null=null;
  switch(v.id){
   case 1: // Forest woodcutter: broad vest, strapped axe and shoulder cloak.
