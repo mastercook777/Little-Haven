@@ -65,6 +65,16 @@ try{
    diagnostics:window.__HAVEN_DEBUG__.getRendererInfo()};
  });
  if(!stats.gl||!stats.width||!stats.height)throw Error('WebGL canvas absent or unavailable: '+JSON.stringify(stats));
+ // World-only screenshots separate the actual town silhouette from long narrative cards.
+ await page.addStyleTag({content:
+  'html.qa-landscape .topbar,html.qa-landscape .hero-intro,html.qa-landscape .guardian-panel,'+
+  'html.qa-landscape .journal-panel,html.qa-landscape .resident-card,html.qa-landscape .toolbar,'+
+  'html.qa-landscape .corner-credit,html.qa-landscape .toast{visibility:hidden !important;}'});
+ const captureLandscape=async(name)=>{
+  await page.evaluate(()=>document.documentElement.classList.add('qa-landscape'));
+  try{return await snapshotValley(page,name);}
+  finally{await page.evaluate(()=>document.documentElement.classList.remove('qa-landscape'));}
+ };
  const captures=[];
  for(const [i,season] of ['spring','summer','autumn','winter'].entries()){
   if(i>0)await page.evaluate(()=>window.__HAVEN_DEBUG__.flowSeason());
@@ -84,6 +94,43 @@ try{
  for(let i=1;i<captures.length;i++)contrasts.push(pixelDifference(captures[i-1].pixels,captures[i].pixels));
  if(contrasts.some(x=>x<5.0))throw Error('Adjacent seasons still too visually similar: '+contrasts.join(', '));
  results.push({seasonPixelDifferences:contrasts});
+
+ // Sprint5: prove three different futures under one seed, at the same world
+ // minute, camera, time-of-day, weather and initial story autopilot.
+ const futureImages={};
+ for(const direction of ['bridge','ferry','grove']){
+  await page.evaluate(()=>{
+   const d=window.__HAVEN_DEBUG__;
+   d.reset();d.advance((24*1440+600-500)/3);
+  });
+  const available=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual().state.phase);
+  if(available!=='invitation')throw Error('Valley invitation never appeared: '+available);
+  await page.locator('#villageChoices .opportunity-choice[data-village="'+direction+'"]').click();
+  const chosen=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual().state.choice);
+  if(chosen!==direction)throw Error('Guardian village direction click failed: '+direction);
+  await page.evaluate(()=>window.__HAVEN_DEBUG__.advance((96-24)*1440/3));
+  for(let attempt=0;attempt<11;attempt++){
+   const wx=await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState().weather);
+   if(wx==='clear')break;
+   await page.evaluate(()=>window.__HAVEN_DEBUG__.advance(480));
+  }
+  await page.waitForTimeout(420);
+  const visual=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual());
+  if(visual.state.choice!==direction||!['landmark','thriving'].includes(visual.state.phase)||
+     visual.signature!==direction+'/'+visual.state.phase)
+   throw Error('Village silhouette did not evolve: '+JSON.stringify(visual));
+  futureImages[direction]=await captureLandscape('two-years-'+direction);
+  results.push({branch:direction,phase:visual.state.phase,workDays:visual.state.workDays,prosperity:visual.state.prosperity,
+   population:(await page.evaluate(()=>window.__HAVEN_DEBUG__.getState().population)),
+   render:await page.evaluate(()=>window.__HAVEN_DEBUG__.getRendererInfo())});
+ }
+ const futures=['bridge','ferry','grove'],developmentContrast={};
+ for(let i=0;i<3;i++)for(let j=i+1;j<3;j++){
+  const key=futures[i]+'-vs-'+futures[j];
+  developmentContrast[key]=pixelDifference(futureImages[futures[i]].pixels,futureImages[futures[j]].pixels);
+  if(developmentContrast[key]<2.0)throw Error('Two-year futures too visually similar: '+key+' diff '+developmentContrast[key]);
+ }
+ results.push({developmentPixelDifferences:developmentContrast});
  // Independent fair-weather, visible-rain and valley-fog captures at identical spring clock times.
  const weatherImages={};
  for(const weather of ['clear','rain','fog']){
@@ -104,9 +151,12 @@ try{
 
  // Sprint4 H1/H2: inspect actual animated vertices, not a rain-angle screenshot.
  const river=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRiverProbe());
- if(river.surfaceName!=='river-water'||river.surfaceY<=.26||
+ if(river.surfaceName!=='river-water'||river.surfaceY<=.075||
   river.samples.length<5||river.samples.filter(s=>s.surfaceHit).length<5)
   throw Error('River surface geometry/projection invalid: '+JSON.stringify(river));
+ const visibleRiver=river.samples.filter(s=>s.unobstructed).length;
+ if(visibleRiver<4)throw Error('Creek remains hidden behind opaque island shell or roads: '+JSON.stringify(river.samples));
+ results.push({visibleRiverSamples:visibleRiver});
  await page.evaluate(()=>{
   const d=window.__HAVEN_DEBUG__;d.reset();
   for(let i=0;i<12&&d.getVisualState().weather!=='rain';i++)d.advance(480);
@@ -133,7 +183,10 @@ try{
  const falling=[down(rain0,rain1),down(rain1,rain2)];
  if(falling.some(n=>n<8)||[...rain0,...rain1,...rain2].some(d=>d.headY<=d.tailY))
   throw Error('Rain reverses or line endpoints flip: '+JSON.stringify({falling,rain0,rain1}));
- results.push({river,fallingRainFrames:falling});
+ const point=river.samples[2].world;
+ const terrain=await page.evaluate(([x,y,z])=>window.__HAVEN_DEBUG__.getTerrainProbe(x,z),point);
+ if(!(terrain.groundY<terrain.waterY))throw Error('River not excavated below water: '+JSON.stringify(terrain));
+ results.push({river,fallingRainFrames:falling,carvedGround:terrain});
  // Evaluate visible occupational separation at two hours of the same day.
  await page.evaluate(()=>{
   const d=window.__HAVEN_DEBUG__;d.reset();
@@ -148,10 +201,15 @@ try{
  };
  const morning=await crowdAt('morning');
  const poseA=await page.evaluate(()=>window.__HAVEN_DEBUG__.getCharacterPose(8));
- await page.waitForTimeout(720);
+ if(!poseA||poseA.clipMode!=='sword-form')throw Error('Sword clip was not playing: '+JSON.stringify(poseA));
+ await page.waitForFunction(previous=>{
+  const pose=window.__HAVEN_DEBUG__.getCharacterPose(8);
+  return pose&&pose.clipMode==='sword-form'&&pose.clipPhase!==previous.phase
+   &&Math.abs(pose.rightArmX-previous.rightArmX)>.07;
+ },{phase:poseA.clipPhase,rightArmX:poseA.rightArmX},{timeout:12000});
  const poseB=await page.evaluate(()=>window.__HAVEN_DEBUG__.getCharacterPose(8));
- if(!poseA||!poseB||Math.abs(poseA.rightArmX-poseB.rightArmX)<.04)
-  throw Error('Practice motion not moving through phases: '+JSON.stringify({poseA,poseB}));
+ if(!poseB||Math.abs(poseA.rightArmX-poseB.rightArmX)<.07)
+  throw Error('Sword clip phase never changed: '+JSON.stringify({poseA,poseB}));
  await page.screenshot({path:out+'/sword-practice.png'});
  results.push({swordPoseDelta:Math.abs(poseA.rightArmX-poseB.rightArmX)});
 

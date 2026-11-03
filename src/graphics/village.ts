@@ -4,6 +4,8 @@ import {makeBuildingRenderer} from './buildingRenderer';
 import {createSeasonalArt} from './seasonArt';
 import {buildVillageWorkplaces} from './lifeDetails';
 import {buildRiverArt} from './riverArt';
+import {buildCarvedTerrain,terrainChannelProbe} from './carvedTerrain';
+import {buildVillageEvolution} from './villageEvolution';
 import {detailTavern,detailHome} from './architectureKit';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
@@ -238,16 +240,28 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
  for(let i=0;i<48;i++){const a=i/48*Math.PI*2,r=1+.032*Math.sin(i*2.9)+.020*Math.cos(i*5.8);edge.push([Math.cos(a)*16.8*r,Math.sin(a)*12.2*r]);}
  const shape=new THREE.Shape();shape.moveTo(...edge[0]);for(let i=1;i<edge.length;i++)shape.lineTo(...edge[i]);shape.closePath();
- const dirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:1.75,bevelEnabled:true,bevelThickness:.28,bevelSize:.34,bevelSegments:2,steps:1}),[mat('#8b7663'),mat('#716150')]);
- dirt.rotation.x=Math.PI/2;dirt.position.y=.02;dirt.castShadow=true;dirt.receiveShadow=true;root.add(dirt);
+ // Keep the sculpted cliff sides of the old floating island, but DON'T
+ // render its opaque upper cap. The old top cap at y≈.30 hid every valley
+ // channel below it. Lowering the whole rock also detached the cliff lip.
+ // ExtrudeGeometry labels caps material 0 and sides/bevel material 1, so draw
+ // only the side/bevel group while the carved terrain owns the entire top.
+ const cliffGeometry=new THREE.ExtrudeGeometry(shape,{depth:1.75,
+  bevelEnabled:true,bevelThickness:.28,bevelSize:.34,bevelSegments:2,steps:1});
+ const wallGroups=cliffGeometry.groups.filter(g=>g.materialIndex===1);
+ cliffGeometry.clearGroups();
+ for(const g of wallGroups)cliffGeometry.addGroup(g.start,g.count,1);
+ const dirt=new THREE.Mesh(cliffGeometry,[mat('#8b7663'),mat('#716150')]);
+ dirt.name='open-cliff-walls';
+ dirt.rotation.x=Math.PI/2;dirt.position.y=-.09;
+ dirt.castShadow=false;dirt.receiveShadow=true;root.add(dirt);
  const turfMaterial=new THREE.MeshStandardMaterial({color:'#8baa79',side:THREE.DoubleSide});
- const turf=new THREE.Mesh(new THREE.ShapeGeometry(shape),turfMaterial);turf.rotation.x=Math.PI/2;turf.position.y=.17;turf.receiveShadow=true;root.add(turf);
+ const turf=buildCarvedTerrain(edge,turfMaterial);root.add(turf);
  // Terraced mountain silhouettes along the rear rim, away from the camera-facing tavern.
  for(let i=0;i<13;i++){
   const x=-14.3+i*2.02,z=-9.7-random(i*7)*.42;
@@ -321,12 +335,14 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const weatherArt=createWeatherArt(root,typeof window!=='undefined'&&window.innerWidth<760,
   typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const buildingRenderer=makeBuildingRenderer(root);
+ const growthArt=buildVillageEvolution(root);
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets],growthVisualSignature:()=>growthArt.visualSignature(),groundProbe:terrainChannelProbe,
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
+   growthArt.update(s.villageGrowth);
    const calendar=getCalendar(s),weather=getWeather(s);
    const id=`${s.storyStage}/${s.choice}/${calendar.season}/${weather}`;
    if(lastStage===id)return;lastStage=id;

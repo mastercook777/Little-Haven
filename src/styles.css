@@ -54,3 +54,15 @@
  .guardian-panel:has(.opportunity-choices:not([hidden])){width:min(270px,calc(100vw - 24px))}
  .guardian-panel:has(.opportunity-choices:not([hidden])) .panel-copy{max-height:62px;overflow:auto}
 }
+
+/* Sprint 5 · subtle growth feedback; avoid covering the playable miniature. */
+.village-growth-status{font-size:11px;color:#71846d;letter-spacing:.04em;padding:5px 0 6px;border-bottom:1px dashed rgba(118,137,104,.23);}
+.village-choices{max-height:240px;overflow:auto;scrollbar-width:thin}
+.village-choices .opportunity-choice{background:#f8f8ee;min-height:57px}
+.village-choices .opportunity-choice strong{font-size:12px;color:#445e49}
+@media(max-width:760px){
+ .village-growth-status{font-size:9px;max-width:210px;white-space:normal}
+ .village-choices{max-height:190px}
+ .village-choices .opportunity-choice{min-height:46px}
+ .village-choices .opportunity-choice strong{font-size:10px}
+}

@@ -1,12 +1,31 @@
 /** Deterministic role-specific routes. Paths reuse the physical lanes in village.ts. */
 import type {Villager} from './world.ts';
 import type {Weather} from './weather.ts';
+import type {VillageGrowthState} from './villageGrowth.ts';
 export type ActivityId='sleep'|'idle'|'walk'|'work'|'sweep'|'carry'|'serve'|'gather'|'weave'|'fish'|'train'|'greet'|'rest'|'shelter';
 export type Point=readonly [number,number];
 export interface LifeMotion{x:number;z:number;heading:number;walking:boolean;activity:string;activityId:ActivityId;interactionTargetId:string|null}
 type RolePlan={route:Point[];job:ActivityId;description:string;local:Point;errand:ActivityId;errandText:string;target:string};
-const rolePlan=(v:Villager,day:number):RolePlan=>{
+const rolePlan=(v:Villager,day:number,growth?:VillageGrowthState):RolePlan=>{
  const home=v.home,work=v.work;
+ // Once a landmark is built, it must become part of someone's real routine.
+ // These are new commutes and jobs rather than extra static market props.
+ const mature=growth&&(growth.phase==='landmark'||growth.phase==='thriving');
+ if(mature&&growth.choice==='bridge'&&v.id===5)return {
+  route:[home,[1,-2],[3,1.3],[6,2.2],[8.35,2.2],[10.7,4.55]],
+  job:'greet',description:'在东岸桥市招呼来往商旅',
+  local:day%2===0?[11.75,5.25]:[9.9,4.0],errand:'greet',
+  errandText:'在桥市照看货摊，交流山外行情',target:'valley-bridge'};
+ if(mature&&growth.choice==='ferry'&&v.id===7)return {
+  route:[home,[3.7,5.7],[4.6,3.2],[6,2.2],[6.5,-1.5],[7.1,-5.4]],
+  job:'fish',description:'从新渡口出船捕鱼',
+  local:day%2===0?[7.1,-4.0]:[6.8,-5.8],errand:'fish',
+  errandText:'在新栈桥查看渔网与船只',target:'valley-ferry'};
+ if(mature&&growth.choice==='grove'&&v.id===3)return {
+  route:[home,[-10.2,5.1],[-7.1,7.0],[-3.9,8.1]],
+  job:'gather',description:'在新果园照管田地',
+  local:day%2===0?[-4.8,9.1]:[-2.8,9.3],errand:'gather',
+  errandText:'为新院落采集果实，修整园圃',target:'valley-grove'};
  switch(v.id){
   case 1:return {route:[home,[-9,-3.9],[-10.4,-2.6],work],job:'carry',description:'在林缘伐木',local:day%3===0?[-8.7,-5.2]:[-11.3,-2.7],errand:'carry',errandText:'沿林边搬运柴薪',target:'home-001'};
   case 2:return {route:[home,[-5.3,-4],[-4.4,-.3],[-4,2.7],work],job:'serve',description:'在酒肆招呼客人',local:day%3===0?[-5.6,3.6]:[-4.2,3.7],errand:'sweep',errandText:'清扫侧廊，擦拭酒盏',target:'inn-001'};
@@ -40,9 +59,9 @@ export function alongLane(route:readonly Point[],progress:number){
  }
  return {x:route[0][0],z:route[0][1],heading:0};
 }
-export function dailyResidentMotion(v:Villager,minutes:number,weather:Weather):LifeMotion{
+export function dailyResidentMotion(v:Villager,minutes:number,weather:Weather,growth?:VillageGrowthState):LifeMotion{
  const day=Math.floor(minutes/1440),hour=(minutes%1440)/60;
- const plan=rolePlan(v,day),home=v.home,work=plan.route.at(-1)!;
+ const plan=rolePlan(v,day,growth),home=v.home,work=plan.route.at(-1)!;
  const stagger=(v.offset%137)/190+dailyHash(v.id,day,5)*.38;
  const depart=7+stagger,arrive=8.2+stagger;
  const errandStart=11.5+dailyHash(v.id,day,4)*.65;
@@ -66,4 +85,4 @@ export function dailyResidentMotion(v:Villager,minutes:number,weather:Weather):L
  if(hour<leave)return still(work,plan.job,plan.description,plan.target);
  return walking([...plan.route].reverse(),leave,leave+1.3,'带着一天的收获归家');
 }
-export function dailyRoutePoints(v:Villager,day:number):readonly Point[]{return rolePlan(v,day).route;}
+export function dailyRoutePoints(v:Villager,day:number,growth?:VillageGrowthState):readonly Point[]{return rolePlan(v,day,growth).route;}
