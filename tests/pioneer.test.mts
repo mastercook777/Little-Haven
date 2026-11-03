@@ -84,7 +84,7 @@ test('Guardians can influence labor without removing resident autonomy',()=>{
  assert.equal(setPioneerPolicy(a,'food'),true);
  assert.equal(setPioneerPolicy(a,'food'),false);
  assert.equal(setPioneerPolicy(b,'shelter'),true);
- advancePioneerWorld(a,1000);advancePioneerWorld(b,1000);
+ advancePioneerWorld(a,260);advancePioneerWorld(b,260);
  assert.ok(a.journal.some(x=>x.title==='守谷人的建议'));
  assert.ok(b.journal.some(x=>x.title==='守谷人的建议'));
  assert.notDeepEqual({resources:a.resources,work:a.intent?.workDone},
