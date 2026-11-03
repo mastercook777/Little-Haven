@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {getCalendar,getWeather,type WorldState} from '../simulation/world';
 import {makeBuildingRenderer} from './buildingRenderer';
 import {createSeasonalArt} from './seasonArt';
+import {buildVillageWorkplaces} from './lifeDetails';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -312,6 +313,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
   autumn:{grass:'#c1a66b',bamboo:'#bc944e',light:'#d5b46a',dark:'#977248',water:'#91a4a0',path:'#b99a77'},
   winter:{grass:'#a1b4ae',bamboo:'#738a83',light:'#9aafa5',dark:'#58736e',water:'#9ac0be',path:'#b5aea0'}
  } as const;
+ buildVillageWorkplaces(root);
  // Bake static geometry within each existing scene/picking/animated group.
  const batchStats=batchStaticSubtree(root);
  const seasonalArt=createSeasonalArt(root);
