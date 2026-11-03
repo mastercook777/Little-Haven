@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import {getCalendar,getWeather,type WorldState} from '../simulation/world';
 import {makeBuildingRenderer} from './buildingRenderer';
+import {createSeasonalArt} from './seasonArt';
+import {buildVillageWorkplaces} from './lifeDetails';
+import {createWeatherArt} from './weatherArt';
+import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
 /** Wuxia valley: all meshes, silhouettes, materials and lights are locally procedural. */
 const cache=new Map<string,THREE.MeshStandardMaterial>();
@@ -140,13 +144,13 @@ function pine(p:THREE.Object3D,x:number,z:number,s:number){
 function bamboo(p:THREE.Object3D,x:number,z:number,s:number,animated:THREE.Group[]){
  const g=group(p,x,.18,z);g.scale.setScalar(s);
  for(let i=0;i<3;i++){
-  const a=i*2.4,xx=Math.cos(a)*.28,zz=Math.sin(a)*.28;const stalk=group(g,xx,0,zz);const tall=2.6+random(i+x)*1.4;
+  const a=i*2.4,xx=Math.cos(a)*.28,zz=Math.sin(a)*.28;const stalk=g;const tall=2.6+random(i+x)*1.4;
   for(let j=0;j<5;j++){
-   cylinder(stalk,.062,.075,tall/5,0,(j+.5)*tall/5,0,i%2?C.bamboo:C.bambooLight,7);
-   cylinder(stalk,.09,.09,.055,0,(j+1)*tall/5,0,C.bambooDark,7);
+   cylinder(stalk,.062,.075,tall/5,xx,(j+.5)*tall/5,zz,i%2?C.bamboo:C.bambooLight,7);
+   cylinder(stalk,.09,.09,.055,xx,(j+1)*tall/5,zz,C.bambooDark,7);
   }
   for(let j=0;j<4;j++){
-   const ang=j*1.7+i;const leaf=sphere(stalk,.44,Math.cos(ang)*.38,tall-.22+j*.10,Math.sin(ang)*.38,j%2?C.bambooLight:C.bambooDark);
+   const ang=j*1.7+i;const leaf=sphere(stalk,.44,xx+Math.cos(ang)*.38,tall-.22+j*.10,zz+Math.sin(ang)*.38,j%2?C.bambooLight:C.bambooDark);
    leaf.scale.set(.92,.16,1.95);leaf.rotation.y=ang;leaf.rotation.z=(j%2?-.30:.28);
   }
  }
@@ -230,7 +234,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -303,30 +307,23 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  for(const [x,z,size] of [[-5.2,4.1,.8],[-1.3,4.1,.5],[-7.2,-2.1,.7],[4.5,3.5,.6]] as const){
   const pool=cylinder(puddles,size,size*.85,.015,x,.283,z,wet,12);pool.scale.z=.48;
  }
- // Sparse deterministic rain shafts. Points reduce draw calls compared with hundreds of Meshes.
- const count=typeof window!=='undefined'&&window.innerWidth<760?110:340;
- const drops=new Float32Array(count*3);
- for(let i=0;i<count;i++){
-  drops[3*i]=-13+random(i*19+9)*25;drops[3*i+1]=1+random(i*23+5)*8;drops[3*i+2]=-9+random(i*11+27)*19;
- }
- const rainGeometry=new THREE.BufferGeometry();
- rainGeometry.setAttribute('position',new THREE.BufferAttribute(drops,3));
- const rain=new THREE.Points(rainGeometry,new THREE.PointsMaterial({
-  color:'#cfdee1',size:.095,transparent:true,opacity:.7,depthWrite:false,sizeAttenuation:true
- }));
- rain.frustumCulled=false;root.add(rain);rain.visible=false;
  const palettes={
-  spring:{grass:'#90b58a',bamboo:'#679c6d',light:'#9ac786',dark:'#4b7e58',water:'#87afaa'},
-  summer:{grass:'#81a86e',bamboo:'#517c5b',light:'#88aa72',dark:'#41664f',water:'#79a9aa'},
-  autumn:{grass:'#b5ad78',bamboo:'#908e5b',light:'#b8ad6f',dark:'#6e7852',water:'#8ca9a2'},
-  winter:{grass:'#a8b3a1',bamboo:'#718878',light:'#a7b7a8',dark:'#566e64',water:'#8da9b0'}
+  spring:{grass:'#89b58e',bamboo:'#5e976c',light:'#a2c58a',dark:'#4c815b',water:'#79b8ac',path:'#c9b79a'},
+  summer:{grass:'#629962',bamboo:'#3d7851',light:'#75ac68',dark:'#315e42',water:'#6da4a3',path:'#ceb895'},
+  autumn:{grass:'#c1a66b',bamboo:'#bc944e',light:'#d5b46a',dark:'#977248',water:'#91a4a0',path:'#b99a77'},
+  winter:{grass:'#a1b4ae',bamboo:'#738a83',light:'#9aafa5',dark:'#58736e',water:'#9ac0be',path:'#b5aea0'}
  } as const;
- let raining=false;
+ buildVillageWorkplaces(root);
+ // Bake static geometry within each existing scene/picking/animated group.
+ const batchStats=batchStaticSubtree(root);
+ const seasonalArt=createSeasonalArt(root);
+ const weatherArt=createWeatherArt(root,typeof window!=='undefined'&&window.innerWidth<760,
+  typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const buildingRenderer=makeBuildingRenderer(root);
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
+ return {root,batchStats,buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
    const calendar=getCalendar(s),weather=getWeather(s);
@@ -335,10 +332,11 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
    const palette=palettes[calendar.season];
    turfMaterial.color.set(palette.grass);C.bamboo.color.set(palette.bamboo);
    C.bambooLight.color.set(palette.light);C.bambooDark.color.set(palette.dark);
-   water.color.set(palette.water);
+   water.color.set(palette.water);pathMat.color.set(palette.path);
+   seasonalArt.setSeason(calendar.season);weatherArt.setWeather(weather);
    winterTrim.visible=calendar.season==='winter';
-   puddles.visible=weather==='rain';raining=weather==='rain';rain.visible=raining;
-   if(scene.fog instanceof THREE.FogExp2)scene.fog.density=weather==='fog'?.021:weather==='rain'?.014:.010;
+   puddles.visible=weather==='rain';
+   if(scene.fog instanceof THREE.FogExp2)scene.fog.density=weather==='fog'?.018:weather==='rain'?.0095:.0075;
    legacyHost.visible=s.storyStage==='legacy'&&s.choice==='host';
    legacyObserve.visible=s.storyStage==='legacy'&&s.choice==='observe';
   },
@@ -347,11 +345,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
    for(const m of windows)m.emissiveIntensity=night*.65;
    for(const m of emissive)m.emissiveIntensity=night;
    water.opacity=.78+.12*Math.sin(t*.65);
-   if(raining){
-    const attr=rainGeometry.getAttribute('position') as THREE.BufferAttribute;
-    for(let i=0;i<count;i++)attr.setY(i,1+(8-((t*4+i*.11)%8)));
-    attr.needsUpdate=true;
-   }
+   seasonalArt.animate(t);weatherArt.animate(t);
    for(let i=0;i<bambooGroups.length;i++)bambooGroups[i].rotation.z=Math.sin(t*.6+i*2.2)*.012;
    for(let i=0;i<swing.length;i++)swing[i].rotation.z=Math.sin(t*.65+i)*.025;
   }

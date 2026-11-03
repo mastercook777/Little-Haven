@@ -7,6 +7,8 @@ import {getWeatherForMinutes,type Weather} from './weather.ts';
 import {advanceBuildingsDay,createBuildings,startRepair,type BuildingState} from './buildings.ts';
 import {rainGuestOpportunity,roofRepairOpportunity,type Opportunity,type GuardianMemory} from './opportunities.ts';
 import {validatePlots} from './plots.ts';
+import {alongLane,dailyResidentMotion,type ActivityId} from './routines.ts';
+export type {ActivityId} from './routines.ts';
 export type {BuildingState,BuildingCondition,BuildingPhase} from './buildings.ts';
 export type {Opportunity,GuardianMemory} from './opportunities.ts';
 export {DAY_MINUTES} from './calendar.ts';
@@ -330,71 +332,60 @@ export function saveWorld(s:WorldState,storage:Pick<Storage,'setItem'>,now=Date.
  const key=SLOT_KEYS[slot-1];if(!key)throw Error('Invalid slot');
  s.lastSavedAt=now;storage.setItem(key,JSON.stringify(s));
 }
-export interface ResidentMotion {x:number;z:number;activity:string;visible:boolean;walking:boolean;heading:number;practicing:boolean;}
-type Waypoint={h:number;p:[number,number];what:string};
-function alongRoute(points:[number,number][],t:number){
- let total=0;const lengths:number[]=[];for(let i=1;i<points.length;i++){const d=Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]);lengths.push(d);total+=d;}
- let distance=t*total;
- for(let i=1;i<points.length;i++){
-  const d=lengths[i-1];const dx=points[i][0]-points[i-1][0],dz=points[i][1]-points[i-1][1];
-  if(distance<=d||i===points.length-1){const u=d?Math.min(1,distance/d):0;return {x:points[i-1][0]+u*dx,z:points[i-1][1]+u*dz,heading:Math.atan2(dx,dz)};}
-  distance-=d;
- }
- return {x:points[0][0],z:points[0][1],heading:0};
+export interface ResidentMotion{
+ x:number;z:number;activity:string;visible:boolean;walking:boolean;heading:number;practicing:boolean;
+ activityId:ActivityId;interactionTargetId:string|null;
 }
-function routine(steps:Waypoint[],h:number){
- let a=steps[0],b=steps[1];for(let i=1;i<steps.length;i++)if(h<=steps[i].h){a=steps[i-1];b=steps[i];break;}
- const t=Math.max(0,Math.min(1,(h-a.h)/(b.h-a.h||1)));
- const route=alongRoute([a.p,b.p],t);
- return {...route,walking:Math.hypot(b.p[0]-a.p[0],b.p[1]-a.p[1])>.1&&t>.03&&t<.97,activity:t>.98?b.what:a.what};
-}
-const BRIDGE:[number,number]=[8.3,2.2];
-const INN:[number,number]=[-3,3.2];
-const PRACTICE:[number,number]=[1.3,5.8];
+/** The two visitors have their own town-entry journeys; regular residents never queue at the tavern door. */
 export function residentMotion(v:Villager,s:WorldState):ResidentMotion{
- const h=(s.minutes/60+v.offset/60)%24;
- if(v.id===8&&(s.storyStage==='departed'||s.storyStage==='rumor'))return {x:13.6,z:2.2,heading:0,visible:false,walking:false,practicing:false,activity:'正在山外闯荡江湖'};
+ const h=(s.minutes%DAY_MINUTES)/60;
+ const hidden=(activity:string):ResidentMotion=>({
+  x:v.home[0],z:v.home[1],heading:0,visible:false,walking:false,practicing:false,
+  activity,activityId:'idle',interactionTargetId:null
+ });
+ if(v.id===8&&(s.storyStage==='departed'||s.storyStage==='rumor'))
+  return hidden('正在山外闯荡江湖');
  if(v.id===9){
   const stay=s.storyStage==='stranger'||(s.choice==='host'&&s.storyStage==='training');
-  const arrival=Math.max(0,Math.min(1,(s.minutes-STORY_VISITOR_AT)/180));
-  const pos=s.storyStage==='stranger'&&s.choice===null?alongRoute([[13.2,2.2],BRIDGE,[5.8,2.2],INN],arrival):{x:-2.8,z:3.9,heading:0};
-  return {...pos,visible:stay,walking:stay&&arrival<.98&&s.choice===null,practicing:s.storyStage==='training'&&s.choice==='host',activity:s.storyStage==='training'?'正在指点阿青练剑':'在酒肆歇脚'};
- }
- if(v.id===11){
-  const visible=s.storyStage==='legacy'&&h>6.5&&h<22;
-  const work:[number,number]=s.choice==='host'?[4.2,8.8]:[12.3,-.9];
-  const route=s.choice==='host'?[v.home,work]:[v.home,[6.4,2.2],BRIDGE,work] as [number,number][];
-  const t=Math.max(0,Math.min(1,(h-7)/3));const pos=alongRoute(route,t);
-  return {...pos,visible,walking:t>.02&&t<.98,practicing:s.choice==='host'&&t>=.98&&h<18,activity:s.choice==='host'?'在剑庐里练习基本功':'在行脚茶亭忙着招待过客'};
+  const arrival=Math.min(1,Math.max(0,(s.minutes-STORY_VISITOR_AT)/170));
+  const route:[[number,number],[number,number],[number,number],[number,number],[number,number]]=
+   [[13.2,2.2],[8.3,2.2],[6.3,2.2],[1.5,3.15],[-2.7,3.35]];
+  const walking=stay&&s.storyStage==='stranger'&&s.choice===null&&arrival<.99;
+  const pos=walking?alongLane(route,arrival):{x:-2.7,z:3.65,heading:0};
+  return {...pos,visible:stay,walking,practicing:false,
+   activity:walking?'沿桥入谷寻找歇脚之处':s.storyStage==='training'?'正指点阿青的剑式':'在酒肆歇脚',
+   activityId:walking?'walk':s.storyStage==='training'?'train':'rest',interactionTargetId:'inn-001'};
  }
  if(v.id===10){
-  const visible=getDay(s)%2===0&&h>10&&h<19;
-  const t=Math.max(0,Math.min(1,(h-10)/3));const pos=alongRoute([[13.5,2.2],BRIDGE,[6,2.2],INN],t);
-  return {...pos,visible,walking:t>.02&&t<.98,practicing:false,activity:'带来一些山外的新消息'};
+  const visible=(Math.floor(s.minutes/DAY_MINUTES)+1)%2===0&&h>9.7&&h<18.8;
+  if(!visible)return hidden('在山外行商');
+  const route:[[number,number],[number,number],[number,number],[number,number],[number,number]]=
+   [[13.5,2.2],[8.3,2.2],[6.0,2.2],[3,2.8],[-2.3,3.3]];
+  const first=h<12.3,returning=h>16.4;
+  const pos=first?alongLane(route,Math.max(0,(h-9.7)/2.6)):
+   returning?alongLane([...route].reverse(),Math.max(0,(h-16.4)/2.4)):
+   {x:-2.1,z:3.8,heading:0};
+  return {...pos,visible:true,walking:first||returning,practicing:false,
+   activity:first?'推着货担走过山桥':returning?'沿山道继续行商':'把山外新鲜事告诉陆娘',
+   activityId:first||returning?'walk':'greet',interactionTargetId:'inn-001'};
  }
- const repairing=buildingById(s,'inn-001')?.phase==='repairing';
- const buildingBench=buildingById(s,'bench-001');
- const busy=(v.id===1||v.id===5)&&repairing;
- if(busy&&h>=8&&h<12){
-  const pos=v.id===1?{x:-5.8,z:2.2}:{x:-1.1,z:2.4};
-  return {...pos,heading:-.75,visible:true,walking:false,practicing:false,
-   activity:'正在为酒肆搬料修屋'};
+ if(v.id===11&&s.storyStage!=='legacy')return hidden('尚未走进山谷');
+ if(v.id===11&&s.choice==='observe'){
+  const shop:[number,number]=[12.3,-.9];
+  const home=v.home;
+  const route:[[number,number],[number,number],[number,number],[number,number],[number,number]]=
+   [home,[1,-2],[6,2.2],[8.3,2.2],shop];
+  const leave=7.1+(v.offset%60)/90,returnAt=17.8;
+  if(h<leave||h>19.3)return {x:home[0],z:home[1],heading:0,visible:h>6.5&&h<21,
+   walking:false,practicing:false,activity:'在家休息',activityId:'rest',interactionTargetId:null};
+  const outbound=h<9.4,returning=h>=returnAt;
+  const p=outbound?alongLane(route,(h-leave)/(9.4-leave)):returning?
+   alongLane([...route].reverse(),(h-returnAt)/1.5):{x:shop[0],z:shop[1],heading:0};
+  return {...p,visible:true,walking:outbound||returning,practicing:false,
+   activity:outbound||returning?'往返山外茶亭':'煮茶，招待山道过客',
+   activityId:outbound||returning?'walk':'serve',interactionTargetId:'tea-pavilion'};
  }
- if(v.id===5&&buildingBench?.phase==='construction'&&h>=9&&h<12)
-  return {x:-6.6,z:2.5,heading:-.3,visible:true,walking:false,practicing:false,
-   activity:'正在帮梁伯打磨侧廊长凳'};
- const work=v.id===8?PRACTICE:v.work;
- const plaza:[number,number]=[-1.6,3.2];
- const steps:Waypoint[]=[
-  {h:0,p:v.home,what:'在家休息'},{h:6.4,p:v.home,what:'准备出门'},
-  {h:8.7,p:work,what:v.id===8?'去练武坪练剑':'走向工作地点'},
-  {h:11.5,p:work,what:v.id===8?'正在练剑':`正在忙着${v.occupation==='酒馆掌柜'?'招呼客人':'手头的活计'}`},
-  {h:12.5,p:plaza,what:'前往酒肆'},{h:14,p:plaza,what:'在酒肆门前歇脚'},
-  {h:15.1,p:work,what:'回去做事'},{h:18.3,p:work,what:v.id===8?'日暮时再练一套剑式':'收拾一天的活计'},
-  {h:19.4,p:INN,what:'去酒肆听听故事'},{h:20.5,p:INN,what:'听说书和山外传闻'},
-  {h:22,p:v.home,what:'沿着小路回家'},{h:24,p:v.home,what:'在家休息'}
- ];
- const motion=routine(steps,h);
- const training=v.id===8 && (h>8.7&&h<11.5||h>15.1&&h<18.3);
- return {...motion,visible:h>6.6&&h<22,practicing:training&&!motion.walking};
+ const life=dailyResidentMotion(v,s.minutes,getWeather(s));
+ const practice=life.activityId==='train'&&!life.walking;
+ return {...life,visible:h>6.4&&h<21,practicing:practice};
 }
