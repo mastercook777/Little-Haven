@@ -1,4 +1,4 @@
-import {VALLEY_BOUNDS,VALLEY_RIVER,VALLEY_ROUTES,type GroundPoint} from './valleyGeography.ts';
+import {VALLEY_BOUNDS,VALLEY_RIVER,VALLEY_ROUTES,VALLEY_PINES,VALLEY_BAMBOO,type GroundPoint} from './valleyGeography.ts';
 import type {VillageDirection} from './villageGrowth.ts';
 
 /** Local XZ footprint covers the roof eave, porch and its reserved walkway. */
@@ -125,7 +125,14 @@ const branches:Record<VillageDirection,readonly VillageParcel[]>={
  ]
 };
 export function reservedParcels(choice:VillageDirection|null):VillageParcel[]{
- return [...BASE_PARCELS,...(choice?branches[choice]:[])].map(x=>({...x}));
+ const vegetation=[...VALLEY_PINES.map(([x,z,size],i)=>({
+  id:'pine-'+i,kind:'protected' as const,x,z,width:1.85*size,depth:1.85*size,
+  rotation:0,clearance:.12,accessX:x,accessZ:z,builtAt:0
+ })),...VALLEY_BAMBOO.map(([x,z,size],i)=>({
+  id:'bamboo-'+i,kind:'protected' as const,x,z,width:1.75*size,depth:1.75*size,
+  rotation:0,clearance:.10,accessX:x,accessZ:z,builtAt:0
+ }))];
+ return [...BASE_PARCELS,...(choice?branches[choice]:[]),...vegetation].map(x=>({...x}));
 }
 export function validateVillageParcel(parcel:VillageParcel,occupied:readonly VillageParcel[],
  accessLimit=4.15):PlotResult{
