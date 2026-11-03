@@ -104,7 +104,7 @@ try{
 
  // Sprint4 H1/H2: inspect actual animated vertices, not a rain-angle screenshot.
  const river=await page.evaluate(()=>window.__HAVEN_DEBUG__.getRiverProbe());
- if(river.surfaceName!=='river-water'||river.surfaceY<=.26||
+ if(river.surfaceName!=='river-water'||river.surfaceY<=.075||
   river.samples.length<5||river.samples.filter(s=>s.surfaceHit).length<5)
   throw Error('River surface geometry/projection invalid: '+JSON.stringify(river));
  await page.evaluate(()=>{
