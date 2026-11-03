@@ -28,7 +28,8 @@ const STANDARD={
  ridge:new THREE.MeshStandardMaterial({color:'#697578',roughness:1}),
  paper:new THREE.MeshStandardMaterial({color:'#e9cea1',emissive:'#c28a51',emissiveIntensity:.15,roughness:1}),
  redCloth:new THREE.MeshStandardMaterial({color:'#ad6250',roughness:1,side:THREE.DoubleSide}),
- jade:new THREE.MeshStandardMaterial({color:'#738b77',roughness:1,side:THREE.DoubleSide})
+ jade:new THREE.MeshStandardMaterial({color:'#738b77',roughness:1,side:THREE.DoubleSide}),
+ roofFrost:new THREE.MeshStandardMaterial({color:'#e5eee6',roughness:1,transparent:true,opacity:.69,depthWrite:false,side:THREE.DoubleSide})
 };
 const boxGeometry=new THREE.BoxGeometry(1,1,1);
 const circleGeometry=new THREE.CylinderGeometry(1,1,1,9);
@@ -78,6 +79,12 @@ export function buildMountainRoof(parent:THREE.Object3D,settings:RoofInfo){
  geometry.setIndex(ids);geometry.computeVertexNormals();
  const mesh=new THREE.Mesh(geometry,material);mesh.name='one-piece-upturned-roof';
  mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);
+ // A seasonally toggled dusting exactly follows the authored roof profile.
+ // Unlike the old hard-coded strips, this never floats above a renovated home.
+ const frost=new THREE.Mesh(geometry,STANDARD.roofFrost);
+ frost.name='seasonally-frosted-authored-roof';frost.position.y=.045;
+ frost.userData.keepDynamicMesh=true;frost.userData.seasonalRoofSnow=true;
+ frost.visible=false;frost.castShadow=false;parent.add(frost);
  // The roof apron and curved edges are structural: one thin timber line,
  // not dozens of disconnected additional roof slats.
  const edgePoints=(sx:number)=>{
@@ -214,6 +221,11 @@ export function createMountainTavern(parent:THREE.Object3D,context:VillageBuildi
  const kitchen=group(g,expanded?2.50:2.16,0,expanded?-1.34:-1.19);
  baseHouse(kitchen,expanded?2.15:1.85,expanded?2.55:2.18,expanded?2.22:2.05,STANDARD.roofWarm,
   STANDARD.wheat,'cottage',windows,0);
+ // The stove vent is now physically part of the working kitchen volume,
+ // not steam emitted from an arbitrary point above the empty sky.
+ const chimneyTop=expanded?3.68:3.38;
+ box(kitchen,.57,chimneyTop-.25,-.23,.34,.64,.34,STANDARD.stone);
+ box(kitchen,.57,chimneyTop+.10,-.23,.47,.10,.45,STANDARD.oldWood);
  // Raised arcade ties the building footprint to the village center, with
  // see-through columns instead of a blocky solid front annex.
  box(g,-.3,.23,expanded?2.68:2.40,expanded?6.80:6.10,.22,expanded?2.30:2.12,STANDARD.stone);
