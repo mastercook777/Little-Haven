@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {getCalendar,getWeather,type ActivityId,type Villager,type WorldState,residentMotion} from '../simulation/world';
 import {dressCharacter,type CharacterCostume} from './characterKit';
 import {REST_POSE,sampleCharacterPose,interpolatePose,type CharacterPose} from './characterMotion';
+import {batchStaticSubtree} from './batchStatic';
 
 /** An articulated workshop-doll body with a real upper-body and head pivot. */
 const fabric=new Map<string,THREE.MeshStandardMaterial>();
@@ -44,11 +45,12 @@ export interface PersonModel{
  pose:CharacterPose;lastT:number;heading:number;
 }
 export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]{
- return villagers.map(v=>{
+ const models=villagers.map(v=>{
   const g=new THREE.Group();g.userData.villagerId=v.id;g.name='villager-'+v.id;scene.add(g);
   const cloth=mat(v.color),hair=mat(v.hair),skin=mat(skinColors[(v.id-1)%4]),dark=mat('#4e4a46');
   const upper=new THREE.Group();upper.position.y=UPPER_Y;upper.name='articulated-torso';g.add(upper);
   const robe=torsoPart(upper,new THREE.CylinderGeometry(.20,.365,.77,9),cloth,0,.59,0);
+  robe.userData.keepDynamicMesh=true;
   torsoPart(upper,new THREE.CylinderGeometry(.19,.21,.35,9),cloth,0,1.02,0);
   torsoPart(upper,new THREE.BoxGeometry(.46,.095,.13),mat('#d8c4a2'),0,.81,.25);
   const lapel=torsoPart(upper,new THREE.BoxGeometry(.09,.37,.075),mat('#eee1c6'),-.09,1.05,.19);
@@ -149,6 +151,8 @@ export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]
   return {villager:v,group:g,upper,headRig,legs,knees,arms,grownGear,winterGear,gear,robe,
    costume,pose:{...REST_POSE},lastT:0,heading:0};
  });
+ for(const person of models)batchStaticSubtree(person.group,{disposeOriginals:false});
+ return models;
 }
 export function updatePeople(people:PersonModel[],state:WorldState,t:number,selected:number|null){
  const winter=getCalendar(state).season==='winter',rain=getWeather(state)==='rain';
