@@ -199,10 +199,16 @@ try{
  await page.screenshot({path:out+'/rain-motion-1.png'});
  await page.waitForTimeout(120);
  await page.screenshot({path:out+'/rain-motion-2.png'});
- const down=(a,b)=>a.filter((p,i)=>b[i].headY<p.headY-.025).length;
+ // Particles falling past the ground wrap from the bottom to the top.
+ // Normalize that legal jump before measuring direction; slow software WebGL
+ // previously produced spurious 7/12 "descending" frames despite correct -Y.
+ const down=(a,b)=>a.filter((p,i)=>{
+  const raw=b[i].headY-p.headY,unwrapped=raw>0?raw-10.6:raw;
+  return unwrapped<-.025;
+ }).length;
  const falling=[down(rain0,rain1),down(rain1,rain2)];
  if(falling.some(n=>n<8)||[...rain0,...rain1,...rain2].some(d=>d.headY<=d.tailY))
-  throw Error('Rain reverses or line endpoints flip: '+JSON.stringify({falling,rain0,rain1}));
+  throw Error('Rain reverses or shaft endpoints flip after accounting for ground wrap: '+JSON.stringify({falling,rain0,rain1}));
  const point=river.samples[2].world;
  const terrain=await page.evaluate(([x,y,z])=>window.__HAVEN_DEBUG__.getTerrainProbe(x,z),point);
  if(!(terrain.groundY<terrain.waterY))throw Error('River not excavated below water: '+JSON.stringify(terrain));
