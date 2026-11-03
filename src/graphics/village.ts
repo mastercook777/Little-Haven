@@ -3,6 +3,7 @@ import {getCalendar,getWeather,type WorldState} from '../simulation/world';
 import {makeBuildingRenderer} from './buildingRenderer';
 import {createSeasonalArt} from './seasonArt';
 import {buildVillageWorkplaces} from './lifeDetails';
+import {buildRiverArt} from './riverArt';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -234,7 +235,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -251,11 +252,8 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
   const h=1.0+random(i+30)*2.6;const m=sphere(root,1.2+random(i)*.7,x,h*.50+.08,z,mat(i%3?'#84928a':'#a0a297'));
   m.scale.set(.8,h/1.9,1.4);
  }
- // River and fixed crossing are now landmarks: visiting swordsmen actually use the bridge.
- const river:[[number,number],[number,number],[number,number],[number,number],[number,number]]=[[8.55,-11.7],[8.62,-5.9],[8.40,2.2],[8.8,7.1],[8.5,11.8]];
- const water=new THREE.MeshStandardMaterial({color:'#79a9aa',roughness:.25,metalness:.04,transparent:true,opacity:.88,side:THREE.DoubleSide});
- ribbon(root,river,2.42,C.bank,.22);ribbon(root,river,1.81,water,.24);
- ribbon(root,[[8.64,-11],[8.52,-6],[8.38,1.7],[8.73,7.5],[8.51,11]],.18,mat('#c4ded4'),.253);
+ // A readable watercourse with bank slopes, stones, and real under-bridge continuity.
+ const riverArt=buildRiverArt(root);
  const pathMat=new THREE.MeshStandardMaterial({color:'#c4b396',side:THREE.DoubleSide});
  const routes:[number,number][][]=[
   [[-12,-5],[-9,-3.9],[-6,-2.7],[-4,2.7],[-3,3.2],[-1,3.1],[3,2.2],[6.3,2.2],[8.3,2.2],[11.2,2.2],[15.9,2.2]],
@@ -323,7 +321,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
    const calendar=getCalendar(s),weather=getWeather(s);
@@ -332,7 +330,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
    const palette=palettes[calendar.season];
    turfMaterial.color.set(palette.grass);C.bamboo.color.set(palette.bamboo);
    C.bambooLight.color.set(palette.light);C.bambooDark.color.set(palette.dark);
-   water.color.set(palette.water);pathMat.color.set(palette.path);
+   riverArt.setSeason(calendar.season);pathMat.color.set(palette.path);
    seasonalArt.setSeason(calendar.season);weatherArt.setWeather(weather);
    winterTrim.visible=calendar.season==='winter';
    puddles.visible=weather==='rain';
@@ -344,7 +342,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
    const night=daylight<.42?1.4:.18;
    for(const m of windows)m.emissiveIntensity=night*.65;
    for(const m of emissive)m.emissiveIntensity=night;
-   water.opacity=.78+.12*Math.sin(t*.65);
+   riverArt.animate(t);
    seasonalArt.animate(t);weatherArt.animate(t);
    for(let i=0;i<bambooGroups.length;i++)bambooGroups[i].rotation.z=Math.sin(t*.6+i*2.2)*.012;
    for(let i=0;i<swing.length;i++)swing[i].rotation.z=Math.sin(t*.65+i)*.025;
