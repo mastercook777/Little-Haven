@@ -5,7 +5,7 @@ import {fallingRainY,rainSegmentY} from './weatherMotion.ts';
 import {VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
-import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad} from '../simulation/pioneerPaths.ts';
+import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
 import {buildMountainRoof} from './villageBuildings.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 
@@ -377,7 +377,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   camp.supplies.scale.setScalar(.84+Math.min(1,s.resources.food/14)*.2);
   people.forEach((visual,i)=>{
    const f=s.founders[i],night=dayHour>=20||dayHour<7;
-   const path=f.commute?.length?f.commute:[[s.camp.x,s.camp.z],[f.target[0],f.target[1]]];
+   const path:readonly WalkPoint[]=f.commute?.length?f.commute:[[s.camp.x,s.camp.z],[f.target[0],f.target[1]]];
    const phaseHour=(s.minutes%60)/60;
    // Walk the actual saved route, including bends around houses and riverbank.
    const along=night?1:phaseHour<.27?phaseHour/.27:
@@ -409,7 +409,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  return {root,update,signatures:()=>({
   buildings:latestWorld.buildings.length,renderedStructures,
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
-  people:people.length
+  people:people.length,roads:latestWorld.roads.length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
