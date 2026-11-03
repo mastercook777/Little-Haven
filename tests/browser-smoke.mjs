@@ -36,14 +36,14 @@ try{
  });
  if(!stats.gl||!stats.width||!stats.height)throw Error('WebGL canvas absent or unavailable: '+JSON.stringify(stats));
  const captures=[];
- for(const season of ['spring','summer','autumn','winter']){
+ for(const [i,season] of ['spring','summer','autumn','winter'].entries()){
+  if(i>0)await page.evaluate(()=>window.__HAVEN_DEBUG__.flowSeason());
   const c=await page.evaluate(()=>window.__HAVEN_DEBUG__.getState());
-  const cc=await page.evaluate(()=>window.__HAVEN_DEBUG__.flowSeason());
   await page.waitForTimeout(250);
   const img=await page.screenshot({path:out+'/'+season+'.png'});
   if(img.length<12_000)throw Error('Suspiciously empty canvas capture: '+season);
   captures.push(img.toString('base64').slice(0,200));
-  results.push({season,oldMinute:c.minutes,crossed:cc.crossedSeasons,bytes:img.length});
+  results.push({season,minute:c.minutes,calendarYear:Math.floor(c.minutes/(1440*48))+1,bytes:img.length});
  }
  const uniq=new Set(captures);
  if(uniq.size<4)throw Error('Season captures did not differ');
