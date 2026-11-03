@@ -196,7 +196,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;coreVisualSignature():string;coreMaturity():number;coreBounds():THREE.Box3;settlementStages():{id:string;age:number;phase:'foundation'|'frame'|'complete';x:number;z:number}[];groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;coreVisualSignature():string;coreMaturity():number;coreBounds():THREE.Box3;coreDeferredExpansions():string[];settlementStages():{id:string;age:number;phase:'foundation'|'frame'|'complete';x:number;z:number}[];groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
