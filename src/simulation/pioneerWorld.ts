@@ -223,53 +223,78 @@ function work(s:PioneerWorld,f:PioneerFounder){
  * consume one person's hour; day/month fast-forward uses these same steps. */
 function step(s:PioneerWorld){
  const weather=getPioneerWeather(s);
+ agePioneerBuildings(s);
  if(s.minutes%DAY_MINUTES===0){
   const season=getPioneerCalendar(s).season;
   for(const site of s.sites){
-   const factor=site.kind==='forage'&&season==='winter'?.38:1;
+   const factor=(site.kind==='forage'||site.kind==='field')&&season==='winter'?.38:1;
    site.stock=round(Math.min(site.capacity,site.stock+site.renewPerDay*factor));
   }
  }
  s.resources.food=round(Math.max(0,s.resources.food-s.founders.length/24));
  s.resources.water=round(Math.max(0,s.resources.water-s.founders.length/24));
  if(s.minutes%DAY_MINUTES===0&&(s.resources.food<1||s.resources.water<1))
-  log(s,'营地储备告急','乡邻暂缺食物或饮水，先安排采集与取水，不会凭空获得补给。');
- requestShelter(s);
+  log(s,'储备告急','乡邻缺少粮水，暂缓非必要劳动，改去水源或有余量的林地采集。');
+ requestShelter(s);schedulePioneerProject(s);considerPioneerMigration(s);
  const intent=s.intent;
  if(intent&&intent.phase==='survey'){
   intent.parcel=planPioneerShelter(s);
-  if(intent.parcel){intent.phase='materials';intent.pauseReason='木料尚未备齐';
-   log(s,'找到安全屋址','梁伯重新勘地，找到了不挡山路且远离溪岸的屋址。',intent.id);}
+  if(intent.parcel){
+   intent.path=pioneerBuildingPath(s.camp,intent.parcel,
+    [...landscape(),...s.buildings.map(b=>b.parcel)])??undefined;
+   intent.phase='materials';intent.pauseReason='木料尚未备齐';
+   log(s,'找到安全屋址','梁伯重新勘地，找到了不挡河岸、林地与山路的合法屋址。',intent.id);
+  }
  }
- const building=intent&&intent.phase!=='survey'&&intent.phase!=='materials';
- const needWood=!!intent&&intent.phase==='materials'&&s.resources.wood<SHELTER_WOOD;
+ const hour=Math.floor(s.minutes%DAY_MINUTES/60);
+ if(hour<7||hour>=20){
+  for(const f of s.founders)allocate(s,f,f.homeBuildingId?'shelter':'rest');
+  s.comfort=s.buildings.length?weather==='rain'?74:82:weather==='rain'?18:32;
+  return;
+ }
+ const building=!!intent&&intent.phase!=='survey'&&intent.phase!=='materials';
+ const needWood=!!intent&&intent.phase==='materials'&&s.resources.wood<intent.woodRequired;
  const [liang,lu,he]=s.founders;
- if(needWood||(!building&&s.resources.wood<2))
-  gather(s,liang,'forest',.94,'collect-wood');
- else if(building)work(s,liang);
+ if(needWood||!building&&s.resources.wood<16){
+  if(!gather(s,liang,'forest',.94,'collect-wood'))allocate(s,liang,'rest');
+ }else if(building)work(s,liang);
  else allocate(s,liang,'tend-fire');
- const foodTarget=s.policy==='food'?18:s.policy==='shelter'?3.8:7.5;
+ const foodTarget=s.policy==='food'?18:s.policy==='shelter'?5.5:9.5;
+ const field=s.sites.find(site=>site.kind==='field'&&site.stock>.01);
  if(s.resources.food<foodTarget||!building){
-  if(!gather(s,he,'forage',weather==='rain'?.62:.86,'forage'))allocate(s,he,'rest');
+  const harvested=field?gather(s,he,'field',weather==='rain'?.58:.94,'farm'):false;
+  if(!harvested&&!gather(s,he,'forage',weather==='rain'?.62:.86,'forage'))
+   allocate(s,he,'rest');
  }else if(building)work(s,he);
- else allocate(s,he,'rest');
- const waterTarget=s.policy==='food'?8:s.policy==='shelter'?1.8:3.3;
+ else allocate(s,he,'shelter');
+ const waterTarget=s.policy==='food'?8:s.policy==='shelter'?2.8:4.3;
  if(s.resources.water<waterTarget||!building&&s.resources.water<6){
-  gather(s,lu,'spring',1.3,'fetch-water');
+  if(!gather(s,lu,'spring',1.36,'fetch-water'))allocate(s,lu,'rest');
  }else if(building)work(s,lu);
  else allocate(s,lu,'tend-fire');
- if(intent?.phase==='materials'){
-  if(s.resources.wood>=SHELTER_WOOD&&s.resources.food>=.5&&s.resources.water>=.5){
-   // Exactly one material debit, before any construction hours can be spent.
-   s.resources.wood=round(s.resources.wood-SHELTER_WOOD);
-   intent.woodCommitted=SHELTER_WOOD;intent.phase='foundation';intent.pauseReason=null;
-   log(s,'备齐搭棚木料','林地采集的木料已运到工地，乡邻开始平整地基。',intent.id);
-  }else intent.pauseReason=s.resources.wood<SHELTER_WOOD?'还缺 '+round(SHELTER_WOOD-s.resources.wood)+' 份木料':
-   '食物或饮水不足，暂缓搭棚';
+ for(const f of s.founders.slice(3)){
+  if(s.resources.food<s.founders.length*1.7){
+   const source=s.sites.some(site=>site.kind==='field'&&site.stock>.05)?'field':'forage';
+   if(!gather(s,f,source,.86,source==='field'?'farm':'forage'))allocate(s,f,'rest');
+  }else if(s.resources.water<s.founders.length*1.2){
+   if(!gather(s,f,'spring',1.25,'fetch-water'))allocate(s,f,'rest');
+  }else if(building&&s.resources.food>3)work(s,f);
+  else if(s.resources.wood<Math.max(11,intent?.woodRequired??11)){
+   if(!gather(s,f,'forest',pioneerHasFacility(s,'wood-yard')?1.15:.72,'collect-wood'))
+    allocate(s,f,'rest');
+  }else allocate(s,f,'shelter');
  }
- if(intent&&intent.workDone>=intent.workRequired)completeShelter(s);
- if(s.buildings.length) s.comfort=weather==='rain'?74:82;
- else s.comfort=weather==='rain'?18:32;
+ if(intent?.phase==='materials'){
+  if(s.resources.wood>=intent.woodRequired&&s.resources.food>=.5&&s.resources.water>=.5){
+   s.resources.wood=round(s.resources.wood-intent.woodRequired);
+   intent.woodCommitted=intent.woodRequired;intent.phase='foundation';intent.pauseReason=null;
+   log(s,'工材送达','乡邻从有限林地采集的 '+intent.woodRequired+
+    ' 份木料已经扣库送至工地，开始真实施工。',intent.id);
+  }else intent.pauseReason=s.resources.wood<intent.woodRequired?
+   '还缺 '+round(intent.woodRequired-s.resources.wood)+' 份木料':'粮水告急，暂缓施工';
+ }
+ if(intent&&intent.workDone>=intent.workRequired)completePioneerProject(s);
+ s.comfort=s.buildings.length?weather==='rain'?74:82:weather==='rain'?18:32;
 }
 export function advancePioneerWorld(s:PioneerWorld,realSeconds:number){
  if(!Number.isFinite(realSeconds)||realSeconds<0)throw new RangeError('Invalid advance');
