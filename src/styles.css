@@ -21,3 +21,36 @@
 .choices .choice-illustration{color:#a37457}
 .speed-btn[data-speed="48"]{color:#9f7d53}
 @media(max-width:760px){.speed-btn[data-speed="48"]{min-width:34px;font-size:10px;padding:0 3px}}
+
+/* v0.3 — compact archive controls remain below the reading area, even on phones. */
+.save-tools{border-top:1px solid #e3e7dc;padding-top:13px;margin-top:6px;display:flex;flex-direction:column;gap:8px}
+.save-tools-heading{font-size:11px;color:#617a62;font-weight:700}
+.save-tools-heading span{color:#9a7857}
+.slot-buttons,.save-actions{display:flex;gap:7px;flex-wrap:wrap}
+.slot-button,.save-actions button{border:1px solid #dce4d7;background:#f5f6ee;color:#54725a;border-radius:8px;padding:7px 11px;font-size:11px;min-height:36px}
+.slot-button.active{background:#dcead9;border-color:#86a887;color:#355d44;font-weight:700}
+.save-actions .reset-game{font-size:11px;color:#a07867;text-decoration:none;background:#fcf5ef;border-color:#ecdcd1}
+@media(max-width:760px){.save-tools{gap:6px;padding-top:9px}.slot-button,.save-actions button{padding:5px 8px;min-height:34px;font-size:10px}.modal-card{padding:19px;height:min(630px,92dvh)}}
+
+/* Sprint 2: reusable guardian letters and inspectable building traces. */
+.opportunity-choices{display:flex;flex-direction:column;gap:8px}
+.opportunity-choice{min-height:55px;padding:10px 12px;border:1px solid #e3e4d7;border-radius:10px;background:#faf9f0;color:#47614c;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:4px;text-align:left;align-items:center}
+.opportunity-choice strong{font-size:12px;grid-column:1;grid-row:1}
+.opportunity-choice small{font-size:10px;color:#829481;grid-column:1;grid-row:2;white-space:normal;line-height:1.4}
+.opportunity-choice span{grid-column:2;grid-row:1 / span 2;color:#91a586}
+.opportunity-choice:hover,.opportunity-choice:focus-visible{border-color:#8aa582;background:#f0f5e9}
+.building-card{top:44%;left:50%;max-width:calc(100vw - 30px)}
+.building-card .resident-thought{font-style:normal}
+@media(max-width:760px){
+ .opportunity-choices{gap:5px}
+ .opportunity-choice{min-height:43px;padding:6px 9px}
+ .opportunity-choice strong{font-size:10px}
+ .opportunity-choice small{font-size:8px}
+ .building-card{top:42%}
+}
+@media(max-width:480px){
+ .opportunity-choice{min-height:40px}
+ .opportunity-choice small{font-size:8px}
+ .guardian-panel:has(.opportunity-choices:not([hidden])){width:min(270px,calc(100vw - 24px))}
+ .guardian-panel:has(.opportunity-choices:not([hidden])) .panel-copy{max-height:62px;overflow:auto}
+}

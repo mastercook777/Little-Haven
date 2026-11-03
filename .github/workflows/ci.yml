@@ -19,3 +19,16 @@ jobs:
         run: npm run test:sim
       - name: Typecheck and Vite build
         run: npm run build
+      - name: GitHub Pages build
+        run: npm run build:pages
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Chromium desktop/mobile smoke
+        run: npm run test:browser
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: little-haven-v03-browser
+          path: artifacts/browser-smoke/
+          if-no-files-found: ignore
