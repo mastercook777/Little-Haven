@@ -16,17 +16,60 @@
 - [x] New save namespace; no destruction of v0.1 progress
 - [x] Story-specific UI and fast-forward, chronicle and resident details
 - [x] Deterministic simulation regression tests
-- [ ] Finish CI TypeScript/Vite build and Pages release verification
+- [x] CI TypeScript/Vite build and Pages release verified for v0.2
 - [ ] Capture active-play browser screenshots, test both branches visually, check touch layouts and frame budget
 
-## v0.3 — 江湖因缘 (next)
+## v0.3 — 山谷有岁月 / Living Valley (design stage)
 
-1. Replace one-off plot with **composable storylets**: visitor occupation, personality, intention, relation and world tension act as inputs.
-2. Expand resident relationships and return-from-travel state, without making every resident a legendary hero.
-3. Add a repeatable tavern traveler loop; one visitor can influence later visits and word-of-mouth.
-4. Introduce gradual visible growth of facilities based on social/use conditions, rather than stat-only unlocks.
-5. Add simple path graph / non-intersecting routes and resident conversations.
-6. Begin long-horizon lightweight choices: shelter, rumors, safety and scarcity, with warning/recovery rather than destructive idle punishment.
+**目标：** 从“数日走完一生的剧情切片”发展为“拥有四季、天气、建筑生命周期和长期机缘的微缩武侠世界”。**本阶段仅完成规划文档，以下待办尚未实现。**
+
+### 设计规格（已完成）
+
+- [x] [世界时间与四季天气](docs/V03_WORLD_FRAMEWORK.md)：同一模拟时钟、日/季/年、流年、离线与存档
+- [x] [建筑生命周期与村庄生长](docs/V03_VILLAGE_GROWTH.md)：稳定地块/建筑 ID、施工、旧化、修葺、扩建、生活痕迹
+- [x] [守谷人参与感](docs/V03_PLAYER_AGENCY.md)：机缘、庇护、无操作自治、风险预警与多存档
+- [x] [美术与表现升级](docs/V03_ART_DIRECTION.md)：构图、房屋 Kit、角色动作、四季/天气渲染与性能标准
+
+### Sprint 0 · 基线
+
+- [x] 从 v0.2 代码确认剧情结局过快的原因（分钟阈值与单层时间）
+- [x] 将玩法、场景、状态与验收写入以上文档
+- [ ] 补齐 v0.2 桌面/手机实机截图、性能及旧存档回归基线
+
+### Sprint 1 · 世界时间框架（P0）
+
+- [ ] 单一模拟时钟派生日、季、年；步进/流年/离线一致
+- [ ] 故事长线改为跨年与条件驱动，避免 1× 数日内完成一生
+- [ ] 存档 v3、旧档保留与新开档基础方案
+- [ ] 四季 + 晴/雨/雾数据与基本场景映射
+- [ ] 自动化测试与可观察季节变化
+
+### Sprint 2 · 村庄生长与玩家参与（P0）
+
+- [ ] 酒馆和一间民居的建筑 ID、地块、使用/磨损/修葺/施工状态
+- [ ] 居民劳动→添置道具、修缮或新增设施，形成可见因果
+- [ ] 雨夜留客与修缮援助两种可复用机缘；无需玩家操作世界仍有发展
+- [ ] 建筑/人物详情可追溯原因；多槽位/新开档支持重玩分支
+
+### Sprint 3 · 美术大改与动作（P1）
+
+- [ ] 酒肆、院落、练武坪、竹林、山道与桥头的空间重构
+- [ ] 可组合中式建筑 Kit + 新旧修葺场景变体
+- [ ] 角色走停、扫地、搬料、抱拳、练剑等可观察动作
+- [ ] 春夏秋冬 + 天气效果、轻量渲染、移动端性能降级
+- [ ] 桌面/移动截图矩阵、浏览器实测、CI 与 Pages 验收
+
+### 延后至 v0.4
+
+复杂门派生态、真实战斗、官府与匪患完整危机、广泛 storylets、大模型实时剧情；优先验证平凡生活能否留下痕迹。
+
+### v0.3 验收门槛
+
+1. 在 1× 观察 15 分钟不会走完阿青的一生；流年按季推进可预览。
+2. 四季与晴/雨/雾有可见、可重复的场景差异。
+3. 至少 1 间民居能老化并修葺，至少 1 项设施有可见施工/添置过程。
+4. 守谷人出手/不出手都形成长期、可反查的因果变化。
+5. 多倍率、离线恢复、存档迁移、场景性能、移动布局通过验收。
 
 ## Design guardrail
 

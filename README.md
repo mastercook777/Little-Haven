@@ -58,6 +58,17 @@ npm run build:pages   # Pages 生产构建
 
 浏览器开发调试：`window.__HAVEN_DEBUG__.getState()`、`.advance(seconds)`、`.choose('host'|'observe')`、`.getRendererInfo()`、`.reset()`。
 
+## v0.3 规划：山谷有岁月
+
+v0.2 仍是目前已上线的版本。**下面是下一阶段的开发规格，暂未实现**：
+
+- [三层时间、四季天气与流年规则](docs/V03_WORLD_FRAMEWORK.md)
+- [建筑老化、修葺、扩建及村民生活痕迹](docs/V03_VILLAGE_GROWTH.md)
+- [守谷人机缘、庇护与多存档重玩](docs/V03_PLAYER_AGENCY.md)
+- [中式微缩村庄空间、动画与渲染升级](docs/V03_ART_DIRECTION.md)
+
+执行顺序参见 [ROADMAP](ROADMAP.md)，先完成小规模系统切片与可视验收，再扩展整村。
+
 ## 当前边界
 
 v0.2 刻意只做一条双分支人生故事，不包括真实武功战斗、无穷江湖事件、复杂社会关系或完整自由路径规划。世界模拟与 Three.js 渲染分开，以便 v0.3 持续扩充人物和因果规则。详见 `docs/QA.md`。

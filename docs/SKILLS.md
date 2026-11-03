@@ -12,10 +12,12 @@ This repo includes the upstream [majidmanzarpour/threejs-game-skills](https://gi
 Open this repository as the Codex project and ask:
 
 ```
-Use $threejs-game-director and the relevant sibling skills to implement the
-v0.2 Jianghu tavern life-arc prototype. Follow the wuxia scene and story
-briefs in docs/V02_*.md and the guardrails in AGENTS.md. Keep the simulated
-Jianghu independent from Three.js, add tests, and verify both endings visually.
+Use $threejs-game-director with threejs-gameplay-systems, threejs-aaa-graphics-builder,
+threejs-game-ui-designer and threejs-qa-release to implement the next *small*
+v0.3 slice described in docs/V03_*.md and ROADMAP.md. First write pure tests
+for calendar/season and deterministic boundary advances, then implement one
+building lifecycle and visible worksite. Preserve v0.2 behavior, do not overwrite
+existing saves, and verify active-play desktop/mobile screenshots before merge.
 ```
 
 If your Codex environment does not automatically discover repository-local skills, the upstream-supported global installation is:
@@ -27,3 +29,14 @@ npx skills add majidmanzarpour/threejs-game-skills --skill '*' -a codex -g -y
 Use the vendored copy as the reference version for this project; only upgrade it deliberately, after checking upstream changes and third-party licensing. Optional model/image/audio generation steps may require separate provider API keys and are **not** needed for local game development.
 
 Note: Upstream `threejs-aaa-graphics-builder` supplies three sample JPG scorecard reference images. If they are not present in the vendored package, follow the text `references/visual-scorecard.md` or obtain the optional anchors from upstream for manual visual review.
+
+## v0.3 任务路由
+
+| 工程任务 | 优先使用的 Skill |
+| --- | --- |
+| 三层时间、季节边界、建筑状态、机缘与测试 | `threejs-gameplay-systems` + `threejs-game-director` |
+| 酒肆/民居 Kit、四季、天气、旧化和渲染优化 | `threejs-aaa-graphics-builder`（`authoring-recipes.md`、`technical-art.md`） |
+| 流年选择、守望录、季节提示与移动端可读性 | `threejs-game-ui-designer` |
+| 桌面与移动端截图、性能指标、Pages 构建 | `threejs-qa-release` |
+
+**当前不需要** Tripo/Gemini/ElevenLabs 的外部素材生成能力；先完成程序化 Low-poly 美术切片。文档仅为开发约定，不能替代真实浏览器测试。
