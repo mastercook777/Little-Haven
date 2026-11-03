@@ -1,6 +1,6 @@
-import {DAY_MINUTES,SEASON_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.ts';
+import {DAY_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.ts';
 import {getWeatherForMinutes} from './weather.ts';
-import {nearestRoad,parcelOverlaps,reservedParcels,validateVillageParcel,
+import {nearestRoad,reservedParcels,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
 
 export const PIONEER_VERSION=4;
@@ -38,7 +38,7 @@ export interface PioneerIntent{
 }
 export interface PioneerBuilding{
  id:string;kind:'shelter';parcel:VillageParcel;completedAt:number;
- causeId:string;occupants:number[];
+ causeId:string;occupants:number[];materialsSpent:{wood:number};workHours:number;
 }
 export interface PioneerWorld{
  schemaVersion:4;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
@@ -177,7 +177,7 @@ function completeShelter(s:PioneerWorld){
  const intent=s.intent;if(!intent||!intent.parcel)return;
  const b:PioneerBuilding={id:'shelter-'+s.nextEventId,kind:'shelter',
   parcel:intent.parcel,completedAt:s.minutes,causeId:intent.id,
-  occupants:s.founders.map(f=>f.id)};
+  occupants:s.founders.map(f=>f.id),materialsSpent:{wood:intent.woodCommitted},workHours:intent.workDone};
  s.buildings.push(b);s.intent=null;s.comfort=80;
  for(const f of s.founders){f.homeBuildingId=b.id;allocate(s,f,'shelter');}
  log(s,'第一间棚子落成','梁伯与陆娘搭起木梁，阿禾把吃食搬进新棚。三人终于有了避雨归处。',b.causeId);
@@ -273,7 +273,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   const ids=new Set<string>();
   const occupied=[...landscape(),campParcel(s)];
   for(const b of s.buildings){
-   if(!b||b.kind!=='shelter'||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||
+   if(!b||b.kind!=='shelter'||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||b.materialsSpent.wood!==SHELTER_WOOD||
     !Number.isFinite(b.parcel.x)||!Number.isFinite(b.parcel.z)||
     !validateVillageParcel(b.parcel,occupied,3.75).ok)return null;
    ids.add(b.id);occupied.push(b.parcel);
