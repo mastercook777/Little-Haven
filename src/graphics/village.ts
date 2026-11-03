@@ -7,6 +7,7 @@ import {buildRiverArt} from './riverArt';
 import {buildCarvedTerrain,terrainChannelProbe} from './carvedTerrain';
 import {buildVillageEvolution} from './villageEvolution';
 import {createMountainHome,createMountainTavern} from './villageBuildings';
+import {makeVillageCoreGrowth} from './villageCoreGrowth';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -88,12 +89,12 @@ function paintedSign(p:THREE.Object3D,x:number,y:number,z:number,word:string){
 function home(p:THREE.Object3D,x:number,z:number,w=2.9,d=2.5,h=1.9,variation=0,windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[]){
  return createMountainHome(p,x,z,w,d,h,variation,windows,emissive);
 }
-function tavern(p:THREE.Object3D,windows:THREE.MeshStandardMaterial[],emissive:THREE.MeshStandardMaterial[],swings:THREE.Group[]){
+function tavern(p:THREE.Object3D,windows:THREE.MeshStandardMaterial[],emissive:THREE.MeshStandardMaterial[],swings:THREE.Group[],expanded=false){
  return createMountainTavern(p,{
   windows,emissive,swings,
   createLantern:(parent,x,y,z)=>lantern(parent,x,y,z,emissive),
   createSign:(parent,x,y,z,word)=>paintedSign(parent,x,y,z,word)
- });
+ },expanded);
 }
 function pine(p:THREE.Object3D,x:number,z:number,s:number){
  const g=group(p,x,.17,z);g.scale.setScalar(s);cylinder(g,.16,.23,1.65,0,.82,0,C.wood);
@@ -193,7 +194,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;coreVisualSignature():string;coreMaturity():number;groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -235,13 +236,31 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  ];
  routes.forEach((points,i)=>ribbon(root,points,i===0?1.08:.72,pathMat,.26));
  bridge(root);archedGate(root);
- // Village structures orbit one social hub rather than a generic marketplace.
- const innModel=tavern(root,windows,emissive,swing);innModel.userData.buildingId='inn-001';
- const homeModel=home(root,-9,-5.5,2.85,2.4,1.86,0,windows,emissive);homeModel.userData.buildingId='home-001';
- home(root,-9.8,3.1,2.8,2.5,1.95,2,windows,emissive);
- home(root,3.4,-5.6,3.15,2.6,2.12,1,windows,emissive);
- home(root,-.7,-7.9,2.5,2.2,1.68,3,windows,emissive);
- home(root,-11.6,-.4,2.4,2.1,1.70,0,windows,emissive);
+ // A working village center actually rebuilds over the years. The stable
+ // picking wrappers survive when whole building volumes are replaced.
+ const innModel=group(root,0,0,0);innModel.name='inn-plot-stable';
+ const oldInn=tavern(innModel,windows,emissive,swing,false);
+ const expandedInn=tavern(innModel,windows,emissive,swing,true);
+ expandedInn.visible=false;innModel.userData.buildingId='inn-001';
+ const homes=[
+  [-9,-5.5,2.85,2.4,1.86,0],
+  [-9.8,3.1,2.8,2.5,1.95,2],
+  [3.4,-5.6,3.15,2.6,2.12,1],
+  [-.7,-7.9,2.5,2.2,1.68,3],
+  [-11.6,-.4,2.4,2.1,1.70,0]
+ ] as const;
+ const homePairs=homes.map(([x,z,w,d,h,variant],i)=>{
+  const wrapper=group(root,0,0,0);wrapper.name='stable-home-plot-'+i;
+  const original=home(wrapper,x,z,w,d,h,variant,windows,emissive);
+  const renovated=home(wrapper,x,z,w*1.12,d*1.10,h*1.17,variant,windows,emissive);
+  renovated.visible=false;
+  if(i===0)wrapper.userData.buildingId='home-001';
+  return {wrapper,original,renovated,name:'home-'+i};
+ });
+ const homeModel=homePairs[0].wrapper;
+ const coreGrowth=makeVillageCoreGrowth(root,
+  {original:oldInn,renovated:expandedInn,name:'inn'},
+  homePairs.map(({original,renovated,name})=>({original,renovated,name})));
  gardenHerbs(root);const yardModel=trainingGround(root);yardModel.userData.buildingId='yard-001';
  // Old wine well, tea baskets and drying poles.
  cylinder(root,.62,.66,.69,-6.4,.53,3.6,C.slate,12);
@@ -292,10 +311,11 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets],growthVisualSignature:()=>growthArt.visualSignature(),groundProbe:terrainChannelProbe,
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets],growthVisualSignature:()=>growthArt.visualSignature(),coreVisualSignature:()=>coreGrowth.signature(),coreMaturity:()=>coreGrowth.stage(),groundProbe:terrainChannelProbe,
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
    growthArt.update(s.villageGrowth);
+   coreGrowth.update(s.villageGrowth);
    const calendar=getCalendar(s),weather=getWeather(s);
    const id=`${s.storyStage}/${s.choice}/${calendar.season}/${weather}`;
    if(lastStage===id)return;lastStage=id;
