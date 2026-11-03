@@ -5,10 +5,10 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createHash} from 'node:crypto';
 
-const base='http://127.0.0.1:5188/';
+const base='http://127.0.0.1:5190/';
 const output='artifacts/pioneer-browser-smoke';
 await mkdir(output,{recursive:true});
-const processVite=spawn('npm',['run','dev','--','--host','127.0.0.1'],{stdio:'pipe'});
+const processVite=spawn('npm',['run','dev','--','--host','127.0.0.1','--port','5190','--strictPort'],{stdio:'pipe'});
 let logs='';processVite.stdout.on('data',d=>logs+=d.toString());
 processVite.stderr.on('data',d=>logs+=d.toString());
 let browser;
