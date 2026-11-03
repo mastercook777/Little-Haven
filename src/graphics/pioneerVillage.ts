@@ -305,6 +305,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const river=buildRiverArt(root);vegetation(root);resourceLandmarks(root,world);
  const camp=campVisual(root,world);
  const constructionLayer=group(root);constructionLayer.name='actual-settlement-registry';
+ let roadLayer=drawFootpaths(root,world.roads);
+ let lastRoads=roadGeometrySignature(world.roads);
  const people=world.founders.map(f=>makeFigure(root,f));
  const rainGeo=new THREE.BufferGeometry(),rainVertices=new Float32Array(270*6);
  const rainSeed=new Float32Array(270*3);
@@ -324,19 +326,33 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const phase=s.intent?.phase??'none';
   const progress=s.intent?.workDone??0;
   const progressIndex=Math.floor(progress*2);
-  const signature=s.buildings.map(b=>b.id).join(',')+'/'+phase+'/'+
-   (s.intent?.parcel?.x??'')+'/'+(s.intent?.parcel?.z??'');
+  const signature=s.buildings.map(b=>b.id+':'+((b.condition??100)<78?'w':'c')).join(',')+
+   '/'+(s.intent?.id??'')+'/'+phase+'/'+(s.intent?.parcel?.x??'')+'/'+
+   (s.intent?.parcel?.z??'');
   if(signature!==lastBuildSig||progressIndex!==lastProgressIndex){
    while(constructionLayer.children.length){
     const old=constructionLayer.children[0];constructionLayer.remove(old);
    }
-   for(const built of s.buildings)shelterVisual(constructionLayer,built.parcel,'complete',1);
+   for(const built of s.buildings)
+    facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition);
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
-    shelterVisual(constructionLayer,s.intent.parcel,s.intent.phase,Math.min(1,progress/9));
+    if(s.intent.kind==='repair'){
+     const p=s.intent.parcel,g=group(constructionLayer,p.x,.19,p.z);
+     g.rotation.y=p.rotation;g.name='pioneer-repair-scaffold';
+     for(const x of [-p.width*.41,p.width*.41])for(const z of [-p.depth*.43,p.depth*.43])
+      pole(g,x,.9,z,.04,1.72,lightWood);
+     box(g,0,1.68,0,p.width*.88,.07,.12,lightWood);
+    }else facilityVisual(constructionLayer,s.intent.parcel,s.intent.kind??'shelter',
+      s.intent.phase,Math.min(1,progress/s.intent.workRequired));
    }
    renderedStructures=constructionLayer.children.length;
    lastBuildSig=signature;lastProgressIndex=progressIndex;
   }
+  const roadSignature=roadGeometrySignature(s.roads);
+  if(roadSignature!==lastRoads){
+   root.remove(roadLayer);roadLayer=drawFootpaths(root,s.roads);lastRoads=roadSignature;
+  }
+  while(people.length<s.founders.length)people.push(makeFigure(root,s.founders[people.length]));
   const season=getPioneerCalendar(s).season;
   const weather=getPioneerWeather(s);
   if(lastSeason!==season){
@@ -360,30 +376,29 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   flame.visible=!(weather==='rain'&&s.resources.wood<=0);
   camp.supplies.scale.setScalar(.84+Math.min(1,s.resources.food/14)*.2);
   people.forEach((visual,i)=>{
-   const f=s.founders[i],night=dayHour>=20||dayHour<6;
-   const residentHome=s.buildings.find(b=>b.occupants.includes(f.id));
-   const origin=night&&residentHome?
-    {x:residentHome.parcel.x,z:residentHome.parcel.z}:s.camp;
-   const goal=night&&residentHome?
-    {x:residentHome.parcel.x+(i-1)*.54,z:residentHome.parcel.z-.28}:
-    {x:f.target[0],z:f.target[1]};
+   const f=s.founders[i],night=dayHour>=20||dayHour<7;
+   const path=f.commute?.length?f.commute:[[s.camp.x,s.camp.z],[f.target[0],f.target[1]]];
    const phaseHour=(s.minutes%60)/60;
-   const depart=Math.min(1,phaseHour*3.5);
-   const returnTrip=phaseHour>.75?Math.max(0,(1-phaseHour)*4):1;
-   const weight=night&&residentHome?1:depart*returnTrip;
-   const x=origin.x+(goal.x-origin.x)*weight;
-   const z=origin.z+(goal.z-origin.z)*weight;
-   visual.root.position.set(x,.19+Math.sin(seconds*3+i)*.028,z);
-   visual.root.rotation.y=Math.atan2(goal.x-origin.x,goal.z-origin.z);
-   const walking=weight<.95&&!night;
-   const swing=walking?Math.sin(seconds*9+i)*.37:.06*Math.sin(seconds*3+i);
+   // Walk the actual saved route, including bends around houses and riverbank.
+   const along=night?1:phaseHour<.27?phaseHour/.27:
+    phaseHour>.78?(1-phaseHour)/.22:1;
+   const t=Math.max(0,Math.min(1,along));
+   const [x,z]=samplePioneerWalk(path,t);
+   const ahead=samplePioneerWalk(path,Math.min(1,t+.035));
+   const moving=!night&&(phaseHour<.27||phaseHour>.78)&&path.length>1;
+   const bob=moving?Math.abs(Math.sin(seconds*7+i))*.045:0;
+   visual.root.position.set(x,.19+bob,z);
+   const heading=Math.atan2(ahead[0]-x,ahead[1]-z);
+   if(Number.isFinite(heading)&&moving)visual.root.rotation.y=heading;
+   const swing=moving?Math.sin(seconds*9+i)*.35:.04*Math.sin(seconds*2+i);
    visual.arms[0].rotation.x=swing;visual.arms[1].rotation.x=-swing;
    visual.legs[0].rotation.x=-swing;visual.legs[1].rotation.x=swing;
-   if(f.activity==='build'&&weight>.85){
-    const effort=Math.sin(seconds*5+i)*.22;
-    visual.arms[0].rotation.x=-.85+effort;visual.arms[1].rotation.x=-.85-effort;
-   }else if(f.activity==='forage'&&weight>.85){
-    visual.root.position.y-=.22;visual.head.rotation.x=.1;
+   visual.root.scale.setScalar(i<3?1:.95);
+   if((f.activity==='build'||f.activity==='repair')&&!moving){
+    const effort=Math.sin(seconds*5+i)*.20;
+    visual.arms[0].rotation.x=-.72+effort;visual.arms[1].rotation.x=-.72-effort;
+   }else if((f.activity==='forage'||f.activity==='farm')&&!moving){
+    visual.root.position.y-=.15;visual.head.rotation.x=.12;
     visual.arms[0].rotation.x=-.55;visual.arms[1].rotation.x=-.55;
    }else visual.head.rotation.x=0;
    visual.root.visible=true;
