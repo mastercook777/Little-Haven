@@ -538,7 +538,6 @@ test('sprint5: island surface conforms exactly to outer cliff outline with no mi
  const positions=g.getAttribute('position');
  assert.equal(positions.count,1+segments*rings);
  assert.equal(g.getIndex()!.count,segments*(3+6*(rings-1)));
- assert.ok(g.computeBoundingBox()===undefined||true);
  let normalY=0;
  const n=g.getAttribute('normal');
  for(let i=1;i<n.count;i++)normalY+=n.getY(i);
