@@ -9,7 +9,7 @@ import {buildVillageEvolution} from './villageEvolution';
 import {createMountainHome,createMountainTavern} from './villageBuildings';
 import {makeVillageCoreGrowth} from './villageCoreGrowth';
 import {makeSettlementRenderer} from './plannedSettlement';
-import {VALLEY_ROUTES} from '../simulation/valleyGeography.ts';
+import {VALLEY_ROUTES,VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -266,8 +266,8 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  }
  stoneLantern(root,-5.9,3.3,emissive);stoneLantern(root,5.7,2.0,emissive);
  fence(root,-11.8,-7.4,-7.2,-7.4,8);
- for(const [x,z,s] of [[-14,-6,1],[-13,8,1.2],[-6,8.7,1.12],[4.7,10.2,.8],[11.3,-7,1.0],[14.5,7,1.25],[5.3,-8.3,1.0]] as const)pine(root,x,z,s);
- for(const [x,z,s] of [[-13.8,3.1,1.12],[-13.2,5.4,.95],[-7,8.0,1.08],[-4.2,8.8,1.12],[-1.3,9.6,1.0],[5.3,10.1,.76],[12,8.4,1.1],[14.5,4.8,1.05],[13,-5.8,.85],[10.5,-8.8,.88]] as const)bamboo(root,x,z,s,bambooGroups);
+ for(const [x,z,s] of VALLEY_PINES)pine(root,x,z,s);
+ for(const [x,z,s] of VALLEY_BAMBOO)bamboo(root,x,z,s,bambooGroups);
  // Scattered tiny shrubs/rocks, avoiding the walkable central village and both riversides.
  for(let i=0;i<125;i++){
   const x=(random(i*13+2)-.5)*31,z=(random(i*37+7)-.5)*21;
