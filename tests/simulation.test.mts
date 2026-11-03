@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {advanceToNextSeason,advanceWorld,buildingById,chapterProgress,chooseFate,chooseOpportunity,createWorld,getCalendar,getClock,getDay,getWeather,
- importWorld,loadWorld,pendingOpportunities,residentMotion,saveWorld,SLOT_KEYS,STORAGE_KEY,PREVIOUS_STORAGE_KEY,STORY_VISITOR_AT,VILLAGERS} from '../src/simulation/world.ts';
+ importWorld,loadWorld,pendingOpportunities,residentMotion,saveWorld,chooseVillageDevelopment,SLOT_KEYS,STORAGE_KEY,PREVIOUS_STORAGE_KEY,STORY_VISITOR_AT,VILLAGERS} from '../src/simulation/world.ts';
 import {DAY_MINUTES,DAYS_PER_SEASON,SEASON_MINUTES,getCalendarFromMinutes} from '../src/simulation/calendar.ts';
 import {getWeatherForMinutes} from '../src/simulation/weather.ts';
 import {PLOTS,validatePlots} from '../src/simulation/plots.ts';
@@ -11,6 +11,10 @@ import {fallingRainY,rainSegmentY} from '../src/graphics/weatherMotion.ts';
 import {REST_POSE,sampleCharacterPose,interpolatePose} from '../src/graphics/characterMotion.ts';
 import {buildRiverArt,RIVER_WAYPOINTS} from '../src/graphics/riverArt.ts';
 import * as THREE from 'three';
+import {creekDistance,CREEK_WATER_Y} from '../src/graphics/riverArt.ts';
+import {terrainHeightAt,terrainChannelProbe} from '../src/graphics/carvedTerrain.ts';
+import {createVillageGrowth,advanceVillageGrowthDay,DEVELOPMENT_OPTIONS} from '../src/simulation/villageGrowth.ts';
+import {makeHeroClips,createHeroAnimator,SWORD_FORM_KEYFRAMES} from '../src/graphics/heroClips.ts';
 
 const to=(s:ReturnType<typeof createWorld>,minute:number)=>advanceWorld(s,(minute-s.minutes)/3);
 const arrived=()=>{const s=createWorld(0);to(s,STORY_VISITOR_AT);return s;};
@@ -336,7 +340,7 @@ test('sprint4 H2: creek is a broad continuous surface whose center crosses below
  assert.ok(RIVER_WAYPOINTS.length>=7);
  const closest=Math.min(...Array.from({length:101},(_,i)=>river.pointAt(i/100).distanceTo(bridge)));
  assert.ok(closest<.24,'river center misses the bridge crossing by '+closest);
- assert.ok(river.getSurfaceHeight()>.26&&river.getSurfaceHeight()<.5);
+ assert.ok(river.getSurfaceHeight()>.075&&river.getSurfaceHeight()<.17);
  assert.equal(river.surface.name,'river-water');
  const riverMeshes:THREE.Mesh[]=[];
  root.traverse(o=>{if(o instanceof THREE.Mesh)riverMeshes.push(o);});
@@ -371,4 +375,128 @@ test('sprint4: contact poses blend smoothly without snapping on interrupted acti
  assert.ok(Math.abs(blended.torsoX-first.torsoX)<=Math.abs(second.torsoX-first.torsoX)*.19);
  assert.deepEqual(interpolatePose(REST_POSE,second,0),REST_POSE);
  assert.deepEqual(interpolatePose(first,second,1),second);
+});
+
+
+test('sprint5: three choices build fundamentally different villages in two game years',()=>{
+ const signatures=new Set<string>();
+ for(const direction of ['bridge','ferry','grove'] as const){
+  const s=createWorld(0);
+  to(s,24*DAY_MINUTES);
+  assert.equal(s.villageGrowth.phase,'invitation');
+  assert.equal(chooseVillageDevelopment(s,direction),true);
+  assert.equal(chooseVillageDevelopment(s,direction),false);
+  to(s,96*DAY_MINUTES);
+  assert.equal(s.villageGrowth.choice,direction);
+  assert.ok(['landmark','thriving'].includes(s.villageGrowth.phase));
+  assert.ok(s.villageGrowth.workDays>=37);
+  assert.ok(s.houses>=7);
+  assert.ok(s.journal.some(e=>e.title.includes('落成')));
+  signatures.add(direction+':'+s.villageGrowth.phase);
+ }
+ assert.equal(signatures.size,3);
+});
+
+test('sprint5: unattended guardians default to self-reliant hillside orchard',()=>{
+ const s=createWorld(0);
+ to(s,35*DAY_MINUTES);
+ assert.equal(s.villageGrowth.phase,'invitation');
+ to(s,37*DAY_MINUTES);
+ assert.equal(s.villageGrowth.choice,'grove');
+ assert.equal(s.villageGrowth.automatic,true);
+ to(s,132*DAY_MINUTES);
+ assert.equal(s.villageGrowth.phase,'thriving');
+ assert.ok(s.population>8&&s.houses>6);
+});
+
+test('sprint5: flowSeason and day-by-day lead to the same settlement growth, stocks, and events',()=>{
+ for(const direction of ['bridge','ferry','grove'] as const){
+  const a=createWorld(0),b=createWorld(0);
+  to(a,24*DAY_MINUTES);to(b,24*DAY_MINUTES);
+  chooseVillageDevelopment(a,direction);chooseVillageDevelopment(b,direction);
+  to(a,115*DAY_MINUTES);
+  for(let day=25;day<=115;day++)to(b,day*DAY_MINUTES);
+  assert.deepEqual(a.villageGrowth,b.villageGrowth);
+  assert.deepEqual(a.journal,b.journal);
+  assert.equal(a.population,b.population);
+  assert.equal(a.houses,b.houses);
+ }
+});
+
+test('sprint5: saves produced before growth update migrate without erasing their narrative choice',()=>{
+ const s=createWorld(0);
+ to(s,DAY_MINUTES);
+ chooseFate(s,'host');
+ to(s,97*DAY_MINUTES);
+ const old=JSON.parse(JSON.stringify(s));
+ delete old.villageGrowth;
+ const restored=importWorld(JSON.stringify(old))!;
+ assert.equal(restored.choice,'host');
+ assert.equal(restored.storyStage,s.storyStage);
+ assert.equal(restored.villageGrowth.choice,null);
+ assert.ok(restored.villageGrowth.decisionAt>restored.minutes);
+ const broken=JSON.parse(JSON.stringify(s));
+ broken.villageGrowth.choice='wormhole';
+ const fallback=importWorld(JSON.stringify(broken));
+ assert.equal(fallback?.villageGrowth.choice,null);
+});
+
+test('sprint5: economy and development only change at world day boundaries',()=>{
+ const g=createVillageGrowth(500);
+ const v=DEVELOPMENT_OPTIONS.map(o=>o.id);
+ assert.deepEqual(v,['bridge','ferry','grove']);
+ assert.equal(advanceVillageGrowthDay(g,500,'spring','clear').length,0);
+ const later=advanceVillageGrowthDay(g,24*DAY_MINUTES,'spring','clear');
+ assert.ok(later.some(e=>e.stage==='invitation'));
+ const before=g.wood;
+ assert.deepEqual(advanceVillageGrowthDay(g,24*DAY_MINUTES,'spring','clear'),[]);
+ assert.equal(g.wood,before);
+});
+
+test('sprint5: river bed is carved beneath its surface and climbs to both grassy banks',()=>{
+ const riverRoot=new THREE.Group(),river=buildRiverArt(riverRoot);
+ for(const u of [.10,.24,.42,.60,.83]){
+  const p=river.pointAt(u);
+  const center=terrainChannelProbe(p.x,p.z);
+  assert.ok(center.distance<.08);
+  assert.ok(center.groundY<CREEK_WATER_Y,JSON.stringify(center));
+  const left=terrainHeightAt(p.x-5,p.z),right=terrainHeightAt(p.x+5,p.z);
+  assert.ok(left>center.groundY||right>center.groundY);
+ }
+ assert.ok(terrainHeightAt(0,-1)>CREEK_WATER_Y);
+});
+
+test('sprint5: authored sword animation clips have distinctive guard, cut and recovery keyframes',()=>{
+ const clips=makeHeroClips();
+ assert.equal(clips['sword-form'].duration,2.74);
+ assert.ok(Object.values(clips).every(c=>c.validate()));
+ assert.ok(clips['sword-form'].tracks.length>=10);
+ const phases=new Set(SWORD_FORM_KEYFRAMES.map(k=>k.phase));
+ assert.ok(phases.has('guard')&&phases.has('cut')&&phases.has('recover'));
+ const guard=SWORD_FORM_KEYFRAMES.find(p=>p.phase==='guard')!;
+ const cut=SWORD_FORM_KEYFRAMES.find(p=>p.phase==='cut')!;
+ assert.ok(Math.abs(guard.pose.upperZ-cut.pose.upperZ)>.25);
+ assert.ok(Math.abs(guard.pose.wristZ-cut.pose.wristZ)>1.1);
+ assert.ok(Math.abs(guard.pose.leftLegX-cut.pose.leftLegX)>.1);
+});
+
+test('sprint5: clip mixer crossfades modes and drives named wrist, hip and arm joints',()=>{
+ const root=new THREE.Group();
+ const joints=['articulated-torso','head-and-hair','left-shoulder','right-shoulder',
+  'left-hip','right-hip','left-knee','right-knee','sword-wrist'];
+ for(const name of joints){const g=new THREE.Group();g.name=name;root.add(g);}
+ const anim=createHeroAnimator(root);
+ assert.equal(anim.currentMode(),'idle');
+ anim.update(.05,'sword-form');
+ assert.equal(anim.currentMode(),'sword-form');
+ for(let i=0;i<17;i++)anim.update(.065,'sword-form');
+ const cut=root.getObjectByName('right-shoulder')!;
+ const phase=anim.currentPhase();
+ assert.ok(['guard','gather','cut','follow'].includes(phase),phase);
+ assert.ok(Math.abs(cut.rotation.x)>.1,'mixer did not bind to right shoulder');
+ const angle=cut.rotation.x;
+ for(let i=0;i<17;i++)anim.update(.065,'sword-form');
+ assert.notEqual(cut.rotation.x,angle,'sword animation never changes with time');
+ anim.update(.05,'walk');
+ assert.equal(anim.currentMode(),'walk');
 });
