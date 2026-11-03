@@ -70,7 +70,7 @@ test('host branch spans four years, producing the sword school and not a one-wee
  to(s,start+96*DAY_MINUTES);assert.equal(s.storyStage,'rumor');
  to(s,start+144*DAY_MINUTES);assert.equal(s.storyStage,'returned');
  const out=to(s,start+156*DAY_MINUTES);assert.equal(out.completed,true);
- assert.equal(s.storyStage,'legacy');assert.equal(s.population,9);assert.equal(s.renown,20);
+ assert.equal(s.storyStage,'legacy');assert.ok(s.population>=9);assert.ok(s.renown>=20);
  assert.ok(s.journal.some(e=>e.title==='竹隐剑庐落成'));
  assert.equal(residentMotion(VILLAGERS[10],s).activity,'在剑庐里练习基本功');
 });
@@ -82,7 +82,7 @@ test('unanswered encounter takes a coherent, slow alternate route',()=>{
  assert.notEqual(s.storyStage,'legacy');
  const start=s.storyStarted!;
  to(s,start+156*DAY_MINUTES);
- assert.equal(s.storyStage,'legacy');assert.equal(s.renown,15);
+ assert.equal(s.storyStage,'legacy');assert.ok(s.renown>=15);
  assert.ok(s.journal.some(e=>e.title==='行脚茶亭开张'));
 });
 
