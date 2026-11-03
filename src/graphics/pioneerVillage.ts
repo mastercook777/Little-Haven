@@ -4,7 +4,9 @@ import {buildRiverArt} from './riverArt.ts';
 import {fallingRainY,rainSegmentY} from './weatherMotion.ts';
 import {VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
- type PioneerWork} from '../simulation/pioneerWorld.ts';
+ type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
+import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad} from '../simulation/pioneerPaths.ts';
+import {buildMountainRoof} from './villageBuildings.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 
 const material=(color:string,emissive?:string)=>new THREE.MeshStandardMaterial({
@@ -178,6 +180,106 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  }
  const tool=group(g,0,0,0);tool.name='occupational-gear';
  return {root:g,arms,legs,head,tool};
+}
+/** The facility models share eave limits with the space planner while
+ * changing the actual silhouette, not merely swapping a material. */
+function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind,
+ phase:'foundation'|'frame'|'complete',progress:number,condition=100){
+ if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
+ const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
+ g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
+ if(kind==='garden'){
+  box(g,0,.025,0,2.22,.065,2.15,material('#947c55'));
+  if(phase==='foundation')return g;
+  for(let row=0;row<4;row++){
+   const z=-.73+row*.49;
+   box(g,0,.11,z,2.08,.14,.32,material('#785e45'));
+   for(let n=0;n<7;n++){
+    const x=-.91+n*.30;
+    const sprout=orb(g,x,.27+(phase==='complete'?.10:0),z,.10,
+     material(row%2?'#75a46d':'#91af6b'),.78,
+     phase==='complete'?1.65:.8,.68);
+    sprout.rotation.y=n;
+   }
+  }
+  if(phase==='complete'){
+   for(const x of [-1.14,1.14])for(const z of [-1.11,1.11])
+    pole(g,x,.36,z,.045,.50,wood);
+   for(const z of [-1.11,1.11])box(g,0,.52,z,2.40,.07,.08,lightWood);
+   box(g,1.15,.37,0,.07,.06,2.3,lightWood);
+  }
+  return g;
+ }
+ const cottage=kind==='cottage';
+ const w=cottage?2.64:2.38,d=cottage?2.50:2.31,h=cottage?1.68:1.57;
+ box(g,0,.12,0,w+.06,.19,d+.03,material('#aba18c'));
+ if(phase==='foundation')return g;
+ for(const x of [-w/2+.14,w/2-.14])for(const z of [-d/2+.14,d/2-.14])
+  pole(g,x,h/2+.21,z,.09,h,wood);
+ if(cottage){
+  box(g,0,h*.49+.22,-d*.43,w-.34,h*.77,.12,material('#dfcbb0'));
+  for(const x of [-w*.45,w*.45])box(g,x,h*.52+.21,0,.10,h*.74,d-.22,wood);
+  if(phase==='complete'){
+   const door=box(g,0,.84,d*.50,.66,1.29,.12,material('#956b52'));
+   door.name='cottage-door';
+   for(const x of [-.95,.95]){
+    box(g,x,1.05,d*.505,.37,.45,.06,material('#dfcfab'));
+    box(g,x,1.06,d*.56,.04,.50,.07,wood);
+    box(g,x,1.06,d*.56,.40,.05,.07,wood);
+   }
+   box(g,0,.25,d/2+.25,1.08,.15,.45,stone);
+  }
+ }else{
+  // An open-air woodworking shelter: stacked lumber, workbench, red-brown
+  // awning and sparse frame, unlike a second copy of the dwelling.
+  box(g,0,.77,-.48,1.70,.12,.73,lightWood);
+  for(let n=0;n<5;n++)box(g,-.58+n*.26,.35,0,.18,.18,1.72,
+   n%2?wood:lightWood);
+  if(phase==='complete'){
+   box(g,.62,.89,.31,.55,.18,.53,material('#a47d5a'));
+   const saw=box(g,.68,1.07,.30,.08,.06,.42,stone);saw.rotation.z=.55;
+  }
+ }
+ if(phase==='frame'){
+  for(const z of [-d*.42,d*.42])box(g,0,h+.21,z,w,.12,.13,wood);
+  return g;
+ }
+ const roof=material(cottage?'#6e7774':'#8f8271');
+ buildMountainRoof(g,{width:w-.10,depth:d-.16,eave:h+.29,rise:cottage?.59:.39,
+  style:cottage?'cottage':'workshop',material:roof});
+ if(condition<78){
+  // Worn roofs reveal genuine repair history; repaired structures regain
+  // a clean silhouette after the simulation transaction finishes.
+  const patch=box(g,.30,h+.50,.33,.65,.035,.50,material('#c8b58a'));
+  patch.rotation.z=.31;
+ }
+ return g;
+}
+function drawFootpaths(parent:THREE.Group,roads:readonly PioneerRoad[]){
+ const root=group(parent);root.name='resident-made-paths';
+ const pathMat=material('#bdad87'),dirtMat=material('#ae9475');
+ for(const road of roads){
+  const g=group(root);g.name='path-'+road.buildingId;
+  const points=road.points;
+  if(points.length<2)continue;
+  const verts:number[]=[],tri:number[]=[];
+  const width=road.grade==='dirt'?.56:.31;
+  for(let i=0;i<points.length;i++){
+   const p=points[i],before=points[Math.max(0,i-1)],after=points[Math.min(points.length-1,i+1)];
+   const dx=after[0]-before[0],dz=after[1]-before[1],len=Math.hypot(dx,dz)||1;
+   const nx=-dz/len*width/2,nz=dx/len*width/2;
+   verts.push(p[0]+nx,.205,p[1]+nz,p[0]-nx,.205,p[1]-nz);
+   if(i>0){const k=i*2;tri.push(k-2,k-1,k,k,k-1,k+1);}
+  }
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
+  geo.setIndex(tri);geo.computeVertexNormals();
+  const path=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({
+   color:road.grade==='dirt'?dirtMat.color:pathMat.color,
+   roughness:1,side:THREE.DoubleSide,transparent:true,
+   opacity:road.grade==='dirt'?.95:.68,depthWrite:true}));
+  path.name='resident-walkable-road';path.receiveShadow=true;g.add(path);
+ }
+ return root;
 }
 export interface PioneerGraphics{
  root:THREE.Group;update(s:PioneerWorld,seconds:number):void;
