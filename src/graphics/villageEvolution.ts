@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type {VillageDirection,VillageGrowthState} from '../simulation/villageGrowth.ts';
-import {batchStaticSubtree} from './batchStatic';
+import {batchStaticSubtree} from './batchStatic.ts';
+import {buildMountainRoof} from './villageBuildings.ts';
 
 /**
  * Whole-space growth. Each route changes land use and skyline by new roofs,
@@ -56,8 +57,10 @@ function house(p:THREE.Object3D,x:number,z:number,w:number,d:number,h:number,var
  block(g,0,h/2+.28,0,w,h,d,wall);
  for(const xx of [-w*.44,w*.44])for(const zz of [-d*.44,d*.44])
   block(g,xx,h*.50+.31,zz,.14,h+.18,.14,M.timber);
- slopedRoof(g,w,d,h+.32,variant==='guest'?1.20:variant==='cottage'?.64:.90,
-  variant==='guest'?M.darkRoof:variant==='cottage'?M.roof:M.darkRoof);
+ buildMountainRoof(g,{width:w,depth:d,eave:h+.32,
+  rise:variant==='guest'?1.12:variant==='cottage'?.67:.88,
+  style:variant==='cottage'?'cottage':'tile',
+  material:variant==='guest'?M.darkRoof:M.roof});
  const front=d/2+.09;
  block(g,0,.91,front,.76,1.3,.10,M.timber);
  for(const sx of [-1,1]){
@@ -175,18 +178,23 @@ function farmland(p:THREE.Object3D,x:number,z:number,w:number,d:number){
 }
 function tradeCourt(p:THREE.Object3D,x:number,z:number){
  const g=group(p,x,.20,z);
- // Clearly paved courtyard and several independent merchant-use roofs, not
- // small trim on an existing home. The district opens toward the main road.
- for(let row=0;row<6;row++)for(let col=0;col<7;col++){
-  block(g,-2.0+col*.67,.105,-1.48+row*.59,.60,.085,.53,
+ g.name='connected-east-bank-market';
+ // A compact *single* covered market, not two tent roofs hidden beneath yet
+ // another oversized house roof. It sits fully east of the creek's bank.
+ for(let row=0;row<4;row++)for(let col=0;col<6;col++){
+  block(g,-1.60+col*.64,.105,-1.08+row*.67,.55,.075,.55,
    (row+col)%3===0?M.stoneDark:M.stone);
  }
- silkTent(g,-1.0,-.7,M.canvas,.87);
- silkTent(g,1.2,.75,M.cloth,.74);
- // Open pavilion watch post visible above the ordinary house roofs.
- for(const dx of [-1.8,1.8])for(const dz of [-1.3,1.3])
-  block(g,dx,1.05,dz,.18,1.77,.18,M.timber);
- slopedRoof(g,4.3,3.1,2.1,1.08,M.darkRoof);
+ for(const xx of [-1.42,1.42])for(const zz of [-.95,.95])
+  block(g,xx,1.14,zz,.14,1.84,.14,M.timber);
+ buildMountainRoof(g,{width:3.55,depth:2.42,eave:2.11,
+  rise:.75,style:'workshop',material:M.darkRoof});
+ // Two inhabited counters beneath one shared canopy.
+ for(const xx of [-.77,.82]){
+  block(g,xx,.56,.07,1.23,.15,.65,M.newTimber);
+  for(let i=0;i<3;i++)
+   sphere(g,xx-.35+i*.34,.73,.08,.17,.14,.17,i%2?M.flower:M.cropLight);
+ }
  return g;
 }
 function fisherYard(p:THREE.Object3D,x:number,z:number){
@@ -222,22 +230,30 @@ function orchardCourt(p:THREE.Object3D,x:number,z:number){
  orchardTree(g,2.1,1.25,1.12);
  return g;
 }
+/** Authored safe parcels on the east bank; footprints fit the island and
+ * keep at least ~2.4 world units clear of the centerline river surface.
+ */
+export const BRIDGE_DISTRICT_PARCELS={
+ market:{x:12.35,z:-1.15,w:3.85,d:2.85},
+ merchant:{x:12.58,z:3.38,w:3.10,d:2.68},
+ guest:{x:12.0,z:-5.25,w:2.65,d:2.20}
+} as const;
 function routeObjects(parent:THREE.Group,direction:VillageDirection){
  const foundationStage=group(parent),constructionStage=group(parent),
   landmarkStage=group(parent),thrivingStage=group(parent);
- const origin=direction==='bridge'?[11.25,.4]:direction==='ferry'?[10.55,-6.1]:[-5.5,-8.1];
+ const origin=direction==='bridge'?[BRIDGE_DISTRICT_PARCELS.market.x,BRIDGE_DISTRICT_PARCELS.market.z]:direction==='ferry'?[10.55,-6.1]:[-5.5,-8.1];
  const [x,z]=origin;
  foundation(foundationStage,x,z,4.0,3.3);
  timberFrame(constructionStage,x,z,4.0,3.3,2.1);
  if(direction==='bridge'){
   foundation(foundationStage,8.0,-2.3,5.8,2.2);
-  steps(constructionStage,7.4,-2.30);timberFrame(constructionStage,11.15,.3,3.5,3,2.0);
+  steps(constructionStage,7.4,-2.30);timberFrame(constructionStage,BRIDGE_DISTRICT_PARCELS.market.x,BRIDGE_DISTRICT_PARCELS.market.z,3.5,2.5,2.0);
   stoneBridge(landmarkStage,7.85,-2.38);
-  tradeCourt(landmarkStage,10.75,4.85);
-  house(landmarkStage,11.4,.10,3.5,3.1,2.55,'merchant');
-  // Market courtyard owns its own stalls and awnings.
-  house(thrivingStage,12.30,6.3,3.85,2.9,3.30,'guest');
-  silkTent(thrivingStage,10.2,4.65,M.cloth,.86);
+  tradeCourt(landmarkStage,BRIDGE_DISTRICT_PARCELS.market.x,BRIDGE_DISTRICT_PARCELS.market.z);
+  house(landmarkStage,BRIDGE_DISTRICT_PARCELS.merchant.x,BRIDGE_DISTRICT_PARCELS.merchant.z,BRIDGE_DISTRICT_PARCELS.merchant.w,BRIDGE_DISTRICT_PARCELS.merchant.d,2.55,'merchant');
+  // Later growth expands the upper bank without covering the foreground
+  // bridge, creek or the area reserved for public footpaths.
+  house(thrivingStage,BRIDGE_DISTRICT_PARCELS.guest.x,BRIDGE_DISTRICT_PARCELS.guest.z,BRIDGE_DISTRICT_PARCELS.guest.w,BRIDGE_DISTRICT_PARCELS.guest.d,3.02,'guest');
  }else if(direction==='ferry'){
   foundation(foundationStage,6.5,-5.55,3.9,2.0);
   timberDock(constructionStage,6.9,-5.75,3.7);

@@ -139,9 +139,19 @@ export function createSeasonalArt(parent:THREE.Object3D):SeasonalArt{
  // Autumn: conspicuous orange-gold crowns and mats of fallen leaves and produce.
  for(const [x,z,s] of [[-13,-3,.95],[-6.8,9.1,.95],[11.6,-6.3,.98],[13.0,6.2,.83]] as const)
   blossomTree(autumn,x,z,'autumn',s);
- const leafGeo=new THREE.PlaneGeometry(.39,.31);
- petals(autumn,165,leafGeo,gold,i=>({...onGround(i+902,30,19,.319),scale:.65+rnd(i*17)*.6}));
- petals(autumn,100,leafGeo,copper,i=>({...onGround(i+1102,30,19,.321),scale:.55+rnd(i*23)*.55}));
+ const leafGeo=new THREE.PlaneGeometry(.32,.27);
+ // Falling foliage settles under actual canopies, not as confetti spread over
+ // every street, rooftop and river during rainy autumn days.
+ const groves:[[number,number],[number,number],[number,number],[number,number]]=[
+  [-13,-3],[-6.8,9.1],[11.6,-6.3],[13,6.2]];
+ const leafCluster=(i:number,seed:number)=>{
+  const [gx,gz]=groves[i%groves.length];
+  return {x:gx+(rnd(i*27+seed)-.5)*4.3,
+   y:.325,z:gz+(rnd(i*29+seed+1)-.5)*3.5,
+   scale:.55+rnd(i*17+seed)*.48,rotation:rnd(i*13+seed)*Math.PI*2};
+ };
+ petals(autumn,96,leafGeo,gold,i=>leafCluster(i,903));
+ petals(autumn,56,leafGeo,copper,i=>leafCluster(i,1207));
  layHarvest(autumn);
  // Winter: thick snow carries volume, trees are visibly leafless, lanterns stand out.
  for(const [x,z] of [[-13,-3],[-6.8,9.1],[11.6,-6.3],[13,6.2]] as const){
@@ -156,17 +166,17 @@ export function createSeasonalArt(parent:THREE.Object3D):SeasonalArt{
  for(const [x,z,w,d] of [[-12,-6.9,2.5,1.3],[-13.5,4.2,1.0,2.9],
   [-5.7,7.1,1.5,1.0],[2.7,-8.2,2,1.0],[5,9.8,3.0,1.2],[12,-5.5,1.2,3.2]] as const)
   newSnow(winter,x,.35,z,w,d);
- for(const [x,y,z,w,d] of [[-3.4,5.77,-.7,2.2,.75],[-9,3.12,-5.5,1.4,.5],
-  [-9.8,3.18,3.1,1.5,.52],[3.4,3.41,-5.6,1.5,.56]] as const)
-  newSnow(winter,x,y,z,w,d);
- // Warm stove and gently ascending steam anchor winter beside the tavern.
+ // Roof snow comes from the exact mesh surfaces in villageBuildings.ts.
+ // Winter steam now starts above the actual kitchen chimney.
  const steam=group(winter);
- const mist=new THREE.MeshBasicMaterial({color:'#e7dfce',transparent:true,opacity:.44,depthWrite:false});
- for(let i=0;i<5;i++)sphere(steam,.26,-3.0+i*.08,6.3+i*.25,-.7-i*.06,mist,.8,.6,.8);
- box(winter,.52,.26,.52,-3.0,5.69,-.7,terracotta);
+ const mist=new THREE.MeshBasicMaterial({color:'#e7dfce',transparent:true,opacity:.36,depthWrite:false});
+ for(let i=0;i<5;i++)sphere(steam,.23,-.68+i*.07,3.75+i*.24,-1.62-i*.05,mist,.8,.6,.8);
  let current:Season='spring';
- const falling=petals(autumn,24,leafGeo,warm,i=>({x:-12+rnd(i*9)*24,y:2.9+rnd(i*17)*2.4,
-  z:-8+rnd(i*19)*16,scale:.48+rnd(i*7)*.34,rotation:rnd(i)*6.28}));
+ const falling=petals(autumn,12,leafGeo,warm,i=>{
+  const [gx,gz]=groves[i%groves.length];
+  return {x:gx+(rnd(i*9)*3-1.5),y:2.9+rnd(i*17)*1.4,
+   z:gz+(rnd(i*19)*2-1),scale:.48+rnd(i*7)*.34,rotation:rnd(i)*6.28};
+ });
  const dummy=new THREE.Object3D();
  return {root,activeSeason:()=>current,setSeason(season){
   current=season;
@@ -174,10 +184,11 @@ export function createSeasonalArt(parent:THREE.Object3D):SeasonalArt{
  },animate(t){
   if(current==='winter'){steam.position.y=Math.sin(t*.62)*.10;steam.position.x=Math.sin(t*.19)*.10;}
   if(current==='autumn'){
-   for(let i=0;i<24;i++){
-    dummy.position.set(-12+rnd(i*9)*24+Math.sin(t*.35+i)*.25,
+   for(let i=0;i<12;i++){
+    const [gx,gz]=groves[i%groves.length];
+    dummy.position.set(gx-1.5+rnd(i*9)*3+Math.sin(t*.35+i)*.25,
      .25+((2.7+rnd(i*17)*3.0-t*(.35+rnd(i)*.1))%3+3)%3,
-     -8+rnd(i*19)*16);
+     gz-1+rnd(i*19)*2);
     dummy.rotation.set(-.55+Math.sin(t+i)*.16,0,t*.38+i);
     dummy.scale.setScalar(.55+rnd(i*7)*.27);dummy.updateMatrix();falling.setMatrixAt(i,dummy.matrix);
    }

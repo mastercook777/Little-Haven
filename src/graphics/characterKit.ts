@@ -2,153 +2,207 @@ import * as THREE from 'three';
 import type {Villager} from '../simulation/world.ts';
 
 /**
- * Human-sized workshop-doll clothing kit. Maintains costume at the default
- * orthographic camera scale: shapes and profession matter more than face detail.
- * The upper group has pivot y=.78 world-local; costume uses absolute-world-height
- * converted by that offset. Animating upper/hem must not animate leg placement.
+ * Integrated cloth silhouettes for the default isometric camera.
+ * The previous version used rectangles for chest armor, aprons, sashes and
+ * backpacks — literally reading as wooden planks stuck onto the doll.
+ * These surfaces are now tapered curved garments with a contiguous neckline,
+ * waist, draped fronts and softly rounded carried bundles.
+ *
+ * Compatible with existing AnimationClip/Mixer named torso and knee pivots.
  */
+const Y=.78;
 const fabrics=new Map<string,THREE.MeshStandardMaterial>();
 const mat=(color:string)=>{
  let m=fabrics.get(color);
- if(!m){m=new THREE.MeshStandardMaterial({color,roughness:.94});fabrics.set(color,m);}
+ if(!m){m=new THREE.MeshStandardMaterial({color,roughness:.96,metalness:0,side:THREE.DoubleSide});fabrics.set(color,m);}
  return m;
 };
-const boxGeo=new THREE.BoxGeometry(1,1,1);
-const coneGeo=new THREE.CylinderGeometry(.80,1.0,1,8);
-const sphereGeo=new THREE.IcosahedronGeometry(1,1);
-const discGeo=new THREE.CylinderGeometry(1,1,1,10);
-const dark=mat('#62564b'),pale=mat('#ddd2b7'),stitch=mat('#ae9578'),bronze=mat('#a88b60'),
- leather=mat('#806b58'),ink=mat('#484748'),linen=mat('#d7c8aa'),rice=mat('#bbac8b'),
- red=mat('#ae7060'),green=mat('#728774');
-const Y=.78;
-function block(parent:THREE.Object3D,x:number,y:number,z:number,w:number,h:number,d:number,m:THREE.Material=leather){
- const a=new THREE.Mesh(boxGeo,m);a.scale.set(w,h,d);a.position.set(x,y-Y,z);
- a.castShadow=true;parent.add(a);return a;
-}
-function volume(parent:THREE.Object3D,x:number,y:number,z:number,w:number,h:number,d:number,m:THREE.Material=leather){
- const a=new THREE.Mesh(sphereGeo,m);a.scale.set(w,h,d);a.position.set(x,y-Y,z);
- a.castShadow=true;parent.add(a);return a;
-}
-function brim(parent:THREE.Object3D,x:number,y:number,z:number,r:number,h:number,m:THREE.Material=rice){
- const a=new THREE.Mesh(discGeo,m);a.scale.set(r,h,r);a.position.set(x,y-Y,z);
- a.castShadow=true;parent.add(a);return a;
-}
-function strap(parent:THREE.Object3D,s:number,y:number,material:THREE.Material,rotation=0){
- const a=block(parent,s*.19,y,.17,.075,.65,.08,material);a.rotation.z=rotation||s*.22;
-}
-function hairTie(parent:THREE.Object3D,color:THREE.Material){
- for(const sx of [-1,1]){
-  const a=block(parent,sx*.24,1.45,.02,.11,.20,.16,color);a.rotation.z=sx*.15;
- }
- volume(parent,0,1.74,-.08,.15,.10,.12,color);
-}
+const SHARED={
+ linen:mat('#d8cdb8'),cream:mat('#e7d7bd'),
+ brown:mat('#816b58'),dark:mat('#5d5148'),
+ red:mat('#a36a5a'),moss:mat('#799076'),
+ indigo:mat('#617989'),straw:mat('#c9b58d'),paper:mat('#e7d7af'),
+ skin:mat('#e2b59b'),wood:mat('#937557')
+};
+const ellipsoid=new THREE.SphereGeometry(1,10,8);
+const littleTorus=new THREE.TorusGeometry(1,.12,5,14);
+const cone=new THREE.ConeGeometry(1,1,12);
+const cylinder=new THREE.CylinderGeometry(1,1,1,10);
 export interface CharacterCostume{
  hems:THREE.Group[];cape:THREE.Group|null;hat:THREE.Group|null;
  workStrap:THREE.Group|null;
 }
-function panel(parent:THREE.Group,s:number,length:number,cloth:THREE.Material):THREE.Group{
- const panelGroup=new THREE.Group();panelGroup.position.set(s*.24,.81-Y,-.07);parent.add(panelGroup);
- const mesh=new THREE.Mesh(coneGeo,cloth);mesh.scale.set(.18,length,.13);
- mesh.position.set(0,-length*.43,0);mesh.castShadow=true;panelGroup.add(mesh);
- const piping=new THREE.Mesh(boxGeo,stitch);piping.scale.set(.13,.035,.15);
- piping.position.set(0,-length*.89,.01);panelGroup.add(piping);
- return panelGroup;
+function rounded(parent:THREE.Object3D,x:number,y:number,z:number,w:number,h:number,d:number,m:THREE.Material){
+ const a=new THREE.Mesh(ellipsoid,m);a.position.set(x,y-Y,z);a.scale.set(w,h,d);a.castShadow=true;parent.add(a);return a;
 }
-function buildPack(parent:THREE.Object3D,bodyColor:THREE.Material,w=.44,h=.55){
- block(parent,0,.96,-.30,w,h,.28,bodyColor);
- for(const sx of [-1,1])strap(parent,sx,1.06,dark,sx*.17);
- block(parent,0,1.23,-.46,w+.04,.12,.08,stitch);
+function softRing(parent:THREE.Object3D,x:number,y:number,z:number,r:number,material:THREE.Material,
+ thickness=.08){
+ const a=new THREE.Mesh(littleTorus,material);a.position.set(x,y-Y,z);
+ a.scale.set(r,r,Math.max(.25,thickness/.10));
+ a.rotation.x=Math.PI/2;a.castShadow=false;parent.add(a);return a;
 }
-function woodenTool(parent:THREE.Object3D,x:number,z:number,kind:'axe'|'staff'){
- const stick=block(parent,x,.91,z,.055,.68,.06,leather);
- stick.rotation.z=.42;
- if(kind==='axe')block(parent,x+.16,1.19,z,.26,.18,.055,ink);
+function hatPart(parent:THREE.Object3D,y:number,r:number,h:number,material:THREE.Material,pointy=false){
+ const g=new THREE.Mesh(pointy?cone:cylinder,material);
+ g.scale.set(r,h,r);g.position.y=y;g.castShadow=true;parent.add(g);return g;
+}
+function clothMesh(parent:THREE.Object3D,rows:number,cols:number,create:(u:number,v:number)=>[number,number,number],
+ material:THREE.Material){
+ const positions:number[]=[],indices:number[]=[];
+ for(let j=0;j<=rows;j++)for(let i=0;i<=cols;i++){
+  positions.push(...create(i/cols,j/rows));
+ }
+ for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){
+  const a=j*(cols+1)+i,b=a+cols+1;
+  indices.push(a,b,a+1,a+1,b,b+1);
+ }
+ const g=new THREE.BufferGeometry();
+ g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+ g.setIndex(indices);g.computeVertexNormals();
+ const cloth=new THREE.Mesh(g,material);
+ cloth.castShadow=true;cloth.receiveShadow=true;parent.add(cloth);
+ return cloth;
+}
+/** Curved, tapered front cloth: no opaque rectangular chest attachment. */
+function frontDrape(parent:THREE.Object3D,cx:number,topY:number,topZ:number,
+ width:number,length:number,material:THREE.Material,fold=0){
+ const g=new THREE.Group();g.position.set(cx,topY-Y,topZ);parent.add(g);
+ clothMesh(g,8,6,(u,v)=>{
+  const across=u*2-1;
+  const flare=width*(.50+.32*v);
+  const twist=Math.sin(v*Math.PI)*fold*.13;
+  const x=across*flare+twist;
+  const z=.018+v*.10+.05*Math.sin(u*Math.PI)+.035*Math.sin(v*Math.PI*2+u*3.14);
+  return [x,-v*length,z];
+ },material);
+ return g;
+}
+/** A back cape is a continuous drape from shoulder to flowing hem. */
+function capeDrape(upper:THREE.Group,material:THREE.Material,length:number){
+ const g=new THREE.Group();g.position.set(0,1.24-Y,-.16);upper.add(g);
+ clothMesh(g,10,9,(u,v)=>{
+  const x=(u*2-1)*(.24+.22*v);
+  const y=-v*length+.025*Math.sin(u*Math.PI*2);
+  const z=-.015-.15*v-.070*Math.sin(u*Math.PI);
+  return [x,y,z];
+ },material);
+ return g;
+}
+function wovenBundle(parent:THREE.Object3D,w:number,h:number,cloth:THREE.Material){
+ rounded(parent,0,1.02,-.32,w,h,.28,cloth);
+ const strap=SHARED.straw;
+ for(const s of [-1,1]){
+  // Curved shoulder cords follow the rounded bundle instead of vertical boxes.
+  const path=new THREE.CatmullRomCurve3([
+   new THREE.Vector3(s*.15,1.37-Y,.10),
+   new THREE.Vector3(s*.23,1.12-Y,-.20),
+   new THREE.Vector3(s*.22,.79-Y,-.34)]);
+  const mesh=new THREE.Mesh(new THREE.TubeGeometry(path,10,.022,5,false),strap);
+  parent.add(mesh);
+ }
+}
+function garmentCollar(parent:THREE.Object3D,material:THREE.Material){
+ // Diagonal overlapping fabric lapel wraps the cylindrical chest.
+ clothMesh(parent,5,4,(u,v)=>{
+  const x=-.15+u*.31 +v*.085;
+  const y=1.28-Y-v*.42;
+  const z=.175+.075*Math.sin(u*Math.PI)+.038*v;
+  return [x,y,z];
+ },material);
+}
+function scarf(parent:THREE.Object3D,color:THREE.Material){
+ rounded(parent,0,1.17,.09,.28,.115,.27,color);
+ frontDrape(parent,.16,1.17,.27,.19,.45,color,.13);
+}
+function loinWrap(upper:THREE.Group,main:THREE.Material,accent:THREE.Material){
+ const hems=[
+  frontDrape(upper,-.17,.82,.11,.25,.52,main,-1),
+  frontDrape(upper,.16,.83,.12,.26,.56,main,1)
+ ];
+ // Soft annular sash rather than a rigid belt plank.
+ const belt=new THREE.Mesh(new THREE.TorusGeometry(.32,.075,5,13),accent);
+ belt.rotation.x=Math.PI/2;belt.scale.y=.78;
+ belt.position.set(0,.80-Y,0);upper.add(belt);
+ return hems;
+}
+function identityHeadwear(upper:THREE.Group,style:'wide'|'herbal'|'work'){
+ const g=new THREE.Group();g.name='profession-headwear';
+ // Upper pivot sits at world height .78. Model head roughly 1.38–1.75.
+ g.position.y=1.78-Y;upper.add(g);
+ if(style==='wide'){
+  hatPart(g,.05,.53,.07,SHARED.straw);
+  hatPart(g,.20,.30,.37,SHARED.straw,true);
+ }else if(style==='herbal'){
+  hatPart(g,.01,.40,.055,SHARED.straw);
+  hatPart(g,.14,.25,.24,SHARED.moss,true);
+ }else{
+  hatPart(g,.00,.35,.07,SHARED.straw);
+  hatPart(g,.16,.22,.25,SHARED.dark,true);
+ }
+ return g;
 }
 export function dressCharacter(upper:THREE.Group,v:Villager):CharacterCostume{
- const base=mat(v.color),secondary=mat(new THREE.Color(v.color).multiplyScalar(.78).getStyle());
- const trim=v.id===8||v.id===9?red:stitch;
- const hems=[panel(upper,-1,.36,secondary),panel(upper,1,.39,secondary)];
- const capeG=new THREE.Group();capeG.position.set(0,1.14-Y,-.15);upper.add(capeG);
- const cape=block(capeG,0,Y-.25,-.08,.49,.63,.075,secondary);
- cape.rotation.x=.14;capeG.visible=[1,7,8,9,10].includes(v.id);
- // Shared tunic structure, cuffs, sash and readable layered neckline.
- block(upper,0,1.08,.235,.34,.22,.10,secondary);
- block(upper,0,.83,.24,.47,.075,.12,trim);
- block(upper,0,.79,.285,.14,.11,.13,pale);
- for(const sx of [-1,1]){
-  block(upper,sx*.235,1.07,.085,.11,.19,.19,base);
-  block(upper,sx*.245,.94,.17,.11,.075,.11,trim);
- }
- const hat=new THREE.Group();hat.name='profession-headwear';hat.position.y=1.73;upper.add(hat);hat.visible=false;
- let workStrap:THREE.Group|null=null;
+ const base=mat(v.color),secondary=mat(new THREE.Color(v.color).multiplyScalar(.79).getStyle());
+ const accent=v.id===8||v.id===9?SHARED.red:SHARED.straw;
+ const hems=loinWrap(upper,secondary,accent);
+ garmentCollar(upper,v.id===6?SHARED.cream:SHARED.linen);
+ // Tapered, volumetric fabric shoulder shaping is shared across occupations.
+ rounded(upper,0,1.12,0,.33,.28,.245,base);
+ for(const sx of [-1,1])
+  rounded(upper,sx*.235,1.1,0,.14,.19,.17,base);
+ const capeIds=[1,7,8,9,10];
+ const cape=capeIds.includes(v.id)?capeDrape(upper,secondary,v.id===9?.84:.61):null;
+ let hat:THREE.Group|null=null,workStrap:THREE.Group|null=null;
  switch(v.id){
-  case 1: // Forest woodcutter: broad vest, strapped axe and shoulder cloak.
-   block(upper,0,1.18,.24,.40,.48,.13,leather);
-   for(const sx of [-1,1])strap(upper,sx,1.13,rice,sx*.27);
-   buildPack(upper,leather,.47,.40);
-   woodenTool(upper,-.42,-.33,'axe');
+  case 1: // Woodcutter, short shoulder mantle and compact rolled tool bundle.
+   wovenBundle(upper,.29,.28,SHARED.brown);
+   scarf(upper,SHARED.brown);
    break;
-  case 2: // Innkeeper: apron and a clear tied bow at the back.
-   block(upper,0,.66,.38,.43,.65,.08,linen);
-   block(upper,0,.95,.38,.46,.08,.11,dark);
-   for(const sx of [-1,1]){
-    const sash=block(upper,sx*.29,.67,-.18,.11,.37,.05,linen);sash.rotation.z=sx*.16;
-   }
-   hairTie(upper,dark);
+  case 2: // Tavern keeper: soft gathered apron, not a rigid chest board.
+   frontDrape(upper,0,1.03,.255,.36,.76,SHARED.linen,.05);
+   garmentCollar(upper,SHARED.cream);
+   rounded(upper,0,1.76,-.10,.16,.12,.15,SHARED.dark);
    break;
-  case 3: // Tea farmer: gathered cloth around shoulders and bamboo basket.
-   block(upper,0,1.20,.16,.51,.19,.16,green);
-   buildPack(upper,rice,.49,.42);
-   brim(hat,0,0,0,.43,.055,rice);
-   brim(hat,0,.17,0,.23,.21,stitch);
-   hat.visible=true;
+  case 3: // Tea farmer's broad straw hat and green woven basket.
+   hat=identityHeadwear(upper,'wide');
+   wovenBundle(upper,.34,.31,SHARED.straw);
    break;
-  case 4: // Herb gatherer: double shawl, pouches and lighter basket.
-   for(const sx of [-1,1]){
-    const shoulder=block(upper,sx*.21,1.18,.15,.22,.41,.12,green);
-    shoulder.rotation.z=sx*.22;
-   }
-   block(upper,.34,.67,.28,.24,.30,.15,rice);
-   brim(hat,0,0,0,.35,.04,rice);hat.visible=true;
+  case 4: // Herbalist: simple shawl and one hip satchel.
+   scarf(upper,SHARED.moss);
+   rounded(upper,.32,.78,.13,.16,.23,.19,SHARED.straw);
+   hat=identityHeadwear(upper,'herbal');
    break;
-  case 5: // Traveling peddler: hanging large backpack and narrow traveling scarf.
-   buildPack(upper,leather,.54,.68);
-   block(upper,.35,.75,.29,.24,.40,.18,rice);
-   strap(upper,-1,1.19,red,-.22);
+  case 5: // Merchant with a rounded shoulder-wrapped travelling load.
+   wovenBundle(upper,.40,.35,SHARED.brown);
+   frontDrape(upper,.22,1.14,.21,.16,.41,SHARED.red,.10);
    break;
-  case 6: // Weaver: short inner vest and headcloth framing the face.
-   block(upper,0,1.12,.22,.43,.30,.09,pale);
-   hairTie(upper,rice);
-   for(const sx of [-1,1]){
-    const ribbon=block(upper,sx*.32,.99,.15,.15,.39,.13,linen);
-    ribbon.rotation.z=sx*.17;
-   }
+  case 6: // Weaver: wider sleeves implied by upper soft geometry, tied hair.
+   for(const sx of [-1,1])
+    rounded(upper,sx*.30,1.00,.09,.14,.23,.16,SHARED.linen);
+   rounded(upper,0,1.76,-.09,.18,.13,.12,SHARED.dark);
    break;
-  case 7: // Fisherman: unmistakable broad sun hat and net satchel.
-   brim(hat,0,0,0,.55,.075,rice);
-   brim(hat,0,.18,0,.27,.25,stitch);hat.visible=true;
-   buildPack(upper,green,.42,.45);
-   workStrap=new THREE.Group();workStrap.position.set(-.32,1.05-Y,-.31);upper.add(workStrap);
-   for(let n=0;n<3;n++)block(workStrap,-.12+n*.11,Y-.14,-.10,.04,.57,.045,rice);
+  case 7: // Fisherman's broad sunlight brim and small net bag.
+   hat=identityHeadwear(upper,'wide');
+   wovenBundle(upper,.27,.26,SHARED.moss);
+   workStrap=new THREE.Group();workStrap.position.set(-.36,.99-Y,-.28);upper.add(workStrap);
+   const loop=new THREE.Mesh(new THREE.TorusGeometry(.21,.024,5,12),SHARED.straw);
+   loop.rotation.y=.3;workStrap.add(loop);
    break;
-  case 8: // A-Qing: fitted training jacket, contrasting sash and strapped sheath.
-   block(upper,0,1.15,.23,.43,.36,.15,secondary);
-   for(const sx of [-1,1])strap(upper,sx,1.11,red,sx*.21);
-   block(upper,-.34,.83,-.22,.14,.73,.16,leather).rotation.z=-.22;
-   block(upper,0,.69,.31,.48,.14,.11,red);
+  case 8: // A-Qing: short training robe with asymmetric loose cloth lapel.
+   frontDrape(upper,-.07,1.18,.27,.32,.49,secondary,.19);
+   scarf(upper,SHARED.red);
+   // The sword is rigged on the wrist in people.ts. Do not attach a fake
+   // rectangular sword scabbard onto this robe.
    break;
-  case 9: // Veteran swordsman: long layered cape and sword scabbard.
-   block(upper,-.39,.98,-.20,.17,.90,.18,ink).rotation.z=-.18;
-   block(upper,0,.87,.30,.44,.13,.08,rice);
-   for(const sx of [-1,1])strap(upper,sx,1.14,rice,sx*.35);
+  case 9: // Veteran swordsman: longer cape with fewer narrow hard elements.
+   scarf(upper,SHARED.linen);
+   frontDrape(upper,.16,.89,.15,.22,.52,SHARED.indigo,-.08);
    break;
-  case 10: // Visiting merchant with a wide, overloaded luggage silhouette.
-   buildPack(upper,rice,.62,.62);block(upper,.33,.85,.22,.33,.37,.23,stitch);
+  case 10: // Travelling trader: large cloth bundle, not an angular block.
+   wovenBundle(upper,.43,.42,SHARED.straw);
+   scarf(upper,SHARED.brown);
    break;
-  default: // Junior swordsman.
-   block(upper,0,1.16,.25,.39,.29,.13,green);
-   block(upper,0,.78,.30,.45,.095,.10,rice);
+  default: // Youth: clear single-layer robe.
+   frontDrape(upper,0,1.02,.25,.28,.53,SHARED.moss,0);
  }
- // Fine face/hair details stay subtle and do not dominate the miniature view.
- return {hems,cape:capeG,hat:hat.visible?hat:null,workStrap};
+ return {hems,cape,hat,workStrap};
 }

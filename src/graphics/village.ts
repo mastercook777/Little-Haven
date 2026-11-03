@@ -6,7 +6,8 @@ import {buildVillageWorkplaces} from './lifeDetails';
 import {buildRiverArt} from './riverArt';
 import {buildCarvedTerrain,terrainChannelProbe} from './carvedTerrain';
 import {buildVillageEvolution} from './villageEvolution';
-import {detailTavern,detailHome} from './architectureKit';
+import {createMountainHome,createMountainTavern} from './villageBuildings';
+import {makeVillageCoreGrowth} from './villageCoreGrowth';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -83,64 +84,17 @@ function paintedSign(p:THREE.Object3D,x:number,y:number,z:number,word:string){
  const plane=new THREE.Mesh(new THREE.PlaneGeometry(.86,1.16),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
  plane.position.set(x,y,z);p.add(plane);return plane;
 }
+// Core buildings are authored as cohesive forms, not old boxes with
+// additional duplicate roof and facade kits appended on top.
 function home(p:THREE.Object3D,x:number,z:number,w=2.9,d=2.5,h=1.9,variation=0,windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[]){
- const g=group(p,x,.16,z);box(g,w+.35,.22,d+.35,0,.13,0,C.bank);
- box(g,w,h,d,0,h/2+.25,0,variation%2?mat('#d8c9b3'):C.plaster);
- for(const sx of [-1,1])for(const sz of [-1,1])box(g,.14,h+.2,.14,sx*w*.45,h*.5+.27,sz*d*.43,C.wood);
- tileRoof(g,w,d,h+.27,.72,variation===1?C.darkTile:C.tile);
- box(g,.67,1.12,.085,0,.83,d/2+.07,C.wood);
- box(g,.47,.66,.09,w*.31,1.34,d/2+.07,C.timber);
- const lit=new THREE.MeshStandardMaterial({color:'#e9c48b',emissive:'#f8ad68',emissiveIntensity:.25});windows.push(lit);
- box(g,.33,.43,.065,w*.31,1.35,d/2+.125,lit);
- box(g,.07,.46,.10,w*.31,1.36,d/2+.18,C.wood);
- for(let i=0;i<2;i++)box(g,.41,.04,.27,random(i+x)*.4-.2,.04,d/2+.52+i*.4,C.slate);
- if(variation===2){ // herb-drying rack
-  for(const side of [-1,1])box(g,.09,1.17,.09,side*.9,.6,-d/2-.25,C.lightWood);
-  box(g,2,.08,.10,0,1.18,-d/2-.25,C.lightWood);
-  for(let i=0;i<5;i++){const herb=sphere(g,.18,(i-2)*.36,.85,-d/2-.25,C.bambooDark);herb.scale.y=.6;}
- }
- if(variation===3){lantern(g,-w*.38,h+.4,d*.40,emissive);}
- detailHome(g,w,d,h,variation);
- return g;
+ return createMountainHome(p,x,z,w,d,h,variation,windows,emissive);
 }
-function tavern(p:THREE.Object3D,windows:THREE.MeshStandardMaterial[],emissive:THREE.MeshStandardMaterial[],swings:THREE.Group[]){
- const x=-3.4,z=-.2;const g=group(p,x,.16,z);const w=5.3,d=3.8;
- box(g,6.3,.28,4.9,0,.14,.30,C.bank);
- box(g,w,2.8,d,0,1.56,0,C.plaster);
- for(const sx of [-1,1])for(const sz of [-1,1])box(g,.23,3.0,.23,sx*2.45,1.6,sz*1.74,C.timber);
- for(const i of [-1,0,1])box(g,.15,2.5,.15,i*1.75,1.5,d*.51,C.wood);
- tileRoof(g,5.7,4.3,3.02,.9);
- // An upper loft gives the tavern an unmistakable two-storey silhouette.
- box(g,3.8,1.7,2.5,0,3.91,-.32,mat('#d6c9ae'));
- for(const sx of [-1,1])box(g,.16,1.7,.14,sx*1.68,3.91,.92,C.timber);
- tileRoof(g,4.15,2.9,4.78,1.02,C.darkTile);
- for(const tx of [-1.75,1.75]){
-  box(g,.63,.78,.08,tx,1.82,d/2+.035,C.timber);
-  const light=new THREE.MeshStandardMaterial({color:'#ebc795',emissive:'#e99e5a',emissiveIntensity:.45});windows.push(light);
-  box(g,.44,.57,.10,tx,1.83,d/2+.10,light);box(g,.05,.63,.12,tx,1.83,d/2+.16,C.wood);
- }
- box(g,1.15,1.77,.10,0,1.22,d/2+.09,C.timber);
- for(const tx of [-1.4,1.4])box(g,.33,.66,.10,tx,3.92,.95,C.wood);
- for(const tx of [-2.7,2.7]){
-  box(g,.13,2.4,.13,tx,1.22,2.45,C.wood);
-  const gLantern=lantern(g,tx,2.83,2.47,emissive);swings.push(gLantern);
- }
- box(g,6.0,.17,1.2,0,2.58,2.45,C.wood);
- box(g,6.0,.13,.14,0,2.55,3.08,C.lightWood);
- const sign=paintedSign(g,-1.9,2.02,3.13,'酒');sign.rotation.y=-.10;
- // earthenware wine jars, benches and the covered porch.
- for(let i=0;i<4;i++){
-  const x=2.17+(i%2)*.53,z=2.9+Math.floor(i/2)*.45;
-  sphere(g,.31,x,.39,z,C.ceramic);cylinder(g,.16,.16,.13,x,.70,z,mat('#98846b'));
- }
- for(const x of [-1.08,1.02]){
-  box(g,1.28,.14,.49,x,.55,3.25,C.lightWood);
-  for(const v of [-.4,.4])box(g,.11,.49,.11,x+v,.3,3.25,C.wood);
- }
- const flag=group(g,3.08,2.85,2.2);box(flag,.075,2.85,.075,0,.32,0,C.wood);
- const banner=box(flag,.08,.96,.74,-.02,.15,.40,mat('#b87058'));banner.rotation.y=.12;swings.push(flag);
- detailTavern(g);
- return g;
+function tavern(p:THREE.Object3D,windows:THREE.MeshStandardMaterial[],emissive:THREE.MeshStandardMaterial[],swings:THREE.Group[],expanded=false){
+ return createMountainTavern(p,{
+  windows,emissive,swings,
+  createLantern:(parent,x,y,z)=>lantern(parent,x,y,z,emissive),
+  createSign:(parent,x,y,z,word)=>paintedSign(parent,x,y,z,word)
+ },expanded);
 }
 function pine(p:THREE.Object3D,x:number,z:number,s:number){
  const g=group(p,x,.17,z);g.scale.setScalar(s);cylinder(g,.16,.23,1.65,0,.82,0,C.wood);
@@ -240,7 +194,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;coreVisualSignature():string;coreMaturity():number;coreBounds():THREE.Box3;groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -282,13 +236,31 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  ];
  routes.forEach((points,i)=>ribbon(root,points,i===0?1.08:.72,pathMat,.26));
  bridge(root);archedGate(root);
- // Village structures orbit one social hub rather than a generic marketplace.
- const innModel=tavern(root,windows,emissive,swing);innModel.userData.buildingId='inn-001';
- const homeModel=home(root,-9,-5.5,2.85,2.4,1.86,0,windows,emissive);homeModel.userData.buildingId='home-001';
- home(root,-9.8,3.1,2.8,2.5,1.95,2,windows,emissive);
- home(root,3.4,-5.6,3.15,2.6,2.12,1,windows,emissive);
- home(root,-.7,-7.9,2.5,2.2,1.68,3,windows,emissive);
- home(root,-11.6,-.4,2.4,2.1,1.70,0,windows,emissive);
+ // A working village center actually rebuilds over the years. The stable
+ // picking wrappers survive when whole building volumes are replaced.
+ const innModel=group(root,0,0,0);innModel.name='inn-plot-stable';
+ const oldInn=tavern(innModel,windows,emissive,swing,false);
+ const expandedInn=tavern(innModel,windows,emissive,swing,true);
+ expandedInn.visible=false;innModel.userData.buildingId='inn-001';
+ const homes=[
+  [-9,-5.5,2.85,2.4,1.86,0],
+  [-9.8,3.1,2.8,2.5,1.95,2],
+  [3.4,-5.6,3.15,2.6,2.12,1],
+  [-.7,-7.9,2.5,2.2,1.68,3],
+  [-11.6,-.4,2.4,2.1,1.70,0]
+ ] as const;
+ const homePairs=homes.map(([x,z,w,d,h,variant],i)=>{
+  const wrapper=group(root,0,0,0);wrapper.name='stable-home-plot-'+i;
+  const original=home(wrapper,x,z,w,d,h,variant,windows,emissive);
+  const renovated=home(wrapper,x,z,w*1.12,d*1.10,h*1.17,variant,windows,emissive);
+  renovated.visible=false;
+  if(i===0)wrapper.userData.buildingId='home-001';
+  return {wrapper,original,renovated,name:'home-'+i};
+ });
+ const homeModel=homePairs[0].wrapper;
+ const coreGrowth=makeVillageCoreGrowth(root,
+  {original:oldInn,renovated:expandedInn,name:'inn'},
+  homePairs.map(({original,renovated,name})=>({original,renovated,name})));
  gardenHerbs(root);const yardModel=trainingGround(root);yardModel.userData.buildingId='yard-001';
  // Old wine well, tea baskets and drying poles.
  cylinder(root,.62,.66,.69,-6.4,.53,3.6,C.slate,12);
@@ -312,9 +284,10 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  // Seasonal props are physical scene geometry, not a full-screen color filter.
  const winterTrim=group(root,0,0,0);
  const frost=mat('#d7e6dc');
- box(winterTrim,3.45,.055,.18,-3.4,5.81,-.52,frost);
- box(winterTrim,2.3,.052,.17,-9,3.03,-5.5,frost);
- box(winterTrim,2.35,.052,.17,-9.8,3.09,3.1,frost);
+ // Roof snow now derives from the actual mesh profile, not old absolute Y
+ // coordinates that floated above the rebuilt tavern and home rooftops.
+ const seasonallyFrostedRoofs:THREE.Object3D[]=[];
+
  for(const [x,z] of [[-13.0,-4.2],[-12.7,1.9],[.4,-8.7],[3.3,9.3],[11.8,5.1]] as const){
   const patch=sphere(winterTrim,.52,x,.225,z,frost);patch.scale.set(1,.07,.76);
  }
@@ -336,13 +309,15 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
   typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const buildingRenderer=makeBuildingRenderer(root);
  const growthArt=buildVillageEvolution(root);
+ root.traverse(o=>{if(o.userData.seasonalRoofSnow)seasonallyFrostedRoofs.push(o);});
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets],growthVisualSignature:()=>growthArt.visualSignature(),groundProbe:terrainChannelProbe,
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets],growthVisualSignature:()=>growthArt.visualSignature(),coreVisualSignature:()=>coreGrowth.signature(),coreMaturity:()=>coreGrowth.stage(),coreBounds:()=>coreGrowth.centerBounds(),groundProbe:terrainChannelProbe,
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
    growthArt.update(s.villageGrowth);
+   coreGrowth.update(s.villageGrowth);
    const calendar=getCalendar(s),weather=getWeather(s);
    const id=`${s.storyStage}/${s.choice}/${calendar.season}/${weather}`;
    if(lastStage===id)return;lastStage=id;
@@ -352,6 +327,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
    riverArt.setSeason(calendar.season);pathMat.color.set(palette.path);
    seasonalArt.setSeason(calendar.season);weatherArt.setWeather(weather);
    winterTrim.visible=calendar.season==='winter';
+   for(const mesh of seasonallyFrostedRoofs)mesh.visible=calendar.season==='winter';
    puddles.visible=weather==='rain';
    if(scene.fog instanceof THREE.FogExp2)scene.fog.density=weather==='fog'?.018:weather==='rain'?.0095:.0075;
    legacyHost.visible=s.storyStage==='legacy'&&s.choice==='host';
