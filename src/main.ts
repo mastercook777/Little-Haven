@@ -135,6 +135,8 @@ $('journalExpand').addEventListener('click',()=>{$('journalModal').hidden=false;
 $('closeJournal').addEventListener('click',()=>{$('journalModal').hidden=true;});
 $('journalModal').addEventListener('click',e=>{if(e.target===$('journalModal'))$('journalModal').hidden=true;});
 function refreshWorld(){
+ speed=1;paused=false;elapsed=0;last=performance.now();$('pause').textContent='Ⅱ';
+ document.querySelectorAll<HTMLButtonElement>('.speed-btn').forEach(el=>el.classList.toggle('active',el.dataset.speed==='1'));
  selected=null;lastDecisionKey='';lastChronicleId=0;lastLightingKey='';lastDaylight=-1;
  renderResident();renderDecision();renderJournal();renderStats();renderClock();village.updateStory(world);
  $('currentSlot').textContent=activeSlot===1?'一号谷':'二号谷';
