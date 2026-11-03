@@ -80,7 +80,7 @@ export function buildMountainRoof(parent:THREE.Object3D,settings:RoofInfo){
  mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);
  // The roof apron and curved edges are structural: one thin timber line,
  // not dozens of disconnected additional roof slats.
- const edgePoints=(sx:number,sz:number)=>{
+ const edgePoints=(sx:number)=>{
   const points:THREE.Vector3[]=[];
   for(let j=0;j<=12;j++){
    const v=-1+2*j/12;
@@ -90,7 +90,7 @@ export function buildMountainRoof(parent:THREE.Object3D,settings:RoofInfo){
  };
  for(const sx of [-1,1]){
   const line=new THREE.Mesh(new THREE.TubeGeometry(
-   new THREE.CatmullRomCurve3(edgePoints(sx,1)),12,.060,5,false),STANDARD.oldWood);
+   new THREE.CatmullRomCurve3(edgePoints(sx)),12,.060,5,false),STANDARD.oldWood);
   line.name='continuous-eave-fascia';line.castShadow=true;parent.add(line);
  }
  // Continuous ridge silhouette, and actual enclosed, triangular gable ends.
@@ -155,7 +155,7 @@ function baseHouse(parent:THREE.Object3D,w:number,d:number,h:number,
  box(g,0,.34,z+.28,w*.61,.16,.50,STANDARD.stone);
  return g;
 }
-function workAwning(parent:THREE.Object3D,w:number,d:number,h:number,material:THREE.Material){
+function workAwning(parent:THREE.Object3D,w:number,d:number,material:THREE.Material){
  const g=group(parent,0,0,d/2+.49);
  // Functional front canopy lower than the main roof.
  for(const sx of [-1,1])box(g,sx*w*.37,1.01,.47,.11,1.32,.13,STANDARD.wood);
@@ -179,7 +179,7 @@ export function createMountainHome(parent:THREE.Object3D,
   v===3?'cottage':v===1?'workshop':'tile',windows,v===1?-1:0);
  if(v===1){
   // Deep, functional crafts porch creates a different footprint.
-  workAwning(g,width,depth,height,STANDARD.jade);
+  workAwning(g,width,depth,STANDARD.jade);
   box(g,width*.48,.62,depth*.52+.75,.68,.85,.75,STANDARD.brightWood);
  }else if(v===2){
   // Tea/herb drying platform is part of this home, not a pile on its roof.
@@ -200,33 +200,33 @@ export function createMountainHome(parent:THREE.Object3D,
  }
  return g;
 }
-export function createMountainTavern(parent:THREE.Object3D,context:VillageBuildingsContext):THREE.Group{
- const g=group(parent,-3.4,.16,-.2);g.name='mountain-tavern-silhouette';
+export function createMountainTavern(parent:THREE.Object3D,context:VillageBuildingsContext,expanded=false):THREE.Group{
+ const g=group(parent,-3.4,.16,-.2);g.name=expanded?'mountain-tavern-renovated':'mountain-tavern-original';
  const windows=context.windows;
  // Main horizontal hall + offset smaller rear loft, rather than 4 nested gray
  // gable roofs stacked on top of the same footprint.
  const hall=group(g,-.28,0,.06);
- baseHouse(hall,5.35,3.90,2.62,STANDARD.roof,
-  STANDARD.plaster,'tile',windows,0);
- const loft=group(g,-1.75,0,-1.44);
- baseHouse(loft,2.26,2.57,3.72,STANDARD.roofBlue,
+ baseHouse(hall,expanded?6.25:5.35,expanded?4.35:3.90,expanded?2.96:2.62,STANDARD.roof,
+  expanded?STANDARD.cream:STANDARD.plaster,'tile',windows,0);
+ const loft=group(g,expanded?-2.04:-1.75,0,expanded?-1.62:-1.44);
+ baseHouse(loft,expanded?2.72:2.26,expanded?2.92:2.57,expanded?4.16:3.72,STANDARD.roofBlue,
   STANDARD.cream,'workshop',windows,0);
- const kitchen=group(g,2.16,0,-1.19);
- baseHouse(kitchen,1.85,2.18,2.05,STANDARD.roofWarm,
+ const kitchen=group(g,expanded?2.50:2.16,0,expanded?-1.34:-1.19);
+ baseHouse(kitchen,expanded?2.15:1.85,expanded?2.55:2.18,expanded?2.22:2.05,STANDARD.roofWarm,
   STANDARD.wheat,'cottage',windows,0);
  // Raised arcade ties the building footprint to the village center, with
  // see-through columns instead of a blocky solid front annex.
- box(g,-.3,.23,2.40,6.10,.22,2.12,STANDARD.stone);
- for(const sx of [-2.90,-1.34,.48,2.23]){
-  box(g,sx,1.39,3.25,.17,2.05,.17,STANDARD.wood);
-  const lantern=context.createLantern(g,sx,2.53,3.27);
-  if(sx===-2.9||sx===2.23)context.swings.push(lantern);
+ box(g,-.3,.23,expanded?2.68:2.40,expanded?6.80:6.10,.22,expanded?2.30:2.12,STANDARD.stone);
+ for(const sx of expanded?[-3.2,-1.60,.22,2.65]:[-2.90,-1.34,.48,2.23]){
+  box(g,sx,expanded?1.50:1.39,expanded?3.51:3.25,.17,expanded?2.26:2.05,.17,STANDARD.wood);
+  const lantern=context.createLantern(g,sx,expanded?2.73:2.53,expanded?3.54:3.27);
+  if(sx===(expanded?-3.2:-2.9)||sx===(expanded?2.65:2.23))context.swings.push(lantern);
  }
- box(g,-.35,2.42,3.25,6.12,.22,.22,STANDARD.brightWood);
+ box(g,-.35,expanded?2.65:2.42,expanded?3.51:3.25,expanded?6.90:6.12,.22,.22,STANDARD.brightWood);
  // A side hall terrace gives the front a usable social space.
- for(const x of [-1.2,.95])box(g,x,.53,3.27,1.12,.13,.62,STANDARD.brightWood);
- const sign=context.createSign(g,-.88,1.77,3.36,'酒');sign.rotation.y=-.07;
- const banner=group(g,2.92,2.5,2.35);
+ for(const x of expanded?[-1.65,.1,1.70]:[-1.2,.95])box(g,x,.53,expanded?3.51:3.27,1.12,.13,.62,STANDARD.brightWood);
+ const sign=context.createSign(g,expanded?-1.22:-.88,expanded?2.03:1.77,expanded?3.62:3.36,'酒');sign.rotation.y=-.07;
+ const banner=group(g,expanded?3.35:2.92,expanded?2.78:2.5,expanded?2.58:2.35);
  box(banner,0,.42,0,.07,1.25,.07,STANDARD.wood);
  const flag=new THREE.Mesh(new THREE.PlaneGeometry(.72,1.10),STANDARD.redCloth);
  flag.position.set(0,-.44,.1);flag.rotation.y=.17;banner.add(flag);
