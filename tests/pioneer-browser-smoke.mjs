@@ -86,6 +86,26 @@ try{
  if(restored.buildings.length!==1||restored.buildings[0].id!==b.id)
   throw Error('Pioneer local save not restored after browser reload');
  results.push({restored:true});
+ // Phase B is visible in real WebGL, not only an expanded JSON registry.
+ await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,now=d.getState().minutes;
+  d.advance(Math.max(0,(48*3*1440-now)/3));
+ });
+ await page.waitForTimeout(280);
+ const grown=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,state=d.getState();
+  return {people:state.founders.length,
+   buildings:state.buildings.map(b=>b.kind),roadCount:state.roads.length,
+   roadGrades:state.roads.map(r=>r.grade),visuals:d.getVisuals(),
+   renderer:d.getRendererInfo()};
+ });
+ if(grown.people<=3||grown.roadCount<3||!grown.buildings.includes('garden')||
+  !grown.buildings.includes('cottage')||!grown.buildings.includes('wood-yard')||
+  grown.visuals.renderedStructures<4||grown.visuals.people!==grown.people)
+  throw Error('Phase B did not produce a visible populated village: '+JSON.stringify(grown));
+ const grownDigest=await screenshot(page,'05-third-year-living-village');
+ if(grownDigest===startDigest)throw Error('Third-year village looks identical to the initial empty valley');
+ results.push({phaseB:grown});
  await page.goto(base,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__HAVEN_DEBUG__?.getState);
  const classic=await page.evaluate(()=>window.__HAVEN_DEBUG__.getState());
