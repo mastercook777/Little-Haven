@@ -16,7 +16,8 @@ export interface RiverArt {
  setSeason(season:Season):void;animate(time:number):void;
  pointAt(u:number):THREE.Vector3;getSurfaceHeight():number;
 }
-const CENTER_Y=.337;
+export const CREEK_WATER_Y=.105;
+const CENTER_Y=CREEK_WATER_Y;
 const waterMat=new THREE.MeshStandardMaterial({
  color:'#5f9eac',roughness:.28,metalness:.04,transparent:false,side:THREE.DoubleSide,
  emissive:'#163b43',emissiveIntensity:.12
@@ -32,6 +33,17 @@ const stemMat=new THREE.MeshStandardMaterial({color:'#5b8070',roughness:1});
 const curve=new THREE.CatmullRomCurve3(RIVER_WAYPOINTS.map(([x,z])=>new THREE.Vector3(x,0,z)),false,'centripetal',.45);
 const rand=(n:number)=>{let k=(n+17)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;};
 const safeU=(u:number)=>Math.max(0,Math.min(1,u));
+/** The terrain channel and water geometry share exactly this spline. */
+export function creekDistance(x:number,z:number):number{
+ let nearest=Infinity;
+ const pt=new THREE.Vector3();
+ for(let i=0;i<=100;i++){
+  curve.getPoint(i/100,pt);
+  const d=Math.hypot(x-pt.x,z-pt.z);
+  if(d<nearest)nearest=d;
+ }
+ return nearest;
+}
 function riverSample(u:number,offset:number,y:number){
  const p=curve.getPoint(safeU(u)),t=curve.getTangent(safeU(u)).normalize();
  // normal lies perpendicular to the bank-to-bank section in XZ.
@@ -54,14 +66,14 @@ function strip(left:number,right:number,leftY:number,rightY:number,material:THRE
 }
 function addWater(parent:THREE.Group){
  // Dark stony stream-bed is wide enough that the creek looks *cut into* grass.
- const bed=strip(-2.38,2.38,.255,.255,bedMat);bed.name='river-bed';parent.add(bed);
+ const bed=strip(-2.38,2.38,.045,.045,bedMat);bed.name='river-bed';parent.add(bed);
  const banks=[
-  strip(-2.42,-1.56,.388,.293,bankMat),
-  strip(1.56,2.42,.293,.388,bankMat),
-  strip(-1.72,-1.48,.325,.34,edgeMat),
-  strip(1.48,1.72,.34,.325,edgeMat),
-  strip(-1.48,-1.30,.337,.34,shallowMat),
-  strip(1.30,1.48,.34,.337,shallowMat)
+  strip(-2.42,-1.56,.169,.078,bankMat),
+  strip(1.56,2.42,.078,.169,bankMat),
+  strip(-1.72,-1.48,.083,.10,edgeMat),
+  strip(1.48,1.72,.10,.083,edgeMat),
+  strip(-1.48,-1.30,.102,.108,shallowMat),
+  strip(1.30,1.48,.108,.102,shallowMat)
  ];
  for(const b of banks){b.name='river-shore';parent.add(b);}
  const surface=strip(-1.38,1.38,CENTER_Y,CENTER_Y,waterMat);
@@ -79,7 +91,7 @@ function stones(parent:THREE.Group){
   for(let i=0;i<count/2;i++){
    const n=i*2+j,u=.035+rand(n*43+1)*.93;
    const side=n%4<2?-1:1,offset=side*(1.83+rand(n*41+8)*.42);
-   const p=riverSample(u,offset,.355);
+   const p=riverSample(u,offset,.158);
    dummy.position.copy(p);dummy.rotation.set(rand(n+11)*.22,rand(n*3+17)*Math.PI,rand(n+7)*.18);
    const size=.17+rand(n*31+17)*.24;dummy.scale.set(size, size*.48, size*.81);
    dummy.updateMatrix();instance.setMatrixAt(i,dummy.matrix);
@@ -92,7 +104,7 @@ function stones(parent:THREE.Group){
  for(let i=0;i<reedCount;i++){
   const u=.06+rand(i*13+2)*.88,side=i%2?-1:1;
   const p=riverSample(u,side*(1.77+rand(i*17+4)*.20),.39);
-  dummy.position.set(p.x,.64,p.z);dummy.rotation.set(0,rand(i+8)*6.28,side*.15);
+  dummy.position.set(p.x,.39,p.z);dummy.rotation.set(0,rand(i+8)*6.28,side*.15);
   dummy.scale.set(.7+rand(i*9)*.75,.75+rand(i*7)*.8,.70);
   dummy.updateMatrix();reeds.setMatrixAt(i,dummy.matrix);
  }
@@ -128,7 +140,7 @@ function waterfall(parent:THREE.Group){
   new THREE.MeshBasicMaterial({color:'#e3f1e8',transparent:true,opacity:.74,depthWrite:false}),16);
  const dummy=new THREE.Object3D();
  for(let i=0;i<16;i++){
-  const o=-half+i/15*half*2,p=riverSample(u,o,.36);
+  const o=-half+i/15*half*2,p=riverSample(u,o,CENTER_Y+.02);
   dummy.position.copy(p);dummy.position.add(new THREE.Vector3(t.x*.15,0,t.z*.15));
   dummy.scale.set(.06+rand(i*13)*.12,.028+rand(i*7)*.028,.09+rand(i*9)*.09);
   dummy.rotation.y=rand(i)*Math.PI;dummy.updateMatrix();foam.setMatrixAt(i,dummy.matrix);
