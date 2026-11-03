@@ -211,11 +211,13 @@ function step(s:PioneerWorld){
   gather(s,liang,'forest',.94,'collect-wood');
  else if(building)work(s,liang);
  else allocate(s,liang,'tend-fire');
- if(s.resources.food<7.5||!building||s.policy==='food'&&s.resources.food<12){
+ const foodTarget=s.policy==='food'?18:s.policy==='shelter'?3.8:7.5;
+ if(s.resources.food<foodTarget||!building){
   if(!gather(s,he,'forage',weather==='rain'?.62:.86,'forage'))allocate(s,he,'rest');
  }else if(building)work(s,he);
  else allocate(s,he,'rest');
- if(s.resources.water<3.3||!building&&s.resources.water<6){
+ const waterTarget=s.policy==='food'?8:s.policy==='shelter'?1.8:3.3;
+ if(s.resources.water<waterTarget||!building&&s.resources.water<6){
   gather(s,lu,'spring',1.3,'fetch-water');
  }else if(building)work(s,lu);
  else allocate(s,lu,'tend-fire');
