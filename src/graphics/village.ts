@@ -4,6 +4,8 @@ import {makeBuildingRenderer} from './buildingRenderer';
 import {createSeasonalArt} from './seasonArt';
 import {buildVillageWorkplaces} from './lifeDetails';
 import {buildRiverArt} from './riverArt';
+import {buildCarvedTerrain,terrainChannelProbe} from './carvedTerrain';
+import {buildVillageEvolution} from './villageEvolution';
 import {detailTavern,detailHome} from './architectureKit';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
@@ -238,7 +240,7 @@ function endingBuilding(p:THREE.Object3D,kind:'host'|'observe',emissive:THREE.Me
  }
  return g;
 }
-export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;}
+export interface VillageGraphics{root:THREE.Group;buildingTargets:THREE.Group[];batchStats:BatchStats;riverAt(u:number):THREE.Vector3;riverSurfaceY:number;riverSurface:THREE.Mesh;rainSample(count:number):{headY:number;tailY:number}[];updateStory(state:WorldState):void;animate(t:number,daylight:number):void;growthVisualSignature():string;groundProbe(x:number,z:number):{groundY:number;waterY:number;distance:number};}
 export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const root=group(scene,0,0,0);const windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[],bambooGroups:THREE.Group[]=[],swing:THREE.Group[]=[];
  const edge:[number,number][]=[];
@@ -247,7 +249,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const dirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:1.75,bevelEnabled:true,bevelThickness:.28,bevelSize:.34,bevelSegments:2,steps:1}),[mat('#8b7663'),mat('#716150')]);
  dirt.rotation.x=Math.PI/2;dirt.position.y=.02;dirt.castShadow=true;dirt.receiveShadow=true;root.add(dirt);
  const turfMaterial=new THREE.MeshStandardMaterial({color:'#8baa79',side:THREE.DoubleSide});
- const turf=new THREE.Mesh(new THREE.ShapeGeometry(shape),turfMaterial);turf.rotation.x=Math.PI/2;turf.position.y=.17;turf.receiveShadow=true;root.add(turf);
+ const turf=buildCarvedTerrain(edge,turfMaterial);root.add(turf);
  // Terraced mountain silhouettes along the rear rim, away from the camera-facing tavern.
  for(let i=0;i<13;i++){
   const x=-14.3+i*2.02,z=-9.7-random(i*7)*.42;
@@ -321,12 +323,14 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const weatherArt=createWeatherArt(root,typeof window!=='undefined'&&window.innerWidth<760,
   typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const buildingRenderer=makeBuildingRenderer(root);
+ const growthArt=buildVillageEvolution(root);
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets],
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets],growthVisualSignature:()=>growthArt.visualSignature(),groundProbe:terrainChannelProbe,
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
+   growthArt.update(s.villageGrowth);
    const calendar=getCalendar(s),weather=getWeather(s);
    const id=`${s.storyStage}/${s.choice}/${calendar.season}/${weather}`;
    if(lastStage===id)return;lastStage=id;
