@@ -3,6 +3,7 @@
  * a rainy-guest intervention, a repair cycle and nonempty renderer diagnostics.
  */
 import {chromium} from 'playwright';
+import {createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -42,7 +43,7 @@ try{
   await page.waitForTimeout(250);
   const img=await page.screenshot({path:out+'/'+season+'.png'});
   if(img.length<12_000)throw Error('Suspiciously empty canvas capture: '+season);
-  captures.push(img.toString('base64').slice(0,200));
+  captures.push(createHash('sha256').update(img).digest('hex'));
   results.push({season,minute:c.minutes,calendarYear:Math.floor(c.minutes/(1440*48))+1,bytes:img.length});
  }
  const uniq=new Set(captures);
