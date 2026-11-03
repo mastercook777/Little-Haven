@@ -65,6 +65,16 @@ try{
    diagnostics:window.__HAVEN_DEBUG__.getRendererInfo()};
  });
  if(!stats.gl||!stats.width||!stats.height)throw Error('WebGL canvas absent or unavailable: '+JSON.stringify(stats));
+ // World-only screenshots separate the actual town silhouette from long narrative cards.
+ await page.addStyleTag({content:
+  'html.qa-landscape .topbar,html.qa-landscape .hero-intro,html.qa-landscape .guardian-panel,'+
+  'html.qa-landscape .journal-panel,html.qa-landscape .resident-card,html.qa-landscape .toolbar,'+
+  'html.qa-landscape .corner-credit,html.qa-landscape .toast{visibility:hidden !important;}'});
+ const captureLandscape=async(name)=>{
+  await page.evaluate(()=>document.documentElement.classList.add('qa-landscape'));
+  try{return await snapshotValley(page,name);}
+  finally{await page.evaluate(()=>document.documentElement.classList.remove('qa-landscape'));}
+ };
  const captures=[];
  for(const [i,season] of ['spring','summer','autumn','winter'].entries()){
   if(i>0)await page.evaluate(()=>window.__HAVEN_DEBUG__.flowSeason());
@@ -91,7 +101,7 @@ try{
  for(const direction of ['bridge','ferry','grove']){
   await page.evaluate(()=>{
    const d=window.__HAVEN_DEBUG__;
-   d.reset();d.advance((24*1440-500)/3);
+   d.reset();d.advance((24*1440+600-500)/3);
   });
   const available=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual().state.phase);
   if(available!=='invitation')throw Error('Valley invitation never appeared: '+available);
@@ -99,12 +109,17 @@ try{
   const chosen=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual().state.choice);
   if(chosen!==direction)throw Error('Guardian village direction click failed: '+direction);
   await page.evaluate(()=>window.__HAVEN_DEBUG__.advance((96-24)*1440/3));
+  for(let attempt=0;attempt<11;attempt++){
+   const wx=await page.evaluate(()=>window.__HAVEN_DEBUG__.getVisualState().weather);
+   if(wx==='clear')break;
+   await page.evaluate(()=>window.__HAVEN_DEBUG__.advance(480));
+  }
   await page.waitForTimeout(420);
   const visual=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual());
   if(visual.state.choice!==direction||!['landmark','thriving'].includes(visual.state.phase)||
      visual.signature!==direction+'/'+visual.state.phase)
    throw Error('Village silhouette did not evolve: '+JSON.stringify(visual));
-  futureImages[direction]=await snapshotValley(page,'two-years-'+direction);
+  futureImages[direction]=await captureLandscape('two-years-'+direction);
   results.push({branch:direction,phase:visual.state.phase,workDays:visual.state.workDays,prosperity:visual.state.prosperity,
    population:(await page.evaluate(()=>window.__HAVEN_DEBUG__.getState().population)),
    render:await page.evaluate(()=>window.__HAVEN_DEBUG__.getRendererInfo())});
