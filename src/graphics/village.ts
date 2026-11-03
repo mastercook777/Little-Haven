@@ -246,13 +246,20 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const edge:[number,number][]=[];
  for(let i=0;i<48;i++){const a=i/48*Math.PI*2,r=1+.032*Math.sin(i*2.9)+.020*Math.cos(i*5.8);edge.push([Math.cos(a)*16.8*r,Math.sin(a)*12.2*r]);}
  const shape=new THREE.Shape();shape.moveTo(...edge[0]);for(let i=1;i<edge.length;i++)shape.lineTo(...edge[i]);shape.closePath();
- const dirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:1.75,bevelEnabled:true,bevelThickness:.28,bevelSize:.34,bevelSegments:2,steps:1}),[mat('#8b7663'),mat('#716150')]);
- dirt.rotation.x=Math.PI/2;
-  // ExtrudeGeometry's front bevel extends .28 ABOVE its origin. Previously
-  // position.y=.02 raised an opaque dirt cap to y≈.30, completely masking the
-  // recessed river and most of the new green terrain (grass y=.17).
-  // Keep the retaining walls and under-island thickness below the real top mesh.
-  dirt.position.y=-.29;dirt.castShadow=true;dirt.receiveShadow=true;root.add(dirt);
+ // Keep the sculpted cliff sides of the old floating island, but DON'T
+ // render its opaque upper cap. The old top cap at y≈.30 hid every valley
+ // channel below it. Lowering the whole rock also detached the cliff lip.
+ // ExtrudeGeometry labels caps material 0 and sides/bevel material 1, so draw
+ // only the side/bevel group while the carved terrain owns the entire top.
+ const cliffGeometry=new THREE.ExtrudeGeometry(shape,{depth:1.75,
+  bevelEnabled:true,bevelThickness:.28,bevelSize:.34,bevelSegments:2,steps:1});
+ const wallGroups=cliffGeometry.groups.filter(g=>g.materialIndex===1);
+ cliffGeometry.clearGroups();
+ for(const g of wallGroups)cliffGeometry.addGroup(g.start,g.count,1);
+ const dirt=new THREE.Mesh(cliffGeometry,[mat('#8b7663'),mat('#716150')]);
+ dirt.name='open-cliff-walls';
+ dirt.rotation.x=Math.PI/2;dirt.position.y=-.09;
+ dirt.castShadow=false;dirt.receiveShadow=true;root.add(dirt);
  const turfMaterial=new THREE.MeshStandardMaterial({color:'#8baa79',side:THREE.DoubleSide});
  const turf=buildCarvedTerrain(edge,turfMaterial);root.add(turf);
  // Terraced mountain silhouettes along the rear rim, away from the camera-facing tavern.
