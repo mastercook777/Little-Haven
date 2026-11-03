@@ -53,10 +53,12 @@ function createLot(root:THREE.Group,lot:VillageParcel,windows:THREE.MeshStandard
  // planner rectangle encloses both the front porch and the rear eaves.
  finished.updateWorldMatrix(true,true);
  const envelope=new THREE.Box3().setFromObject(finished);
- const offsetX=-(envelope.min.x+envelope.max.x)/2;
- const offsetZ=-(envelope.min.z+envelope.max.z)/2;
- const actualWidth=envelope.max.x-envelope.min.x;
- const actualDepth=envelope.max.z-envelope.min.z;
+ const center=site.worldToLocal(envelope.getCenter(new THREE.Vector3()));
+ const offsetX=-center.x,offsetZ=-center.z;
+ const across=envelope.max.x-envelope.min.x,along=envelope.max.z-envelope.min.z;
+ const rotated=Math.abs(Math.sin(lot.rotation))>.5;
+ const actualWidth=rotated?along:across;
+ const actualDepth=rotated?across:along;
  if(actualWidth>lot.width+lot.clearance*2+.02||
     actualDepth>lot.depth+lot.clearance*2+.02)
   throw new Error('Model footprint larger than reserved parcel: '+lot.id+
