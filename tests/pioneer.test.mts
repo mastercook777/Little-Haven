@@ -207,7 +207,11 @@ test('Phase B hourly, season skips and import/reload keep the exact same world',
  }
  assert.deepEqual(a,b);
  const imported=importPioneerWorld(JSON.stringify(a));
- assert.ok(imported);
+ assert.ok(imported,'invalid saved growth: '+JSON.stringify({
+  buildings:a.buildings.map(b=>({kind:b.kind,parcel:b.parcel})),
+  intent:a.intent,sites:a.sites.length,roads:a.roads.length,
+  housing:pioneerHousingCapacity(a),residents:a.founders.length
+ }));
  assert.deepEqual(imported,a);
  assert.ok(imported!.roads.length>0);
 });
