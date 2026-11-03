@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type {VillageDirection,VillageGrowthState} from '../simulation/villageGrowth.ts';
-import {batchStaticSubtree} from './batchStatic';
-import {buildMountainRoof} from './villageBuildings';
+import {batchStaticSubtree} from './batchStatic.ts';
+import {buildMountainRoof} from './villageBuildings.ts';
 
 /**
  * Whole-space growth. Each route changes land use and skyline by new roofs,
