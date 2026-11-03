@@ -69,15 +69,20 @@
     <footer class="toolbar">
       <div class="time-control"><div class="sun-icon" id="dayIcon">☀</div><div class="time-copy"><b id="clock">08:20</b><small id="period">晨光正好</small></div></div>
       <span class="tool-separator"></span>
-      <div class="tool-group"><button class="speed-btn active" data-speed="1" title="正常速度">1×</button><button class="speed-btn" data-speed="4" title="四倍速度">4×</button><button class="speed-btn" data-speed="12" title="十二倍速度">12×</button><button class="speed-btn" data-speed="48" title="流年快进，观察整段江湖故事">流年</button></div>
+      <div class="tool-group"><button class="speed-btn active" data-speed="1" title="正常速度">1×</button><button class="speed-btn" data-speed="4" title="四倍速度">4×</button><button class="speed-btn" data-speed="12" title="十二倍速度">12×</button><button class="speed-btn" data-speed="48" title="跨越至下一季并回顾山谷变化">流年</button></div>
       <span class="tool-separator"></span>
       <div class="tool-group"><button class="tool-icon" id="pause" title="暂停/继续" aria-label="暂停/继续">Ⅱ</button><button class="tool-icon" id="resetCamera" title="重置视角" aria-label="重置视角">⌖</button><button class="tool-icon" id="zoomIn" title="放大" aria-label="放大">+</button><button class="tool-icon" id="zoomOut" title="缩小" aria-label="缩小">−</button></div>
       <span class="tool-separator desktop-only"></span>
       <span class="autosave desktop-only"><span class="save-dot"></span> 自动保存</span>
     </footer>
 
-    <div id="journalModal" class="modal-backdrop" hidden><div class="modal-card"><div class="modal-top"><div><span class="section-eyebrow">STORIES OF THE VALLEY</span><h2>守望录 · 江湖故事</h2></div><button class="modal-close" id="closeJournal">×</button></div><div id="journalAll" class="all-events"></div><button class="reset-game" id="resetGame">重启江湖篇章</button></div></div>
-    <div class="corner-credit">LITTLE HAVEN <span>·</span> JIANGHU PROTOTYPE 0.2</div>
+    <div id="journalModal" class="modal-backdrop" hidden><div class="modal-card"><div class="modal-top"><div><span class="section-eyebrow">STORIES OF THE VALLEY</span><h2>守望录 · 江湖故事</h2></div><button class="modal-close" id="closeJournal">×</button></div><div id="journalAll" class="all-events"></div><div class="save-tools">
+        <div class="save-tools-heading">山谷存档 · <span id="currentSlot">一号谷</span></div>
+        <div class="slot-buttons"><button id="saveSlot1" class="slot-button active">一号谷</button><button id="saveSlot2" class="slot-button">二号谷</button></div>
+        <div class="save-actions"><button id="exportGame">导出存档</button><button id="importTrigger">导入存档</button><button class="reset-game" id="resetGame">在当前槽重新开档</button></div>
+        <input id="importFile" type="file" accept=".json,application/json" hidden />
+      </div></div></div>
+    <div class="corner-credit">LITTLE HAVEN <span>·</span> LIVING VALLEY · 0.3 PREVIEW</div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
