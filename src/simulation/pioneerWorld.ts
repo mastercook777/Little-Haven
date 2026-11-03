@@ -2,6 +2,10 @@ import {DAY_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.
 import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,reservedParcels,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
+import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {agePioneerBuildings,completePioneerProject,considerPioneerMigration,
+ pioneerHasFacility,pioneerHousingCapacity,pioneerBuildingLabel,
+ registerPioneerTrip,schedulePioneerProject} from './pioneerGrowth.ts';
 
 export const PIONEER_VERSION=4;
 export const PIONEER_SLOT_KEYS=['little-haven-pioneer-v04-slot-1','little-haven-pioneer-v04-slot-2'] as const;
@@ -17,14 +21,16 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter';
+export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'repair';
+export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
  id:number;name:string;role:string;color:string;
  activity:PioneerWork;target:[number,number];homeBuildingId:string|null;
+ commute?:WalkPoint[];pathRoadId?:string;
 }
 export interface PioneerResourceSite{
- id:string;kind:'forest'|'forage'|'spring';x:number;z:number;
+ id:string;kind:'forest'|'forage'|'spring'|'field';x:number;z:number;
  stock:number;capacity:number;renewPerDay:number;totalGathered:number;
 }
 export interface PioneerJournal{
@@ -32,13 +38,15 @@ export interface PioneerJournal{
 }
 export interface PioneerIntent{
  id:string;reason:string;createdAt:number;requestedBy:number[];
+ kind?:PioneerBuildKind|'repair';targetBuildingId?:string;path?:WalkPoint[];
  parcel:VillageParcel|null;phase:'survey'|'materials'|'foundation'|'frame';
  woodRequired:number;woodCommitted:number;workDone:number;workRequired:number;
  pauseReason:string|null;
 }
 export interface PioneerBuilding{
- id:string;kind:'shelter';parcel:VillageParcel;completedAt:number;
+ id:string;kind:PioneerBuildKind;parcel:VillageParcel;completedAt:number;
  causeId:string;occupants:number[];materialsSpent:{wood:number};workHours:number;
+ condition?:number;lastRepairAt?:number;
 }
 export interface PioneerWorld{
  schemaVersion:4;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
@@ -46,6 +54,7 @@ export interface PioneerWorld{
  resources:{wood:number;food:number;water:number};
  sites:PioneerResourceSite[];intent:PioneerIntent|null;buildings:PioneerBuilding[];
  journal:PioneerJournal[];nextEventId:number;policy:PioneerPolicy;comfort:number;
+ roads:PioneerRoad[];nextResidentId:number;nextSurveyAt:number;lastArrivalAt:number;
 }
 const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
 const parcel=(id:string,x:number,z:number,width:number,depth:number,rotation=0):VillageParcel=>{
@@ -96,7 +105,8 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
     target:point(camp.x,camp.z+.9),homeBuildingId:null}
   ],
   resources:{wood:1,food:5,water:5},sites:resourceSites(seed),
-  intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32
+  intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
+  roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0
  };
  log(s,'荒谷点火','梁伯、陆娘和阿禾在安全的林缘安下临时营火。眼前尚无永久屋舍。');
  return s;
@@ -131,13 +141,17 @@ export function planPioneerShelter(s:PioneerWorld):VillageParcel|null{
   }
  }
  alternatives.sort((a,b)=>a.score-b.score||a.parcel.x-b.parcel.x||a.parcel.z-b.parcel.z);
- return alternatives[0]?.parcel??null;
+ for(const item of alternatives){
+  if(pioneerBuildingPath(s.camp,item.parcel,occupied.filter(b=>b.id!=='temporary-camp')))return item.parcel;
+ }
+ return null;
 }
 function requestShelter(s:PioneerWorld){
  if(s.buildings.some(b=>b.kind==='shelter')||s.intent)return;
  const id='need-'+s.nextEventId;
  const location=planPioneerShelter(s);
- s.intent={id,reason:'三人露宿山野，夜雨与寒风需要遮蔽。',createdAt:s.minutes,
+ const walk=location?pioneerBuildingPath(s.camp,location,[...landscape(),...s.buildings.map(b=>b.parcel)]):null;
+ s.intent={id,kind:'shelter',path:walk??undefined,reason:'三人露宿山野，夜雨与寒风需要遮蔽。',createdAt:s.minutes,
   requestedBy:s.founders.map(f=>f.id),parcel:location,
   phase:location?'materials':'survey',woodRequired:SHELTER_WOOD,woodCommitted:0,
   workDone:0,workRequired:SHELTER_WORK,
