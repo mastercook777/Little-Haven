@@ -13,7 +13,7 @@ export interface ArchitecturePair{
 }
 export interface VillageCoreGrowth{
  update(growth:VillageGrowthState):void;signature():string;
- stage():number;centerBounds():THREE.Box3;deferredExpansions():string[];
+ stage():number;centerBounds():THREE.Box3;deferredExpansions():string[];collidingPairs():string[];
 }
 /** Drawn volume (not just wall dimensions) is the safety envelope. */
 export function modelOverlapXZ(a:THREE.Object3D,b:THREE.Object3D,minArea=.10):boolean{
@@ -105,7 +105,7 @@ export function makeVillageCoreGrowth(parent:THREE.Object3D,
    const place=court(root,dir,grown);place.visible=false;courts.set(key,place);
   }
  const bounds=new THREE.Box3();
- let signature='';let tier=0;let deferred:string[]=[];
+ let signature='';let tier=0;let deferred:string[]=[],currentCollisions:string[]=[];
  function update(g:VillageGrowthState){
   const next=maturityTier(g);
   const key=(g.choice||'none')+':'+next+':'+g.phase;
@@ -138,6 +138,9 @@ export function makeVillageCoreGrowth(parent:THREE.Object3D,
    slot.original.visible=active[i]===slot.original;
    slot.renovated.visible=active[i]===slot.renovated;
   });
+  currentCollisions=[];
+  for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++)
+   if(modelOverlapXZ(active[i],active[j]))currentCollisions.push(slots[i].name+' × '+slots[j].name);
   courts.forEach((place,name)=>{
    const wants=g.choice!==null&&name.startsWith(g.choice);
    place.visible=wants&&(tier>=3?name.endsWith('-grown'):tier>=1&&name.endsWith('-repair'));
@@ -150,7 +153,7 @@ export function makeVillageCoreGrowth(parent:THREE.Object3D,
   automatic:false,workDays:0,lastDayProcessed:0,wood:0,food:0,trade:0,prosperity:0,completedStages:[],
   plannerSeed:0,settlementLots:[],lastPlotAttemptDay:0,lastMigrationDay:0});
  return {
-  update,signature:()=>signature,stage:()=>tier,deferredExpansions:()=>[...deferred],
+  update,signature:()=>signature,stage:()=>tier,deferredExpansions:()=>[...deferred],collidingPairs:()=>[...currentCollisions],
   centerBounds:()=>{
    bounds.makeEmpty();
    const active=tavern.original.visible?tavern.original:tavern.renovated;
