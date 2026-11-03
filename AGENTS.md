@@ -1,29 +1,37 @@
-# Little Haven (守望谷) — Instructions for coding agents
+# 守望谷 / Little Haven — instructions for coding agents
 
-## Product vision
-Little Haven is a calm, observation-first **living diorama idle game**. The player is a guardian who occasionally chooses how to help; villagers are autonomous. The reward is seeing visible, causal world changes, not farming arbitrary currencies or clicking buildings repeatedly.
+## Product definition
+
+An observation-first **wuxia micro-world idle game**. The player is an unseen 守谷人; residents live and make choices independently. The visible 3D game is a small mountain tavern village; the surrounding 江湖 exists as a rules-driven offscreen story world. **Discoverable character relationships and visible consequences beat currencies and clicks.**
 
 ## Source of truth
-- `docs/DESIGN.md`: current v0.1 design, first-session promise and limitations.
-- `ROADMAP.md`: prioritized next vertical slice.
-- `docs/QA.md`: verified checks and remaining browser QA.
-- `src/simulation/world.ts`: authoritative deterministic world state; `src/graphics/*` are presentation.
-- `docs/SKILLS.md`: local Three.js skills usage and provenance.
 
-## Important decisions
-1. Preserve the current bright, clean, pastel miniature aesthetic until gameplay has been validated. Avoid unrelated visual redesigns.
-2. Keep world simulation independent of Three.js; renderers must never own save state or game logic.
-3. Prefer reproducible, seeded behavior, explicit time-step handling and bounded offline progress.
-4. A guardian choice must leave **visible** consequences in the world, resident behaviors and/or the chronicle.
-5. Don't add AI API calls, accounts, paid assets or servers to the core game without approval.
-6. Maintain desktop mouse and mobile touch support. Avoid hiding the diorama beneath interface panels.
-7. Never commit keys, node_modules, dist or generated test artifacts.
+1. `docs/V02_JIANGHU_BRIEF.md`: current product promise and scope.
+2. `docs/V02_SCENE_PLAN.md`: wuxia diorama art direction and camera composition.
+3. `docs/V02_STORY_SYSTEM.md`: first life-arc causal event chain, threshold contract and tests.
+4. `ROADMAP.md`: priorities, v0.2 implementation and v0.3 non-goals.
+5. `src/simulation/world.ts`: authoritative testable story and citizen state; no Three.js here.
+6. `src/graphics/`: purely visual representation; no decision rules, save or clock mutation.
 
-## Skills for Codex
-Begin broad game changes with `$threejs-game-director`; find the vendored skills in `.agents/skills/`. Consult `threejs-gameplay-systems`, `threejs-aaa-graphics-builder`, `threejs-game-ui-designer`, `threejs-debug-profiler`, and `threejs-qa-release` as relevant. 3D/image/audio generation skills are optional and should degrade gracefully without API keys. Read each skill's actual `SKILL.md`, rather than assuming it was executed. See `docs/SKILLS.md`.
+## Hard rules
 
-## Definition of done
-For gameplay changes, run `npm run test:sim`, `npm run check`, `npm run build` when dependencies are available; perform real browser interactions and screenshot checks when feasible. Document what passed and what could not be verified; do not confuse a compiling scene with playable systems. New state fields need save/load compatibility and tests.
+- Preserve the established bright miniature island and orthographic readability. Buildings are simplified Chinese mountain houses, not realistic temples or a UI-only reskin.
+- `Wuxia story → world state → scene/model presentation`. Every major event must leave a visible trace.
+- Resident autonomy: absence of player choice must resolve to a coherent path instead of blocking world growth.
+- Keep offline time bounded and save data versioned. v0.2 uses a new localStorage key; the v0.1 save is intentionally untouched.
+- Prefer deterministic, rule-driven content. Do not require live LLM inference, API keys, servers, or paid models.
+- Never imply visiting travelers are permanent population. Use stage-dependent visibility.
+- Optimize for browser and mobile; don't cover the miniature world with large panels.
+- Maintain regression tests for `host`, `observe`, automated default, fast forward, and persistence.
 
-## First follow-up milestone
-Make the village self-growing instead of introducing more decorative models: need -> proposal -> guardian response -> construction -> new resident behavior -> follow-up need.
+## Skills
+
+Read `.agents/skills/threejs-game-director/SKILL.md` and relevant siblings under `.agents/skills/` when making substantial changes. For 0.2 the most relevant are `threejs-gameplay-systems`, `threejs-aaa-graphics-builder` (authoring recipes, technical art), `threejs-game-ui-designer` and `threejs-qa-release`. See `docs/SKILLS.md` for provenance. Runtime needs none of these skills.
+
+## Verification / PR checklist
+
+- `npm run test:sim`
+- `npm run check`
+- `npm run build:pages`
+- Real desktop/browser smoke: initial vista, visitor arrival, player choice, both ending buildings, persistence/reload, no canvas blank/error. Mobile viewport when possible.
+- Avoid commits of `node_modules`, `dist`, generated reports, or credentials. Document unverified items plainly.

@@ -1,112 +1,67 @@
-# 守望谷 · Little Haven — Three.js Prototype v0.1
+# 守望谷 · 江湖一隅 | Little Haven v0.2
 
-> 一座会自己生活的小小山谷。玩家不是市长，也不是上帝式建造者，而是一位偶尔回应村民愿望的守护者。
+> 山外是江湖，山里有故人。守望一座以无名酒肆为中心的微缩武侠山谷，看看它如何悄悄生出故事。
 
-这是可在桌面或手机浏览器运行的 **Three.js + TypeScript + Vite** 原型，使用纯程序化 3D 模型，无需购买素材、配置 AI API 或搭建后端。
+这是一个基于 **Three.js + TypeScript + Vite** 的观察型武侠放置网页游戏原型。程序化 Low-poly 中国山居、酒肆、竹林、练武坪、石桥；居民会按照作息行动，一名少年和一位旅人拥有可见的两结局故事链。**无需账号、素材生成 API 或后端服务器。**
 
-## 快速运行
+## 本地运行
 
-要求：**Node.js 20.19+ / 22+**，首次安装依赖需要联网。
+Node.js 22+，首次运行需要联网获取 npm 依赖：
 
 ```bash
 npm install
 npm run dev
 ```
 
-打开命令行显示的网址（默认 **http://localhost:5188/**）。Windows 用户也可以直接双击 `start-windows.bat`，首次运行会自动安装依赖；macOS/Linux 可执行 `./start-macos-linux.sh`。
+访问 `http://localhost:5188/`。也可使用 Windows 的 `start-windows.bat` 或 macOS/Linux 的 `start-macos-linux.sh`。本地生产构建：`npm run build`。GitHub Pages 构建：`npm run build:pages`。
 
-生产构建：
+**在线版本**：[mastercook777.github.io/Little-Haven/](https://mastercook777.github.io/Little-Haven/) — 只有 GitHub Actions Pages 部署成功后才代表最新提交已经上线。
 
-```bash
-npm run build
-npm run preview
-```
+## 如何观察故事
 
-构建后的静态文件在 `dist/`。**请通过本地服务器打开**，不要直接双击源码 HTML；Vite 的模块资源需要正常的 HTTP 服务。
+- 拖动旋转 / 滚轮缩放；点击居民查看身份和活动。触屏可单指旋转和双指缩放。
+- 初始阿青每天在练武坪练剑；稍后有佩剑客沈问舟沿山路走入酒肆。
+- 在 **江湖风闻** 中选择 **留客一宿** 或 **顺其自然**，影响阿青的人生路线。
+- 通过 1×、4×、12× 或 **流年（48×）** 观察少年习武、出山、风闻、归来和不同的最终建筑。
+- 不选择也可以：旅人会继续上路，阿青依然会自行开启自己的故事。
+- 打开 **守望录** 阅读重要变化；进度保存在本机浏览器，离线有上限地结算。
 
-## 操作方式
+> v0.2 使用 `little-haven-jianghu-v02` 存档键，**不会覆盖之前的 v0.1 存档**。本次是新的江湖篇章，所以从第一天开始。
 
-| 操作 | 桌面浏览器 | 触屏设备 |
-| --- | --- | --- |
-| 旋转村庄 | 按住左键拖动 | 单指拖动 |
-| 放大缩小 | 鼠标滚轮 / 工具栏 +/- | 双指缩放 / 工具栏 +/- |
-| 查看居民 | 点击居民 | 轻点居民 |
-| 守护者事件 | 在右侧信箱选择木桥或花园 | 同左 |
-| 时间流速 | 工具栏 1× / 4× / 12× | 同左 |
-| 暂停 | 工具栏 `Ⅱ` 或空格 | 工具栏 |
-| 编年史 | 山谷手记「翻阅全部记录」 | 同左 |
-| 重置存档 | 编年史底部「重新开始」 | 同左 |
-
-## 原型已经实现
-
-- 程序化微缩岛屿：地表、土层、村庄房屋、镇厅、风车、农田、集市、河流、树木、花草、路灯、绵羊与蝴蝶。
-- 正交相机、OrbitControls 旋转/缩放，缩放上限和俯仰限制。
-- 初始 8 位、最多 10 位居民：不同职业/装束/性格，基于游戏内时钟的工作、闲聊、散步、回家日程；点击查看档案。
-- 昼夜变化：光照、天空渐变、窗灯、路灯和时间显示。
-- 第一个真正有分支的守护者事件：**修建小桥 / 开辟花园**。施工进度改变 3D 模型，完成后影响人口、幸福感、居民活动区域与编年史。项目约需 43 秒（1×）或 11 秒（4×）。
-- 山谷编年史，模拟状态与渲染分离，`localStorage` 自动存档（每五秒、切换后台、关闭页面），重新打开有离线进度结算。为控制跳跃，单次恢复最多推进 120 秒现实时间等价的模拟进度。
-- 1×、4×、12× 时间倍率，暂停/继续、重置镜头和存档。
-- 核心模拟无需 Three.js，支持 Node 自带测试运行器的自动化测试。
-
-## 项目结构
+## 项目文件
 
 ```text
-src/
-  main.ts                 UI 交互、主循环、摄像机、灯光、射线拾取
-  styles.css              响应式 HUD/美术风格
-  simulation/world.ts     确定性的状态、时间、事件、居民日程与存档
-  graphics/village.ts     程序化 3D 微缩岛屿与建设进度
-  graphics/people.ts      居民 3D 模型与动画
-tests/simulation.test.mts  7 项纯逻辑测试
-docs/DESIGN.md            玩法设计、核心循环和非目标
-docs/QA.md                本次可验证项目与限制
-.github/workflows/deploy.yml  可选 GitHub Pages 发布
+src/simulation/world.ts        无浏览器依赖的时钟、居民、武侠故事状态机、存档
+src/graphics/village.ts        程序化微缩山谷、酒肆、山道、竹林、练武坪、结局建筑
+src/graphics/people.ts         村民、少年、江湖客模型及运动/练武动画
+src/main.ts                    Three.js 主循环、灯光、视角、UI 与点击交互
+src/styles.css                 桌面/移动响应式风格
+index.html                     游戏界面
+
+docs/V02_JIANGHU_BRIEF.md      本轮设计 brief
+docs/V02_SCENE_PLAN.md         山谷重构与布局规范
+docs/V02_STORY_SYSTEM.md       第一条江湖故事链及测试合同
+ROADMAP.md                     已完成和后续优先级
+AGENTS.md                      Codex 等开发代理的约束
+.agents/skills/                9 个仓库级 Three.js Game Skills
 ```
 
-## 测试
+## 测试与开发技能
 
 ```bash
-npm run test:sim
-npm run check
-npm run build
+npm run test:sim      # 9 项独立逻辑测试
+npm run check         # TypeScript 类型检查
+npm run build:pages   # Pages 生产构建
 ```
 
-其中 `npm run test:sim` 只需 Node.js 22+ 即可运行（使用实验性 TypeScript 类型剥离），不需要启动浏览器；`check` 和 `build` 需要先执行 `npm install`。
+使用已经放进仓库的 [threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) 时，从 `.agents/skills/threejs-game-director/SKILL.md` 开始，按实际需求使用 gameplay / graphics / UI / QA 同级能力。Skills 只用于帮助开发，不是玩家运行依赖，详见 `docs/SKILLS.md`。
 
-页面调试钩子 `window.__HAVEN_DEBUG__`：
+浏览器开发调试：`window.__HAVEN_DEBUG__.getState()`、`.advance(seconds)`、`.choose('host'|'observe')`、`.getRendererInfo()`、`.reset()`。
 
-```js
-__HAVEN_DEBUG__.getState()            // 当前世界存档的拷贝
-__HAVEN_DEBUG__.choose('bridge')      // 程序化触发守护者选择
-__HAVEN_DEBUG__.advance(50)           // 推进 50 实际秒等效的模拟
-__HAVEN_DEBUG__.getRendererInfo()     // 绘制调用和三角形数量
-__HAVEN_DEBUG__.reset()               // 临时重置内存世界
-```
+## 当前边界
 
-## 可选：部署 GitHub Pages
+v0.2 刻意只做一条双分支人生故事，不包括真实武功战斗、无穷江湖事件、复杂社会关系或完整自由路径规划。世界模拟与 Three.js 渲染分开，以便 v0.3 持续扩充人物和因果规则。详见 `docs/QA.md`。
 
-仓库已迁移到 `mastercook777/Little-Haven`。要正式上线公开试玩，还需要在仓库设置里启用 GitHub Pages：
+## 许可与上游引用
 
-1. 把本项目源码推送到 GitHub 仓库 `main` 分支。
-2. 打开仓库 **Settings → Pages → Build and deployment → Source**，选择 **GitHub Actions**。
-3. 工作流 `.github/workflows/deploy.yml` 会自动运行模拟测试、执行 `npm run build:pages` 并发布 `dist/`。
-4. 网页地址通常为 `https://<用户名>.github.io/Little-Haven/`。
-
-**仓库名如果不是 `Little-Haven`，请把 `vite.config.ts` 里的 `/Little-Haven/` 改为实际仓库名**。GitHub Pages 只托管静态文件；目前存档保存在用户设备本地，不会同步到云端。
-
-## Skill 工作流
-
-已将 [majidmanzarpour/threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) 的 **9 个 Codex Skills** 纳入本仓库的 `.agents/skills/`，包括 director、gameplay、graphics、UI、debug、QA 与可选素材生成工具。项目内使用请从 [`AGENTS.md`](AGENTS.md)、[`ROADMAP.md`](ROADMAP.md) 和 [`docs/SKILLS.md`](docs/SKILLS.md) 开始，并在 Codex 中调用 `$threejs-game-director`。**Skills 仅供开发代理使用，运行游戏不需要安装它们或任何额外 API。**
-
-## 目前尚未实现
-
-- 村民没有完整的碰撞/动态导航网格，日程路径采用位置插值；部分路线可能穿越建筑或河岸。
-- 没有家庭、恋爱、代际更替，也没有完整经济生产/消耗和无限村庄扩张。
-- 两个守护者分支只能选择其一，没有第二封信；这是用来验证「选择 → 可见建设 → 后续变化」的垂直切片。
-- 音效仅有可选的实验性极轻背景音，不是完成版声音设计。
-- 存档只在当前浏览器设备内有效；清理浏览器数据会丢失存档。
-- 尚未完成性能分级或在实体手机上的 FPS 测试。
-
-## License
-
-此原型源码供个人研究与继续开发。Three.js 本身依据其开源协议授权。若用于公开发布，请添加你希望使用的完整项目许可。
+Three.js 使用其开源许可。技能来源及引用见 `THIRD_PARTY_NOTICES.md`。项目本身的独立许可需由维护者确定。
