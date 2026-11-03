@@ -173,7 +173,7 @@ export function updatePeople(people:PersonModel[],state:WorldState,t:number,sele
   const alpha=1-Math.exp(-dt*8.5);
   const action=movement.activityId,walking=movement.walking;
   const hero=person.heroAnimator;
-  if(hero)hero.update(dt,walking?'walk':action==='train'?'sword-form':'idle');
+  if(hero)hero.update(Math.min(.30,rawDt),walking?'walk':action==='train'?'sword-form':'idle');
   else{
    const target=sampleCharacterPose(action,t,v.id,walking,rain);
    person.pose=interpolatePose(person.pose,target,alpha);
