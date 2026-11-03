@@ -1,9 +1,9 @@
 # 守望谷 v0.4 · 开荒纪元（Pioneer Era）
 ## 从一处篝火开始，长出一座真正有生活的武侠小镇
 
-> 状态：**正式设计基线 v1.0，尚未实施**  
+> 状态：**正式设计基线 v1.0；Phase A 已在独立 PR #10 实现工程预览并通过自动 CI，尚未合并到 main 或正式发布**  
 > 日期：2026-11-03  
-> 适用仓库：`mastercook777/Little-Haven`（v0.3.0-preview.7）  
+> 适用仓库：`mastercook777/Little-Haven`（v0.3.0-preview.7 基线；v0.4.0-alpha.1 开荒分支）  
 > 用户参考： [《放置领主：财富之城》Steam 页面](https://store.steampowered.com/app/4315040/) —— 只借鉴“从简陋聚落到繁荣城镇”的易读成长节奏，不复制具体美术、系统或固定建筑布点。  
 > 上游文档：[v0.3 生活演化](V05_LIVING_VILLAGE_VERTICAL_SLICE.md)、[Sprint 7 安全选址](V07_SPATIAL_GROWTH_PLANNING.md)、[时间与天气](V03_WORLD_FRAMEWORK.md)。
 
@@ -386,3 +386,12 @@ P0 继续使用现有一座微缩山谷，并给地形标记：可建坡度、�
 
 **作品原则（最终检查句）：**  
 **玩家关闭界面、只看一块荒谷与逐年形成的房屋、道路和居民生活时，应能感到“他们曾经在这里生活”，而不是“程序在这里摆上了房子”。**
+
+
+## Phase A 实施记录（2026-11-03，PR #10）
+
+- 源码：`src/simulation/pioneerWorld.ts` + `src/graphics/pioneerVillage.ts`；独立页面 `pioneer.html`/`src/pioneerMain.ts`；旧谷仍从 `index.html` 进入。
+- 真实数据：三位开荒者、零永久建筑、临时营火、森林/采集/水源有限资源点和再生、每日食水消耗、棚屋 `BuildIntent`、SAT 屋址、材料单次扣除、工时、地基/梁架/完工/入住以及日志。开荒 mode 不会初始化 `inn-001` 或旧谷 NPC/故事状态。
+- 存档：两个独立 v4 本地槽、严格 v4 JSON 导入、4 游戏日离线封顶；不迁移或覆盖 v3 旧谷。
+- 验证：GitHub Actions CI run `41618844450` 成功；60/60 模拟单测、TypeScript、Vite 普通及 Pages 构建成功；旧谷 Chromium 桌面/手机回归成功；v4 Chromium 1440×900 和 390×844 WebGL、开荒空白、施工中模型、首次入住、重载持久化及老酒馆保留均自动通过。v4 首间棚屋桌面渲染约 354 calls / 34216 triangles / 40 geometries（SwiftShader 测试环境）。截图保存在 CI `little-haven-v03-v04-browser` artifact。
+- **未过的人工闸门**：美术品质、真实 1× 长时间连续观察、入口道路路径的视觉可信度、工作动作真实性、移动端实体设备性能。原始动态路网、人口增长、茶棚酒肆故事仍为 Phase B/C；专业绑定角色为 Phase D。
