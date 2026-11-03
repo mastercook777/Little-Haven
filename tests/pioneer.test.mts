@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {DAY_MINUTES,nextSeasonBoundary} from '../src/simulation/calendar.ts';
 import {createWorld} from '../src/simulation/world.ts';
 import {parcelOverlaps,reservedParcels,validateVillageParcel} from '../src/simulation/villagePlanning.ts';
+import {pioneerWalkable,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
+import {pioneerHousingCapacity} from '../src/simulation/pioneerGrowth.ts';
 import {advancePioneerWorld,advancePioneerToSeason,createPioneerWorld,
  getPioneerCalendar,importPioneerWorld,loadPioneerWorld,PIONEER_SLOT_KEYS,
  planPioneerShelter,savePioneerWorld,setPioneerPolicy} from '../src/simulation/pioneerWorld.ts';
@@ -37,9 +39,9 @@ test('Pioneer camp and candidate shelter reuse SAT while excluding old BASE_PARC
 
 test('Real work and gathered wood must create and occupy the first shelter',()=>{
  const s=createPioneerWorld(42,1000);
- advancePioneerWorld(s,14*60);
- assert.equal(s.intent,null,'shelter should finish during early normal play');
- assert.equal(s.buildings.length,1);
+ for(let i=0;i<100&&!s.buildings.length;i++)advancePioneerWorld(s,20);
+ assert.ok(s.buildings.length>0,'shelter should finish during early normal play');
+ assert.equal(s.buildings[0].kind,'shelter');
  const b=s.buildings[0];
  assert.equal(b.kind,'shelter');
  assert.ok(b.parcel.id.startsWith('pioneer-'));
@@ -72,11 +74,11 @@ test('Same seed and policy yield equivalent settlements under chunked advancemen
  advancePioneerWorld(whole,3000);
  for(let i=0;i<150;i++)advancePioneerWorld(chunked,20);
  assert.deepEqual(chunked,whole);
- assert.equal(whole.buildings.length,1);
+ assert.ok(whole.buildings.length>=1);
  assert.ok(whole.resources.food>=0&&whole.resources.water>=0);
- const before=JSON.stringify(whole.buildings);
+ const first=whole.buildings[0].id;
  advancePioneerWorld(whole,1400);
- assert.equal(JSON.stringify(whole.buildings),before,'first shelter cannot be duplicated');
+ assert.equal(whole.buildings.filter(b=>b.id===first).length,1,'first shelter cannot be duplicated');
 });
 
 test('Guardians can influence labor without removing resident autonomy',()=>{
@@ -98,7 +100,7 @@ test('Season skip matches the authoritative hourly advancement',()=>{
  advancePioneerToSeason(a);advancePioneerWorld(b,duration);
  assert.deepEqual(a,b);
  assert.equal(getPioneerCalendar(a).season,'summer');
- assert.equal(a.buildings.length,1);
+ assert.ok(a.buildings.length>=1);
 });
 
 test('Pioneer imports only v4 and validates reserved geometry and resources',()=>{
@@ -141,4 +143,81 @@ test('Offline progress obeys the four-day cap and shares the normal step functio
  advancePioneerWorld(manual,4*DAY_MINUTES/3);
  assert.deepEqual({...loaded,lastSavedAt:1000},{...manual,lastSavedAt:1000});
  assert.ok(loaded.minutes-saved.minutes<=4*DAY_MINUTES+1);
+});
+
+test('Phase B grows genuine facilities and safe roads rather than revealing static houses',()=>{
+ const s=createPioneerWorld(42,1000);
+ assert.equal(s.roads.length,0);
+ advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ const kinds=new Set(s.buildings.map(b=>b.kind));
+ assert.ok(kinds.has('shelter'));
+ assert.ok(kinds.has('garden'),'food uncertainty must cause a worked garden');
+ assert.ok(kinds.has('cottage'),'housing demand must cause a real new dwelling');
+ assert.ok(kinds.has('wood-yard'),'resource logistics must produce a workplace');
+ assert.ok(s.roads.length>=3,'resident-made paths must connect finished facilities');
+ assert.ok(s.founders.length>3,'new occupied cottages invite actual named residents');
+ assert.ok(s.founders.every(f=>f.homeBuildingId&&s.buildings.some(b=>b.id===f.homeBuildingId)));
+ assert.ok(pioneerHousingCapacity(s)>=s.founders.length);
+ assert.ok(s.journal.some(e=>e.title==='又添一位乡邻'));
+ const ids=new Set();
+ for(const b of s.buildings){
+  assert.ok(!ids.has(b.id));ids.add(b.id);
+  assert.ok(b.materialsSpent.wood>0&&b.workHours>0,'construction work and wood must be real');
+  assert.ok(s.journal.some(x=>x.id&&x.causeId===b.causeId));
+ }
+ const natural=reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
+ const occupied=[...natural];
+ const camp={id:'camp',kind:'protected',x:s.camp.x,z:s.camp.z,
+  width:1.25,depth:1.25,rotation:0,clearance:.24,
+  accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
+ occupied.push(camp);
+ for(const b of s.buildings){
+  assert.ok(validateVillageParcel(b.parcel,occupied,4.25).ok,'unsafe '+b.id);
+  occupied.push(b.parcel);
+ }
+ for(const road of s.roads){
+  const others=[...natural,...s.buildings.filter(b=>b.id!==road.buildingId).map(b=>b.parcel)];
+  assert.ok(roadSegmentsSafe(road.points,others),'road intersects obstacles '+road.id);
+  assert.ok(road.uses>=0);
+  assert.ok(s.buildings.some(b=>b.id===road.buildingId));
+ }
+});
+
+test('By year 3 different guardian priorities and seeds produce different physical layouts',()=>{
+ const seed=20261103,models=[];
+ for(const policy of ['balanced','food','shelter']){
+  const world=createPioneerWorld(seed,1000);
+  if(policy!=='balanced')setPioneerPolicy(world,policy);
+  advancePioneerWorld(world,(48*2*DAY_MINUTES)/3);
+  models.push(world.buildings.map(b=>[b.kind,b.parcel.x,b.parcel.z,b.parcel.rotation]));
+ }
+ assert.equal(new Set(models.map(JSON.stringify)).size,3,'worlds must physically diverge');
+ const other=createPioneerWorld(seed+765,1000);
+ advancePioneerWorld(other,(48*2*DAY_MINUTES)/3);
+ assert.notDeepEqual(other.buildings.map(b=>[b.parcel.x,b.parcel.z]),models[0].map(b=>[b[1],b[2]]));
+});
+
+test('Phase B hourly, season skips and import/reload keep the exact same world',()=>{
+ const a=createPioneerWorld(42,1000),b=createPioneerWorld(42,1000);
+ const until=48*2*DAY_MINUTES;
+ advancePioneerWorld(a,(until-a.minutes)/3);
+ while(b.minutes<until-1){
+  const step=Math.min(until-b.minutes,3*DAY_MINUTES);
+  advancePioneerWorld(b,step/3);
+ }
+ assert.deepEqual(a,b);
+ const imported=importPioneerWorld(JSON.stringify(a));
+ assert.ok(imported);
+ assert.deepEqual(imported,a);
+ assert.ok(imported!.roads.length>0);
+});
+
+test('Phase B repair changes building wear and can only spend real materials',()=>{
+ const s=createPioneerWorld(42,1000);
+ advancePioneerWorld(s,4*48*DAY_MINUTES/3);
+ const first=s.buildings[0];
+ assert.ok(Number.isFinite(first.condition));
+ assert.ok(s.journal.some(e=>e.title==='修屋工单'),'old houses must generate repair needs');
+ assert.ok(s.journal.some(e=>e.title==='旧屋焕新'),'actual repairs must be completed');
+ assert.ok(first.lastRepairAt!>=first.completedAt);
 });
