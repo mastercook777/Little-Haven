@@ -173,6 +173,55 @@ function farmland(p:THREE.Object3D,x:number,z:number,w:number,d:number){
  for(const xx of [-w/2,w/2])block(g,xx,.50,0,.12,.82,d+.20,M.timber);
  return g;
 }
+function tradeCourt(p:THREE.Object3D,x:number,z:number){
+ const g=group(p,x,.20,z);
+ // Clearly paved courtyard and several independent merchant-use roofs, not
+ // small trim on an existing home. The district opens toward the main road.
+ for(let row=0;row<6;row++)for(let col=0;col<7;col++){
+  block(g,-2.0+col*.67,.105,-1.48+row*.59,.60,.085,.53,
+   (row+col)%3===0?M.stoneDark:M.stone);
+ }
+ silkTent(g,-1.0,-.7,M.canvas,.87);
+ silkTent(g,1.2,.75,M.cloth,.74);
+ // Open pavilion watch post visible above the ordinary house roofs.
+ for(const dx of [-1.8,1.8])for(const dz of [-1.3,1.3])
+  block(g,dx,1.05,dz,.18,1.77,.18,M.timber);
+ slopedRoof(g,4.3,3.1,2.1,1.08,M.darkRoof);
+ return g;
+}
+function fisherYard(p:THREE.Object3D,x:number,z:number){
+ const g=group(p,x,.16,z);
+ groundPad(g,0,0,4.1,3.5,M.stone);
+ // A long communal net-drying gantry, ropes and fishing baskets, rather than
+ // unrelated wooden blocks stuck onto a tavern roof.
+ for(const xx of [-1.6,1.6]){
+  block(g,xx,1.08,-.98,.15,1.85,.15,M.timber);
+  block(g,xx,1.08,.98,.15,1.85,.15,M.timber);
+ }
+ block(g,0,1.94,-.98,3.45,.13,.15,M.newTimber);
+ block(g,0,1.94,.98,3.45,.13,.15,M.newTimber);
+ for(let i=0;i<9;i++){
+  const y=1.22+i*.074;
+  block(g,0,y,-.96,3.15,.027,.035,M.cream);
+ }
+ for(let i=0;i<5;i++)block(g,-1.40+i*.70,1.58,-.96,.027,.75,.045,M.cream);
+ silkTent(g,.60,.35,M.blue,.75);
+ return g;
+}
+function orchardCourt(p:THREE.Object3D,x:number,z:number){
+ const g=group(p,x,.18,z);
+ // One landscaped, visible green district: three seasonal terrace levels
+ // and an L-shaped village garden distinct from a square stone market.
+ for(let i=0;i<4;i++){
+  block(g,0,.25+i*.10,-1.7+i*.64,5.8,.32,.52,M.earth);
+  for(let k=0;k<11;k++)sphere(g,-2.45+k*.49,.49+i*.10,-1.7+i*.64,
+   .19,.15,.22,k%2?M.cropLight:M.crop);
+ }
+ orchardTree(g,-2.6,1.25,.95);
+ orchardTree(g,2.5,-1.25,.84);
+ orchardTree(g,2.1,1.25,1.12);
+ return g;
+}
 function routeObjects(parent:THREE.Group,direction:VillageDirection){
  const foundationStage=group(parent),constructionStage=group(parent),
   landmarkStage=group(parent),thrivingStage=group(parent);
@@ -184,6 +233,7 @@ function routeObjects(parent:THREE.Group,direction:VillageDirection){
   foundation(foundationStage,8.0,-2.3,5.8,2.2);
   steps(constructionStage,7.4,-2.30);timberFrame(constructionStage,11.15,.3,3.5,3,2.0);
   stoneBridge(landmarkStage,7.85,-2.38);
+  tradeCourt(landmarkStage,10.75,4.85);
   house(landmarkStage,11.4,.10,3.5,3.1,2.55,'merchant');
   silkTent(landmarkStage,11.65,4.25,M.canvas,.93);
   house(thrivingStage,12.30,6.3,3.85,2.9,3.30,'guest');
@@ -192,7 +242,10 @@ function routeObjects(parent:THREE.Group,direction:VillageDirection){
   foundation(foundationStage,6.5,-5.55,3.9,2.0);
   timberDock(constructionStage,6.9,-5.75,3.7);
   timberDock(landmarkStage,6.75,-5.72,3.9);
+  timberDock(landmarkStage,6.7,-1.55,2.7);
   fishingBoat(landmarkStage,7.0,-5.20,1.0);
+  fishingBoat(landmarkStage,7.5,-1.05,.80);
+  fisherYard(landmarkStage,4.65,-3.75);
   house(landmarkStage,10.4,-6.1,3.40,2.72,2.12,'riverside');
   silkTent(landmarkStage,11.35,-2.45,M.blue,.96);
   house(thrivingStage,11.45,-8.2,3.1,2.40,1.92,'riverside');
@@ -202,6 +255,7 @@ function routeObjects(parent:THREE.Group,direction:VillageDirection){
   foundation(foundationStage,-10.7,-7.9,3.8,2.6);
   farmland(constructionStage,-11.0,-7.45,3.25,2.25);
   house(landmarkStage,-5.6,-8.1,3.50,2.96,2.18,'cottage');
+  orchardCourt(landmarkStage,-7.0,-2.85);
   farmland(landmarkStage,-10.75,-7.45,3.4,2.20);
   for(const [tx,tz,size] of [[-12.2,-3.15,.77],[-14.0,-1.4,.82],
     [-13.0,-5.25,.9],[-8.3,-8.40,.80]] as const)orchardTree(landmarkStage,tx,tz,size);
