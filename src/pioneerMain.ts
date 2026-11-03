@@ -1,0 +1,244 @@
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {buildPioneerVillage} from './graphics/pioneerVillage.ts';
+import {SEASON_NAMES} from './simulation/calendar.ts';
+import {WEATHER_NAMES} from './simulation/weather.ts';
+import {advancePioneerWorld,advancePioneerToSeason,createPioneerWorld,
+ getPioneerCalendar,getPioneerWeather,importPioneerWorld,loadPioneerWorld,
+ pioneerSummary,savePioneerWorld,setPioneerPolicy,PIONEER_ACTIVE_SLOT,
+ type PioneerPolicy,type PioneerWork,type PioneerWorld} from './simulation/pioneerWorld.ts';
+import './pioneer.css';
+
+const $=<T extends HTMLElement=HTMLElement>(id:string):T=>{
+ const el=document.getElementById(id);if(!el)throw new Error('Missing pioneer UI: '+id);
+ return el as T;
+};
+const canvas=$<HTMLCanvasElement>('pioneerWorld');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,
+ powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(innerWidth<760?1.35:2,devicePixelRatio||1));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.16;
+const scene=new THREE.Scene();scene.fog=new THREE.FogExp2('#d5e0d6',.010);
+const camera=new THREE.OrthographicCamera(-24,24,16,-16,.1,250);
+const defaultEye=new THREE.Vector3(29,30,39);
+camera.position.copy(defaultEye);camera.lookAt(0,0,0);
+const orbit=new OrbitControls(camera,canvas);
+orbit.target.set(0,0,0);orbit.enablePan=false;orbit.enableDamping=true;
+orbit.dampingFactor=.065;orbit.minPolarAngle=.43;orbit.maxPolarAngle=1.26;
+orbit.minZoom=.72;orbit.maxZoom=2.3;orbit.rotateSpeed=.64;
+orbit.mouseButtons.LEFT=THREE.MOUSE.ROTATE;
+orbit.touches.ONE=THREE.TOUCH.ROTATE;orbit.touches.TWO=THREE.TOUCH.DOLLY_ROTATE;
+const hemi=new THREE.HemisphereLight('#e4eeed','#a3a58b',2.15);scene.add(hemi);
+const sun=new THREE.DirectionalLight('#fff0d7',2.70);
+sun.position.set(-24,35,21);sun.castShadow=true;
+sun.shadow.mapSize.set(innerWidth<760?1024:2048,innerWidth<760?1024:2048);
+sun.shadow.camera.left=-27;sun.shadow.camera.right=27;
+sun.shadow.camera.top=22;sun.shadow.camera.bottom=-22;
+sun.shadow.camera.near=.1;sun.shadow.camera.far=110;sun.shadow.bias=-.00017;
+scene.add(sun,sun.target);
+const fill=new THREE.DirectionalLight('#c5d9cb',.55);
+fill.position.set(15,12,-18);scene.add(fill);
+function resize(){
+ const w=innerWidth,h=innerHeight,span=w<760?33:28.5,aspect=w/h;
+ camera.left=-span*aspect/2;camera.right=span*aspect/2;
+ camera.top=span/2;camera.bottom=-span/2;camera.updateProjectionMatrix();
+ renderer.setSize(w,h,false);
+}
+addEventListener('resize',resize);resize();
+let slot=1;
+try{slot=localStorage.getItem(PIONEER_ACTIVE_SLOT)==='2'?2:1;}catch{}
+let world:PioneerWorld;
+try{world=loadPioneerWorld(localStorage,Date.now(),slot);}catch{
+ world=createPioneerWorld(20261103+slot*193);
+}
+let valley=buildPioneerVillage(scene,world);
+let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
+const labels:Record<PioneerWork,string>={
+ rest:'照看营地', 'collect-wood':'林缘拾柴','forage':'入林采食',
+ 'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
+ 'shelter':'回家休息','farm':'耕作收菜','repair':'修屋补梁'
+};
+const safe=(input:string)=>input.replace(/[&<>"']/g,c=>
+ ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
+const amount=(n:number)=>n.toFixed(1).replace(/\.0$/,'');
+function toast(message:string){
+ const el=$('pioneerToast');el.textContent=message;el.classList.add('show');
+ const key=++lastToast;
+ window.setTimeout(()=>{if(lastToast===key)el.classList.remove('show');},3100);
+}
+function renderUI(){
+ const cal=getPioneerCalendar(world),weather=getPioneerWeather(world);
+ const w=world.resources;
+ $('pioneerWeather').textContent=SEASON_NAMES[cal.season]+' · '+WEATHER_NAMES[weather];
+ $('pioneerDay').textContent='第 '+cal.year+' 年 · '+SEASON_NAMES[cal.season]+' '+cal.dayOfSeason+' 日';
+ $('pioneerClock').textContent=String(cal.hour).padStart(2,'0')+':'+String(cal.minute).padStart(2,'0');
+ $('pioneerSeason').textContent='第 '+cal.year+' 年 · '+SEASON_NAMES[cal.season];
+ $('pioneerWood').textContent=amount(w.wood);$('pioneerFood').textContent=amount(w.food);
+ $('pioneerWater').textContent=amount(w.water);
+ $('pioneerStatus').textContent=pioneerSummary(world);
+ $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
+  world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
+ const intent=world.intent;
+ const cause=world.buildings.length&&!intent?
+  '有 '+world.buildings.filter(b=>b.kind==='cottage').length+
+  ' 座山居、'+world.buildings.filter(b=>b.kind==='garden').length+
+  ' 片菜圃；房屋随着岁月磨损，乡邻也会自行修葺。':
+  intent?.phase==='foundation'||intent?.phase==='frame'?
+  '搭棚工时 '+amount(intent.workDone)+' / '+amount(intent.workRequired)+'；'+
+   '已实际消耗木料 '+amount(intent.woodCommitted)+' 份。':
+  intent?.pauseReason??'营火旁尚无住屋，乡邻正筹划安全的避雨处。';
+ $('pioneerReason').textContent=cause;
+ $('founderTasks').innerHTML=world.founders.slice(0,6).map(f=>
+  '<div class="founder-task"><b>'+safe(f.name)+'</b><span>'+safe(labels[f.activity])+'</span></div>').join('');
+ for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]')))
+  btn.classList.toggle('active',btn.dataset.policy===world.policy);
+ $('pioneerJournal').innerHTML=world.journal.slice(-5).reverse().map(e=>
+  '<div class="chronicle-line"><b>'+safe(e.title)+'</b><p>'+safe(e.text)+'</p></div>').join('');
+ for(const button of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-speed]')))
+  button.classList.toggle('active',Number(button.dataset.speed)===speed);
+ $('pioneerPause').textContent=paused?'▶':'Ⅱ';
+ $('pioneerSlot1').classList.toggle('active',slot===1);
+ $('pioneerSlot2').classList.toggle('active',slot===2);
+}
+function replaceWorld(next:PioneerWorld){
+ scene.remove(valley.root);
+ // The new mode has its own scene graph; never borrow a hidden v0.3 village.
+ valley.root.traverse(object=>{
+  const mesh=object as THREE.Mesh;
+  if(mesh.isMesh||object instanceof THREE.LineSegments){
+   const geometry=(object as THREE.Mesh).geometry;
+   if(geometry&&geometry!==undefined)geometry.dispose();
+   const mat=(object as THREE.Mesh).material;
+   if(Array.isArray(mat))mat.forEach(m=>m.dispose());
+   else mat?.dispose();
+  }
+ });
+ world=next;valley=buildPioneerVillage(scene,world);
+ lastLighting='';renderUI();
+}
+function persist(){try{savePioneerWorld(world,localStorage,Date.now(),slot);}catch{}}
+function switchSlot(next:number){
+ if(next===slot)return;
+ persist();slot=next;
+ try{localStorage.setItem(PIONEER_ACTIVE_SLOT,String(slot));}catch{}
+ let loaded:PioneerWorld;
+ try{loaded=loadPioneerWorld(localStorage,Date.now(),slot);}
+ catch{loaded=createPioneerWorld(20261103+slot*193);}
+ replaceWorld(loaded);
+ toast('已进入'+(slot===1?'一号谷':'二号谷')+'，开荒存档独立保存。');
+}
+for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-speed]'))){
+ btn.addEventListener('click',()=>{speed=Number(btn.dataset.speed)||1;renderUI();});
+}
+for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]'))){
+ btn.addEventListener('click',()=>{
+  const changed=setPioneerPolicy(world,btn.dataset.policy as PioneerPolicy);
+  if(changed){renderUI();persist();toast('建议已记入守望录，乡邻会自行安排劳动。');}
+ });
+}
+$('pioneerSeasonSkip').addEventListener('click',()=>{
+ const before=world.buildings.length;advancePioneerToSeason(world);
+ renderUI();valley.update(world,world.minutes/3);persist();
+ toast(world.buildings.length>before?'流年之间，乡邻造好了第一间棚子。':
+  '时序流转，村民的每日劳动已逐时结算。');
+});
+$('pioneerPause').addEventListener('click',()=>{paused=!paused;renderUI();});
+$('pioneerCamera').addEventListener('click',()=>{
+ camera.position.copy(defaultEye);orbit.target.set(0,0,0);orbit.update();
+});
+$('pioneerZoomIn').addEventListener('click',()=>{camera.zoom=Math.min(2.3,camera.zoom*1.15);camera.updateProjectionMatrix();});
+$('pioneerZoomOut').addEventListener('click',()=>{camera.zoom=Math.max(.72,camera.zoom/1.15);camera.updateProjectionMatrix();});
+$('pioneerSlot1').addEventListener('click',()=>switchSlot(1));
+$('pioneerSlot2').addEventListener('click',()=>switchSlot(2));
+$('pioneerReset').addEventListener('click',()=>{
+ if(!confirm('确认将当前开荒槽重新开档？旧谷存档和另一个开荒槽不会受影响。'))return;
+ replaceWorld(createPioneerWorld(world.seed,Date.now()));persist();
+ toast('营火重新点起，荒谷的故事从头开始。');
+});
+$('pioneerExport').addEventListener('click',()=>{
+ persist();const data=JSON.stringify(world,null,2);
+ const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));
+ const a=document.createElement('a');a.href=url;
+ a.download='little-haven-pioneer-v04-slot-'+slot+'.json';a.click();
+ window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+ toast('开荒存档已导出。');
+});
+$('pioneerImport').addEventListener('click',()=>$<HTMLInputElement>('pioneerFile').click());
+$<HTMLInputElement>('pioneerFile').addEventListener('change',async()=>{
+ const file=$<HTMLInputElement>('pioneerFile').files?.[0];
+ $<HTMLInputElement>('pioneerFile').value='';
+ if(!file)return;if(file.size>2_000_000){toast('存档过大。');return;}
+ const parsed=importPioneerWorld(await file.text());
+ if(!parsed){toast('无效的开荒 v4 存档，旧谷存档不能导入新谷。');return;}
+ if(!confirm('导入文件将覆盖当前开荒槽，是否继续？'))return;
+ replaceWorld(parsed);persist();toast('开荒记录已恢复。');
+});
+addEventListener('keydown',event=>{
+ if(event.key===' '&&!(event.target instanceof HTMLButtonElement)){
+  event.preventDefault();$('pioneerPause').click();
+ }
+ if(event.key==='Escape'){
+  const details=document.querySelector<HTMLDetailsElement>('details.save-menu');if(details)details.open=false;
+ }
+});
+function lighting(){
+ const cal=getPioneerCalendar(world),weather=getPioneerWeather(world);
+ const key=cal.season+'/'+weather+'/'+cal.hour;
+ if(key===lastLighting)return;lastLighting=key;
+ const day=Math.max(.14,Math.min(1,Math.sin((cal.hour-5)/15*Math.PI)*1.22));
+ const sky:{[season:string]:string}={
+  spring:'#d3e9da',summer:'#b9dcca',autumn:'#e8dfc1',winter:'#d2e5e7'
+ };
+ const tint=new THREE.Color(sky[cal.season]);
+ if(weather==='rain')tint.lerp(new THREE.Color('#83969a'),.53);
+ if(weather==='fog')tint.lerp(new THREE.Color('#bac6bb'),.30);
+ if(day<.30)tint.lerp(new THREE.Color('#4e5b67'),.60);
+ scene.fog!.color.copy(tint);renderer.toneMappingExposure=.89+day*.28;
+ hemi.intensity=(.8+day*1.38)*(weather==='rain'?.82:1);
+ sun.intensity=(.27+day*2.7)*(weather==='rain'?.38:1);
+ sun.color.set(cal.season==='autumn'?'#f7cfaa':'#fff0db');
+ document.documentElement.style.setProperty('--pioneer-sky','#'+tint.getHexString());
+ $('pioneerApp').style.background='linear-gradient('+tint.getStyle()+',#f3e9d9)';
+}
+function tick(now:number){
+ const dt=Math.max(0,Math.min(.09,(now-last)/1000));last=now;
+ if(!paused){
+  const previous=world.buildings.length,previousPopulation=world.founders.length,events=world.journal.length;
+  advancePioneerWorld(world,dt*speed);
+  if(world.buildings.length>previous)toast('村民亲手完成了新设施，山谷里又添了一处生活痕迹。');
+  else if(world.founders.length>previousPopulation)toast('山谷添了新邻居，住进了真正空出的屋舍。');
+  else if(world.journal.length>events&&world.intent?.phase==='frame')
+   toast('木梁已经搭起，工地出现了新的变化。');
+ }
+ lighting();valley.update(world,world.minutes/3);orbit.update();renderer.render(scene,camera);
+ if(now-lastUI>340){lastUI=now;renderUI();}
+ if(now-lastSave>5000){lastSave=now;persist();}
+ requestAnimationFrame(tick);
+}
+let hiddenSince:number|null=null;
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden){hiddenSince=Date.now();persist();}
+ else if(hiddenSince!==null){
+  advancePioneerWorld(world,Math.min(4*1440/3,Math.max(0,(Date.now()-hiddenSince)/1000)));
+  hiddenSince=null;last=performance.now();renderUI();
+ }
+});
+addEventListener('pagehide',persist);
+renderUI();
+const debugging={
+ getState:()=>structuredClone(world),
+ advance:(seconds:number)=>{const result=advancePioneerWorld(world,seconds);
+  valley.update(world,world.minutes/3);renderUI();return result;},
+ flowSeason:()=>{const result=advancePioneerToSeason(world);
+  valley.update(world,world.minutes/3);renderUI();return result;},
+ choosePolicy:(policy:PioneerPolicy)=>{const changed=setPioneerPolicy(world,policy);
+  renderUI();return changed;},
+ reset:(seed=world.seed)=>{replaceWorld(createPioneerWorld(seed));persist();return true;},
+ getVisuals:()=>valley.signatures(),
+ getRendererInfo:()=>({calls:renderer.info.render.calls,
+  triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries})
+};
+(window as typeof window&{__PIONEER_DEBUG__?:typeof debugging}).__PIONEER_DEBUG__=debugging;
+requestAnimationFrame(tick);

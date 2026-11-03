@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
+  <meta name="theme-color" content="#f0efdf" />
+  <meta name="description" content="守望谷 · 开荒纪元。从三人一火的荒谷开始，看乡邻自己建起第一处家园。" />
+  <title>守望谷 · 开荒纪元 | Little Haven</title>
+</head>
+<body>
+<div id="pioneerApp">
+  <canvas id="pioneerWorld" aria-label="可旋转观察的开荒微缩山谷"></canvas>
+  <header class="pioneer-header">
+    <div class="identity"><span class="identity-seal">谷</span>
+      <div><span class="eyebrow">LITTLE HAVEN · PIONEER ERA</span><h1>守望谷 <small>开荒纪元</small></h1></div>
+    </div>
+    <nav class="mode-switch" aria-label="游戏模式">
+      <a href="./index.html">旧谷 · 经典观察</a><span class="mode-current">新谷 · 开荒纪元</span>
+    </nav>
+  </header>
+  <aside class="pioneer-intro">
+    <span class="eyebrow">THE FIRST FIRE</span>
+    <h2>三人一火，<br /><em>山谷从此有人家。</em></h2>
+    <p>没有酒肆，也没有预先画好的小镇。山林里的每一根木料，都将由乡邻亲自采集。</p>
+    <div class="small-note">拖动旋转 · 滚轮缩放 · 放置观察</div>
+  </aside>
+  <aside class="pioneer-panel" aria-label="营地近况">
+    <div class="panel-kicker"><span class="small-sun">✦</span> 营地手记 <span id="pioneerWeather">春 · 晴</span></div>
+    <h2 id="pioneerStatus">营火初起 · 营地尚无永久建筑</h2>
+    <p id="pioneerReason" class="reason">乡邻正商议第一间棚子。</p>
+    <div class="resource-row" aria-live="polite">
+      <div><span>木料</span><b id="pioneerWood">1</b></div>
+      <div><span>食物</span><b id="pioneerFood">5</b></div>
+      <div><span>饮水</span><b id="pioneerWater">5</b></div>
+    </div>
+    <div class="pioneer-growth" id="pioneerGrowth">三位常住乡邻 · 还没有人工乡路</div>
+    <div class="founder-heading">今时各自忙什么</div>
+    <div id="founderTasks" class="founder-tasks"></div>
+    <div class="policy-heading">守谷人 · 提一个方向</div>
+    <div class="policy-actions">
+      <button type="button" data-policy="shelter">先筑遮蔽</button>
+      <button type="button" data-policy="food">先备口粮</button>
+      <button type="button" data-policy="balanced">顺其自然</button>
+    </div>
+    <div class="panel-foot">不开口，乡邻也会自行安排生活。</div>
+  </aside>
+  <aside class="pioneer-chronicle">
+    <div class="chronicle-title"><strong>守望录</strong><span id="pioneerDay">第 1 年 · 春</span></div>
+    <div id="pioneerJournal" class="chronicle-lines" aria-live="polite"></div>
+  </aside>
+  <footer class="pioneer-toolbar">
+    <div class="clock-tile"><strong id="pioneerClock">08:20</strong><span id="pioneerSeason">第一年 · 春</span></div>
+    <div class="toolbar-group" aria-label="时间流速">
+      <button data-speed="1" class="active">1×</button><button data-speed="4">4×</button>
+      <button data-speed="12">12×</button><button id="pioneerSeasonSkip" title="推进至下一季">流年</button>
+    </div>
+    <div class="toolbar-group tools">
+      <button id="pioneerPause" title="暂停或继续">Ⅱ</button>
+      <button id="pioneerCamera" title="重置镜头">⌖</button>
+      <button id="pioneerZoomIn" title="放大">＋</button>
+      <button id="pioneerZoomOut" title="缩小">－</button>
+    </div>
+    <details class="save-menu">
+      <summary>山谷存档</summary>
+      <div class="save-popover">
+        <div class="slot-select"><button id="pioneerSlot1">一号谷</button><button id="pioneerSlot2">二号谷</button></div>
+        <button id="pioneerExport">导出当前存档</button>
+        <button id="pioneerImport">导入开荒存档</button>
+        <button id="pioneerReset" class="danger">重新开荒当前槽</button>
+        <input id="pioneerFile" type="file" accept=".json,application/json" hidden />
+      </div>
+    </details>
+  </footer>
+  <div id="pioneerToast" class="pioneer-toast" role="status"></div>
+  <div class="build-mark">v0.4 · PHASE B · LIVING SETTLEMENT</div>
+</div>
+<script type="module" src="/src/pioneerMain.ts"></script>
+</body>
+</html>

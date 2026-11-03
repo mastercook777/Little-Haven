@@ -66,3 +66,8 @@
  .village-choices .opportunity-choice{min-height:46px}
  .village-choices .opportunity-choice strong{font-size:10px}
 }
+
+/* Independent pioneer mode entry; the classic mode remains untouched. */
+.pioneer-entry-link{display:inline-block;pointer-events:auto;margin-top:17px;padding:10px 14px;border:1px solid rgba(106,134,108,.35);border-radius:12px;background:rgba(250,249,235,.73);color:#57765c;font-size:11px;font-weight:700;text-decoration:none;backdrop-filter:blur(10px)}
+.pioneer-entry-link:hover{background:#f2f3e5}
+@media(max-width:760px){.pioneer-entry-link{font-size:10px;margin-top:9px;padding:8px 10px}}

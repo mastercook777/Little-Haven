@@ -1,8 +1,18 @@
-# 守望谷 · 江湖一隅 | Little Haven v0.2
+# 守望谷 | Little Haven — v0.3 经典观察 / v0.4 开荒预览
 
 > 山外是江湖，山里有故人。守望一座以无名酒肆为中心的微缩武侠山谷，看看它如何悄悄生出故事。
 
 这是一个基于 **Three.js + TypeScript + Vite** 的观察型武侠放置网页游戏原型。程序化 Low-poly 中国山居、酒肆、竹林、练武坪、石桥；居民会按照作息行动，一名少年和一位旅人拥有可见的两结局故事链。**无需账号、素材生成 API 或后端服务器。**
+
+## v0.4 开荒纪元 · Phase A + B 公测（独立模式）
+
+- 正式页面上线后可通过首页按钮或 [开荒纪元](https://mastercook777.github.io/Little-Haven/pioneer.html) 进入。旧谷观察模式仍在主页，v3 存档不会被覆盖。
+- 从「三人一火，零永久屋舍」开始：梁伯拾柴、陆娘取水、阿禾采食；自主选址搭建第一间棚屋，材料由真实、有限且季节再生的资源点供给。
+- Phase B：屋舍与粮食需求继续推动菜圃、山居、木作棚以及旧屋修补。新居民带着姓名和工作真实入住空屋，不是单独上调人口数字。
+- 每座设施都要有需求、工单、屋檐防碰撞选址、实材、工时和日志。真实可走路网由居民工作的通勤路径产生，从踩踏路逐步成为土径，建造与人物路线不加载旧村预制路网。
+- 支持观察优先、有限的三种发展建议、1×/4×/12×/流年、四季晴雨雾、各自独立的两组开荒存档、v4 JSON 导入导出和离线时间上限。
+- 技术验收包括 3 个不同发展方向同种子/不同种子的第三年地图、空间净空、路可达、资源与人员守恒，以及实际 Chromium 桌面/390px 手机截图。浏览器 CI 通过不等于所有低端安卓设备性能已认证。
+- **当前边界**：Phase C 酒肆和江湖人物需等待真实设施门槛，尚未接入；逐点行人互相避让、长期迁址以及专业绑定角色/高端美术仍需后续打磨。阶段名不代表这些内容已经完成。
 
 ## 本地运行
 
@@ -49,9 +59,9 @@ AGENTS.md                      Codex 等开发代理的约束
 ## 测试与开发技能
 
 ```bash
-npm run test:sim      # 9 项独立逻辑测试
+npm run test:sim      # v0.3 + v0.4 模拟层逻辑回归
 npm run check         # TypeScript 类型检查
-npm run build:pages   # Pages 生产构建
+npm run build:pages   # Pages 生产构建（同时输出 index.html 和 pioneer.html）
 ```
 
 使用已经放进仓库的 [threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) 时，从 `.agents/skills/threejs-game-director/SKILL.md` 开始，按实际需求使用 gameplay / graphics / UI / QA 同级能力。Skills 只用于帮助开发，不是玩家运行依赖，详见 `docs/SKILLS.md`。
