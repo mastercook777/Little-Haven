@@ -43,6 +43,7 @@
           <button type="button" class="choice" data-choice="observe"><span class="choice-illustration">山</span><span class="choice-description"><b>顺其自然</b><small>让少年自己追寻机缘</small></span><span class="choice-arrow">↗</span></button>
         </div>
         <div class="opportunity-choices" id="opportunityChoices" hidden></div>
+        <div class="opportunity-choices village-choices" id="villageChoices" hidden></div>
         <div class="decision-progress" id="decisionProgress" hidden><div class="progress-label"><span id="progressText">建设中</span><strong id="progressPercent">0%</strong></div><div class="progress-track"><div id="progressFill"></div></div></div>
         <div class="decision-result" id="decisionResult" hidden></div>
       </div>
@@ -51,6 +52,7 @@
 
     <aside class="journal-panel">
       <div class="journal-heading"><span>✦</span><b>守望录</b><span class="journal-day" id="dayLabel">流年 · 第 1 日</span></div>
+      <div class="village-growth-status" id="valleyStatus">水脉与村路 · 等待生长</div>
       <div class="journal-content" id="journalEntries"><p>酒旗初立，山谷无名。少年仍在练习木剑。</p></div>
       <button id="journalExpand" class="text-action">翻阅全部记录 <span>↗</span></button>
     </aside>
@@ -92,7 +94,7 @@
         <div class="save-actions"><button id="exportGame">导出存档</button><button id="importTrigger">导入存档</button><button class="reset-game" id="resetGame">在当前槽重新开档</button></div>
         <input id="importFile" type="file" accept=".json,application/json" hidden />
       </div></div></div>
-    <div class="corner-credit">LITTLE HAVEN <span>·</span> LIVING VALLEY · 0.3 SPRINT 4</div>
+    <div class="corner-credit">LITTLE HAVEN <span>·</span> LIVING VALLEY · 0.3 SPRINT 5</div>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
