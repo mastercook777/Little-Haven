@@ -4,6 +4,11 @@
  */
 import {DAY_MINUTES,SEASON_MINUTES,SEASON_NAMES,getCalendarFromMinutes,nextSeasonBoundary,type CalendarView} from './calendar.ts';
 import {getWeatherForMinutes,type Weather} from './weather.ts';
+import {advanceBuildingsDay,createBuildings,startRepair,type BuildingState} from './buildings.ts';
+import {rainGuestOpportunity,roofRepairOpportunity,type Opportunity,type GuardianMemory} from './opportunities.ts';
+import {validatePlots} from './plots.ts';
+export type {BuildingState,BuildingCondition,BuildingPhase} from './buildings.ts';
+export type {Opportunity,GuardianMemory} from './opportunities.ts';
 export {DAY_MINUTES} from './calendar.ts';
 export type {Season,CalendarView} from './calendar.ts';
 export type {Weather} from './weather.ts';
@@ -21,6 +26,7 @@ export interface WorldState{
  population:number;happiness:number;houses:number;renown:number;
  choice:Decision|null;storyStage:StoryStage;storyStarted:number|null;autoChosen:boolean;
  lastDayLogged:number;lastSeasonLogged:number;journal:ChronicleEntry[];lastSavedAt:number;
+ buildings:BuildingState[];opportunities:Opportunity[];guardianMemories:GuardianMemory[];
 }
 export const MINUTES_PER_REAL_SECOND=3;
 export const STORAGE_KEY='little-haven-living-v03-slot-1';
@@ -53,6 +59,7 @@ export const VILLAGERS:Villager[]=[
 export function createWorld(now=Date.now()):WorldState{
  return {version:3,minutes:8*60+20,seed:20261103,population:8,happiness:82,houses:6,renown:0,
  choice:null,storyStage:'peace',storyStarted:null,autoChosen:false,lastDayLogged:1,lastSeasonLogged:0,lastSavedAt:now,
+ buildings:createBuildings(),opportunities:[],guardianMemories:[],
  journal:[{id:1,day:1,time:500,title:'山谷无名',text:'深山中只有几户人家、一间酒肆。少年阿青每日到竹林旁练剑，还不知外面有多大的江湖。'}]};
 }
 export function getCalendar(s:WorldState):CalendarView{return getCalendarFromMinutes(s.minutes);}
@@ -70,7 +77,77 @@ function chronicle(s:WorldState,title:string,text:string,at=s.minutes){
  const time=Math.floor(at%DAY_MINUTES);
  s.journal.push({id:(s.journal.at(-1)?.id||0)+1,day:Math.floor(at/DAY_MINUTES)+1,time,title,text});
  if(s.journal.length>100)s.journal=s.journal.slice(-100);
+ return 'journal-'+s.journal.at(-1)!.id;
 }
+
+/** Pending opportunities are not instructions to NPCs; they are optional guardian interventions. */
+export function pendingOpportunities(s:WorldState):Opportunity[]{
+ return s.opportunities.filter(o=>o.state==='available').slice(0,2);
+}
+export function buildingById(s:WorldState,id:string):BuildingState|undefined{
+ return s.buildings.find(b=>b.id===id);
+}
+function addBuildingProp(b:BuildingState,prop:string){
+ if(!b.props.includes(prop))b.props.push(prop);
+}
+export function chooseOpportunity(s:WorldState,id:string,optionId:string,automatic=false):boolean{
+ const o=s.opportunities.find(item=>item.id===id&&item.state==='available');
+ if(!o||!o.options.some(opt=>opt.id===optionId))return false;
+ const inn=buildingById(s,'inn-001');
+ if(o.kind==='roof-repair'&&(!inn||!startRepair(inn,optionId as 'roof'|'drainage'|'autonomy')))return false;
+ o.state='resolved';
+ let title='',description='';
+ if(o.kind==='rain-guest'){
+  if(!inn)return false;
+  if(optionId==='stay'){
+   addBuildingProp(inn,'guest-umbrella');inn.useScore=Math.min(100,inn.useScore+4);
+   title='雨夜留灯';description='陆娘备了热茶，在酒肆门边添起伞架，旅人有了一夜安稳。';
+  }else if(optionId==='guide'){
+   addBuildingProp(inn,'road-sign');
+   title='路口添了指路牌';description='小七按陆娘的话，在山道旁立起木牌，晚归的人不再摸黑走错路。';
+  }else{
+   addBuildingProp(inn,'warm-tea');
+   title='檐下有热茶';description='守谷人未出手，陆娘仍给过路人端了一碗热茶，炉火多亮了一夜。';
+  }
+ }else{
+  title=optionId==='roof'?'乡邻补瓦':optionId==='drainage'?'先修排水':'村民自修屋檐';
+  description=optionId==='roof'?'守谷人备下新瓦，梁伯先搭木架，乡亲们开始逐日补屋顶。':
+   optionId==='drainage'?'众人先疏通排水，梁伯支起木架，准备慢慢加固旧屋檐。':
+   '无人安排修缮，陆娘与梁伯商量后也开始了保守修补。';
+ }
+ const eventId=chronicle(s,title,description);
+ for(const id of o.buildingIds){
+  const building=buildingById(s,id);
+  if(building&&!building.causeEventIds.includes(eventId))building.causeEventIds.push(eventId);
+ }
+ s.guardianMemories.push({opportunityId:o.id,chosenOptionId:optionId,
+  resolvedAtMinutes:s.minutes,automatic,producedEventIds:[eventId]});
+ if(s.guardianMemories.length>120)s.guardianMemories=s.guardianMemories.slice(-120);
+ return true;
+}
+function addOpportunitiesForDay(s:WorldState){
+ const seasonIndex=Math.floor(s.minutes/SEASON_MINUTES),inn=buildingById(s,'inn-001');
+ if(!inn)return;
+ const present=pendingOpportunities(s).length;
+ const rainId='rain-guest-'+seasonIndex;
+ if(present<2&&getWeather(s)==='rain'&&
+  !s.opportunities.some(o=>o.id===rainId)){
+  const opportunity=rainGuestOpportunity(seasonIndex,s.minutes);
+  const cause=chronicle(s,'雨夜将至','山道起雨，陆娘看见有行脚客在酒幌下躲雨。');
+  opportunity.causeIds.push(cause);s.opportunities.push(opportunity);
+ }
+ const roofId='roof-repair-'+seasonIndex;
+ if(pendingOpportunities(s).length<2&&inn.phase==='occupied'&&inn.conditionScore<55&&
+  !s.opportunities.some(o=>o.id===roofId)&&
+  !s.opportunities.some(o=>o.kind==='roof-repair'&&o.state==='available')){
+  const opportunity=roofRepairOpportunity(seasonIndex,s.minutes);
+  opportunity.causeIds.push(chronicle(s,'酒肆旧檐待修','连日风雨使瓦色黯淡，陆娘想要为老屋准备修缮。'));
+  s.opportunities.push(opportunity);
+ }
+ // Resolved invitations stay in guardianMemories; keep the active window cheap to serialize.
+ if(s.opportunities.length>48)s.opportunities=s.opportunities.filter(o=>o.state==='available').concat(s.opportunities.filter(o=>o.state==='resolved').slice(-32));
+}
+
 /** One deliberate choice, or an explicit, recorded autonomous fallback. */
 export function chooseFate(s:WorldState,choice:Decision,automatic=false):boolean{
  if(s.storyStage!=='stranger'||s.choice!==null||!['host','observe'].includes(choice))return false;
@@ -83,25 +160,27 @@ export function chooseFate(s:WorldState,choice:Decision,automatic=false):boolean
 }
 export interface AdvanceResult{
  newDay:boolean;visitor:boolean;milestones:StoryStage[];completed:boolean;
- crossedSeasons:number;crossedYears:number;
+ crossedSeasons:number;crossedYears:number;visualChanges:string[];pendingChoices:string[];
 }
 /** Time-ordered event boundaries make stepping, batching and offline recovery converge. */
 export function advanceWorld(s:WorldState,realSeconds:number):AdvanceResult{
- const out:AdvanceResult={newDay:false,visitor:false,milestones:[],completed:false,crossedSeasons:0,crossedYears:0};
+ const out:AdvanceResult={newDay:false,visitor:false,milestones:[],completed:false,crossedSeasons:0,crossedYears:0,visualChanges:[],pendingChoices:[]};
  if(!Number.isFinite(realSeconds)||realSeconds<=0)return out;
  const startDay=getDay(s),startYear=getCalendar(s).year;
  const target=s.minutes+realSeconds*MINUTES_PER_REAL_SECOND;
  // Practical upper bound: prevent untrusted imports from locking the browser in a giant loop.
  if(!Number.isFinite(target)||target-s.minutes>DAY_MINUTES*48*20)return out;
  let iterations=0;
- while(s.minutes<target-1e-8&&iterations++<1200){
+ while(s.minutes<target-1e-8&&iterations++<1600){
   const nextSeason=nextSeasonBoundary(s.minutes);
+  const nextDay=(Math.floor(s.minutes/DAY_MINUTES)+1)*DAY_MINUTES;
+  const deadline=Math.min(Infinity,...s.opportunities.filter(o=>o.state==='available').map(o=>Math.max(s.minutes,o.deadlineMinutes)));
   const visitor=s.storyStage==='peace'&&s.minutes<=STORY_VISITOR_AT?STORY_VISITOR_AT:Infinity;
   const fallback=s.storyStage==='stranger'&&s.choice===null?Math.max(s.minutes,STORY_AUTO_CHOICE_AT):Infinity;
   const nextMilestone=s.choice===null||s.storyStarted===null?null:
    STAGE_SCHEDULE.find(([stage])=>stageIndex[s.storyStage]<stageIndex[stage]);
   const milestone=nextMilestone?Math.max(s.minutes,s.storyStarted!+nextMilestone[1]):Infinity;
-  const next=Math.min(target,nextSeason,visitor,fallback,milestone);
+  const next=Math.min(target,nextDay,nextSeason,visitor,fallback,milestone,deadline);
   if(next<s.minutes)break;
   s.minutes=next;
   if(visitor===next){
@@ -133,6 +212,22 @@ export function advanceWorld(s:WorldState,realSeconds:number):AdvanceResult{
      :'阿青在通往山外的路边修起茶亭，让风尘仆仆的人都有一处歇脚之地。');
    }
   }
+  if(deadline===next){
+   for(const opportunity of [...s.opportunities]){
+    if(opportunity.state==='available'&&opportunity.deadlineMinutes<=next)
+     chooseOpportunity(s,opportunity.id,opportunity.defaultOutcomeId,true);
+   }
+  }
+  if(nextDay===next){
+   const daily=advanceBuildingsDay(s.buildings,getCalendar(s),getWeather(s));
+   for(const change of daily){
+    const id=chronicle(s,change.title,change.text);
+    const building=buildingById(s,change.buildingId);
+    if(building&&!building.causeEventIds.includes(id))building.causeEventIds.push(id);
+    out.visualChanges.push(change.buildingId+':'+change.tag);
+   }
+   addOpportunitiesForDay(s);
+  }
   if(nextSeason===next){
    const c=getCalendar(s);out.crossedSeasons++;
    const note:Record<string,string>={
@@ -147,6 +242,7 @@ export function advanceWorld(s:WorldState,realSeconds:number):AdvanceResult{
  }
  s.lastDayLogged=getDay(s);out.newDay=s.lastDayLogged>startDay;
  out.crossedYears=Math.max(0,getCalendar(s).year-startYear);
+ out.pendingChoices=pendingOpportunities(s).map(o=>o.id);
  return out;
 }
 export function advanceToNextSeason(s:WorldState):AdvanceResult{
@@ -171,8 +267,32 @@ function valid(v:unknown):v is WorldState{
   &&!!s.storyStage&&s.storyStage in stageIndex&&[null,'host','observe'].includes(s.choice??null)
   &&(s.choice===null||Number.isFinite(s.storyStarted))&&Number.isFinite(s.lastSeasonLogged);
 }
+/** Older v3 Sprint 1 JSON has no buildings; hydrate it without erasing the story. */
+function hydrateWorld(s:WorldState):WorldState{
+ const baseline=createBuildings();
+ const incoming=Array.isArray(s.buildings)?s.buildings:[];
+ const buildings=baseline.map(def=>{
+  const old=incoming.find(x=>x&&x.id===def.id);
+  if(!old||!Number.isFinite(old.conditionScore)||!Number.isFinite(old.workProgress)||!Array.isArray(old.props)||!Array.isArray(old.causeEventIds))return def;
+  if(!['planned','foundation','construction','occupied','repairing'].includes(old.phase))return def;
+  return {...def,...old,conditionScore:Math.max(0,Math.min(100,old.conditionScore)),
+   workProgress:Math.max(0,Math.min(1,old.workProgress)),props:old.props.filter((p:unknown)=>typeof p==='string').slice(-30),
+   causeEventIds:old.causeEventIds.filter((p:unknown)=>typeof p==='string').slice(-80)};
+ });
+ const opportunities=Array.isArray(s.opportunities)?s.opportunities.filter(o=>
+  o&&typeof o.id==='string'&&Array.isArray(o.options)&&
+  ['rain-guest','roof-repair'].includes(o.kind)&&
+  ['available','resolved'].includes(o.state)&&Number.isFinite(o.deadlineMinutes)).slice(-48):[];
+ const guardianMemories=Array.isArray(s.guardianMemories)?s.guardianMemories.filter(m=>
+  m&&typeof m.opportunityId==='string'&&Array.isArray(m.producedEventIds)).slice(-120):[];
+ return {...s,buildings,opportunities,guardianMemories};
+}
 export function importWorld(raw:string):WorldState|null{
- try{const parsed:unknown=JSON.parse(raw);return valid(parsed)?parsed:null;}catch{return null;}
+ try{
+  const parsed:unknown=JSON.parse(raw);
+  if(!valid(parsed)||!validatePlots())return null;
+  return hydrateWorld(parsed);
+ }catch{return null;}
 }
 /** Migration copies the old world and preserves its branch/chronicle; never touches the v0.2 key. */
 function migrateV2(raw:string,now:number):WorldState|null{
@@ -181,7 +301,7 @@ function migrateV2(raw:string,now:number):WorldState|null{
   if(old.version!==2||!Number.isFinite(old.minutes)||!Array.isArray(old.journal)
    ||!old.storyStage||!(old.storyStage in stageIndex)||![null,'host','observe'].includes(old.choice??null))return null;
   const fresh=createWorld(now);
-  return {...fresh,...old,version:3,seed:fresh.seed,
+  return {...fresh,...old,version:3,seed:fresh.seed,buildings:createBuildings(),opportunities:[],guardianMemories:[],
    lastSeasonLogged:Math.floor((old.minutes||0)/SEASON_MINUTES),lastSavedAt:now};
  }catch{return null;}
 }
@@ -248,6 +368,17 @@ export function residentMotion(v:Villager,s:WorldState):ResidentMotion{
   const t=Math.max(0,Math.min(1,(h-10)/3));const pos=alongRoute([[13.5,2.2],BRIDGE,[6,2.2],INN],t);
   return {...pos,visible,walking:t>.02&&t<.98,practicing:false,activity:'带来一些山外的新消息'};
  }
+ const repairing=buildingById(s,'inn-001')?.phase==='repairing';
+ const buildingBench=buildingById(s,'bench-001');
+ const busy=(v.id===1||v.id===5)&&repairing;
+ if(busy&&h>=8&&h<12){
+  const pos=v.id===1?{x:-5.8,z:2.2}:{x:-1.1,z:2.4};
+  return {...pos,heading:-.75,visible:true,walking:false,practicing:false,
+   activity:'正在为酒肆搬料修屋'};
+ }
+ if(v.id===5&&buildingBench?.phase==='construction'&&h>=9&&h<12)
+  return {x:-6.6,z:2.5,heading:-.3,visible:true,walking:false,practicing:false,
+   activity:'正在帮梁伯打磨侧廊长凳'};
  const work=v.id===8?PRACTICE:v.work;
  const plaza:[number,number]=[-1.6,3.2];
  const steps:Waypoint[]=[
