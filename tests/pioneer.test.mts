@@ -52,7 +52,7 @@ test('Real work and gathered wood must create and occupy the first shelter',()=>
  const gathered=s.sites.find(x=>x.kind==='forest')!.totalGathered;
  assert.ok(Math.abs(s.resources.wood-(1+gathered-7))<.0001,'wood must be conserved');
  assert.ok(s.journal.some(e=>e.title==='商量搭棚'));
- assert.ok(s.journal.some(e=>e.title==='备齐搭棚木料'));
+ assert.ok(s.journal.some(e=>e.title==='工材送达'));
  assert.ok(s.journal.some(e=>e.title==='梁架起身'));
  assert.ok(s.journal.some(e=>e.title==='第一间棚子落成'));
 });
@@ -151,7 +151,7 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
  advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
  const kinds=new Set(s.buildings.map(b=>b.kind));
  assert.ok(kinds.has('shelter'));
- assert.ok(kinds.has('garden'),'food uncertainty must cause a worked garden');
+ assert.ok(kinds.has('garden'),'missing garden: '+JSON.stringify({intent:s.intent,resources:s.resources,sites:s.sites,founders:s.founders,buildings:s.buildings.map(b=>b.kind)}));
  assert.ok(kinds.has('cottage'),'housing demand must cause a real new dwelling');
  assert.ok(kinds.has('wood-yard'),'resource logistics must produce a workplace');
  assert.ok(s.roads.length>=3,'resident-made paths must connect finished facilities');
@@ -217,7 +217,7 @@ test('Phase B repair changes building wear and can only spend real materials',()
  advancePioneerWorld(s,4*48*DAY_MINUTES/3);
  const first=s.buildings[0];
  assert.ok(Number.isFinite(first.condition));
- assert.ok(s.journal.some(e=>e.title==='修屋工单'),'old houses must generate repair needs');
+ assert.ok(s.journal.some(e=>e.title==='修屋工单'),'missing repair: '+JSON.stringify({intent:s.intent,resources:s.resources,buildings:s.buildings.map(b=>({kind:b.kind,condition:b.condition})),journal:s.journal.slice(-4)}));
  assert.ok(s.journal.some(e=>e.title==='旧屋焕新'),'actual repairs must be completed');
  assert.ok(first.lastRepairAt!>=first.completedAt);
 });
