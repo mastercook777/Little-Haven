@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildVillage} from './graphics/village';
 import {makePeople,updatePeople} from './graphics/people';
-import {advanceToNextSeason,advanceWorld,buildingById,chapterProgress,chooseFate,chooseOpportunity,createWorld,getCalendar,getClock,getDaylight,getWeather,importWorld,loadWorld,pendingOpportunities,residentMotion,saveWorld,SLOT_KEYS,VILLAGERS,type Decision,type WorldState} from './simulation/world';
+import {advanceToNextSeason,advanceWorld,buildingById,chapterProgress,chooseFate,chooseOpportunity,chooseVillageDevelopment,DEVELOPMENT_OPTIONS,villageGrowthLabel,createWorld,getCalendar,getClock,getDaylight,getWeather,importWorld,loadWorld,pendingOpportunities,residentMotion,saveWorld,SLOT_KEYS,VILLAGERS,type Decision,type WorldState} from './simulation/world';
 import {conditionOf} from './simulation/buildings';
 import {SEASON_NAMES} from './simulation/calendar';
 import {WEATHER_NAMES} from './simulation/weather';
@@ -49,15 +49,27 @@ function renderJournal(){
  $('journalAll').innerHTML=[...world.journal].reverse().map(e=>`<div class="event-row"><div class="event-day">DAY ${String(e.day).padStart(2,'0')} <span>· ${String(Math.floor(e.time/60)).padStart(2,'0')}:${String(e.time%60).padStart(2,'0')}</span></div><h3>${escapeHtml(e.title)}</h3><p>${escapeHtml(e.text)}</p></div>`).join('');
 }
 function renderDecision(){
- const stage=world.storyStage,opportunity=pendingOpportunities(world)[0];
- const key=stage+'/'+world.choice+'/'+(opportunity?.id||'-');
+ const stage=world.storyStage,opportunity=pendingOpportunities(world)[0],growthOpen=world.villageGrowth.phase==='invitation';
+ const key=stage+'/'+world.choice+'/'+(opportunity?.id||'-')+'/'+world.villageGrowth.phase+'/'+world.villageGrowth.choice;
  if(lastDecisionKey===key)return;lastDecisionKey=key;
- const invite=stage==='stranger'&&world.choice===null&&!opportunity;
+ const invite=stage==='stranger'&&world.choice===null&&!opportunity&&!growthOpen;
  $('choices').hidden=!invite;
- $('opportunityChoices').hidden=!opportunity;
- $('decisionProgress').hidden=!!opportunity||world.choice===null||stage==='legacy';
- $('decisionResult').hidden=!!opportunity||stage!=='legacy';
- $('letterCount').textContent=opportunity?'待回应 · '+pendingOpportunities(world).length:invite?'机缘初现':stage==='legacy'?'旧事仍有新声':'流年有信';
+ $('villageChoices').hidden=!growthOpen;
+ $('opportunityChoices').hidden=!opportunity||growthOpen;
+ $('decisionProgress').hidden=growthOpen||!!opportunity||world.choice===null||stage==='legacy';
+ $('decisionResult').hidden=growthOpen||!!opportunity||stage!=='legacy';
+ $('letterCount').textContent=growthOpen?'水脉机缘 · 三条道路':opportunity?'待回应 · '+pendingOpportunities(world).length:invite?'机缘初现':stage==='legacy'?'旧事仍有新声':'流年有信';
+ if(growthOpen){
+  $('decisionTag').textContent='乡邻新愿 · 山谷如何生长';
+  $('decisionTitle').textContent='水脉与村路';
+  const days=Math.max(0,Math.ceil((world.villageGrowth.deadlineAt-world.minutes)/1440));
+  $('decisionBody').textContent='河水改变了山谷的路。村民有不同的打算，你愿意支持怎样的未来？尚有'+days+'日；无人干预，乡邻也会自行决定。';
+  $('villageChoices').innerHTML=DEVELOPMENT_OPTIONS.map((option,i)=>
+   '<button type="button" class="opportunity-choice" data-village="'+option.id+'">'+
+   '<strong>'+escapeHtml(option.label)+'</strong><small>'+escapeHtml(option.preview)+'</small>'+
+   '<span aria-hidden="true">'+(i===2?'◌':'↗')+'</span></button>').join('');
+  return;
+ }
  if(opportunity){
   $('decisionTag').textContent=opportunity.kind==='rain-guest'?'谷中结缘 · 雨夜':'谷中庇护 · 修葺';
   $('decisionTitle').textContent=opportunity.title;
@@ -98,7 +110,7 @@ function renderProgress(){
  const stage=world.storyStage;
  $('progressText').textContent=stage==='stranger'?'机缘正在萌芽':stage==='training'?'少年的剑路':stage==='departed'?'出游的日子':stage==='rumor'?'风闻传回故乡':'归乡后的打算';
 }
-function renderStats(){ $('population').textContent=String(world.population);$('houses').textContent=String(world.houses);$('renown').textContent=String(world.renown);}
+function renderStats(){ $('population').textContent=String(world.population);$('houses').textContent=String(world.houses);$('renown').textContent=String(world.renown);$('valleyStatus').textContent=villageGrowthLabel(world.villageGrowth);}
 function renderClock(){
  const c=getClock(world),h=c.hour;$('clock').textContent=c.text;$('dayLabel').textContent=formatDay();
  const cal=getCalendar(world);$('period').textContent=window.innerWidth<760?cal.year+'年'+SEASON_NAMES[cal.season]+cal.dayOfSeason+'·'+WEATHER_NAMES[getWeather(world)]:'第'+cal.year+'年 · '+SEASON_NAMES[cal.season]+cal.dayOfSeason+'日 · '+WEATHER_NAMES[getWeather(world)];
@@ -119,7 +131,17 @@ function renderResident(){
 }
 function renderBuilding(){
  const card=$('buildingCard'),b=selectedBuilding?buildingById(world,selectedBuilding):null;
- if(!b){card.hidden=true;return;}
+ if(!b){
+  const direction=selectedBuilding?.startsWith('valley-')?selectedBuilding.slice(7):'';
+  const growth=world.villageGrowth,option=DEVELOPMENT_OPTIONS.find(x=>x.id===direction);
+  if(!option||growth.choice!==direction){card.hidden=true;return;}
+  card.hidden=false;$('buildingName').textContent=option.landmark;
+  const labels={quiet:'尚未规划',invitation:'乡邻商议',foundation:'整理地基',construction:'梁架施工',landmark:'主要设施落成',thriving:'村落渐成形'};
+  $('buildingCondition').textContent=labels[growth.phase]+' · 乡邻已经劳作 '+growth.workDays+' 日';
+  $('buildingActivity').textContent='◌ 木料 '+growth.wood+' · 粮食 '+growth.food+' · 交流 '+growth.trade+' · 兴盛 '+growth.prosperity;
+  $('buildingHistory').textContent='缘由可查：守谷人与村民选择了「'+option.label+'」，发展将继续由乡邻自主完成。';
+  return;
+ }
  card.hidden=false;$('buildingName').textContent=b.name;
  const condition=conditionOf(b);
  const labels={new:'良好',livedIn:'有人住过的痕迹',worn:'屋瓦渐旧',dilapidated:'亟待修葺'};
@@ -135,11 +157,21 @@ function renderBuilding(){
 function selectBuilding(id:string|null){
  selectedBuilding=id;selected=null;renderResident();renderBuilding();
  const b=id?buildingById(world,id):null;if(b)toast('走近了'+b.name+' · 看见岁月的痕迹');
+ else if(id?.startsWith('valley-'))toast('走近了正在改变的村庄 · '+villageGrowthLabel(world.villageGrowth));
 }
 function selectResident(id:number|null){
  selectedBuilding=null;renderBuilding();selected=id;renderResident();
  const v=VILLAGERS.find(v=>v.id===id);if(v)toast('认识了 '+v.name+' · '+v.occupation);
 }
+$('villageChoices').addEventListener('click',event=>{
+ const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-village]');
+ if(!button)return;
+ const chosen=button.dataset.village as typeof DEVELOPMENT_OPTIONS[number]['id'];
+ if(chooseVillageDevelopment(world,chosen)){
+  lastDecisionKey='';renderDecision();renderJournal();renderStats();renderBuilding();village.updateStory(world);persist();
+  toast('山谷有了新方向。接下来，乡邻会逐渐改变这里的道路与建筑。');
+ }
+});
 $('opportunityChoices').addEventListener('click',event=>{
  const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-op]');
  if(!button)return;
@@ -237,7 +269,7 @@ canvas.addEventListener('pointerup',e=>{
  mouse.set(e.clientX/window.innerWidth*2-1,-(e.clientY/window.innerHeight)*2+1);raycaster.setFromCamera(mouse,camera);
  const candidates:THREE.Object3D[]=[];
  for(const p of people)if(p.group.visible)p.group.traverse(o=>{if(o instanceof THREE.Mesh&&o.geometry.type!=='CircleGeometry')candidates.push(o);});
- const hits=raycaster.intersectObjects([...candidates,...village.buildingTargets],true);
+ const hits=raycaster.intersectObjects([...candidates,...village.buildingTargets.filter(o=>o.visible)],true);
  if(hits.length){
   let target:THREE.Object3D|null=hits[0].object;
   while(target&&target.userData.villagerId===undefined&&target.userData.buildingId===undefined)target=target.parent;
@@ -308,6 +340,9 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
  reset:()=>{world=createWorld();lastDecisionKey='';renderDecision();renderJournal();renderStats();village.updateStory(world);return true;},
  flowSeason:()=>{const result=advanceToNextSeason(world);lastDecisionKey='';renderDecision();renderJournal();village.updateStory(world);return result;},
  chooseOpportunity:(id:string,option:string)=>{const result=chooseOpportunity(world,id,option);lastDecisionKey='';renderDecision();village.updateStory(world);return result;},
+ chooseVillage:(direction:'bridge'|'ferry'|'grove')=>{const result=chooseVillageDevelopment(world,direction);lastDecisionKey='';renderDecision();renderJournal();renderStats();village.updateStory(world);return result;},
+ getGrowthVisual:()=>({state:structuredClone(world.villageGrowth),signature:village.growthVisualSignature()}),
+ getTerrainProbe:(x:number,z:number)=>village.groundProbe(x,z),
  getRendererInfo:()=>({
   calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
   geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,
