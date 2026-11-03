@@ -85,7 +85,7 @@ __HAVEN_DEBUG__.reset()               // 临时重置内存世界
 
 ## 可选：部署 GitHub Pages
 
-完全不必现在部署。确定原型可玩后再建立自己的仓库即可。仓库如果命名为 `Little-Haven`：
+仓库已迁移到 `mastercook777/Little-Haven`。要正式上线公开试玩，还需要在仓库设置里启用 GitHub Pages：
 
 1. 把本项目源码推送到 GitHub 仓库 `main` 分支。
 2. 打开仓库 **Settings → Pages → Build and deployment → Source**，选择 **GitHub Actions**。
@@ -96,7 +96,7 @@ __HAVEN_DEBUG__.reset()               // 临时重置内存世界
 
 ## Skill 工作流
 
-参考 [majidmanzarpour/threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) 的开发分层：director → gameplay-systems → graphics-builder → game-ui-designer → qa-release。项目中实现了独立模拟、视觉脚本、调试钩子、自动化测试、设计简报和 QA 记录。**不需要装 Skills 才能运行游戏**。想让本机 Codex 自动调用该 Skill 包，可按上游 README 安装。
+已将 [majidmanzarpour/threejs-game-skills](https://github.com/majidmanzarpour/threejs-game-skills) 的 **9 个 Codex Skills** 纳入本仓库的 `.agents/skills/`，包括 director、gameplay、graphics、UI、debug、QA 与可选素材生成工具。项目内使用请从 [`AGENTS.md`](AGENTS.md)、[`ROADMAP.md`](ROADMAP.md) 和 [`docs/SKILLS.md`](docs/SKILLS.md) 开始，并在 Codex 中调用 `$threejs-game-director`。**Skills 仅供开发代理使用，运行游戏不需要安装它们或任何额外 API。**
 
 ## 目前尚未实现
 
