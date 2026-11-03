@@ -114,7 +114,7 @@ export function createHeroAnimator(root:THREE.Object3D):HeroAnimator{
     previous.crossFadeTo(next,.28,false);
     active=mode;
    }
-   mixer.update(Math.max(0,Math.min(.07,dt)));
+   mixer.update(Math.max(0,Math.min(.30,dt)));
   }
  };
 }
