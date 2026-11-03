@@ -6,12 +6,14 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen хо
 
 ## Source of truth
 
-1. `docs/V02_JIANGHU_BRIEF.md`: current product promise and scope.
-2. `docs/V02_SCENE_PLAN.md`: wuxia diorama art direction and camera composition.
-3. `docs/V02_STORY_SYSTEM.md`: first life-arc causal event chain, threshold contract and tests.
-4. `ROADMAP.md`: priorities, v0.2 implementation and v0.3 non-goals.
-5. `src/simulation/world.ts`: authoritative testable story and citizen state; no Three.js here.
-6. `src/graphics/`: purely visual representation; no decision rules, save or clock mutation.
+1. `ROADMAP.md`: release phases, priorities and acceptance criteria.
+2. `docs/V03_WORLD_FRAMEWORK.md`: planned calendar, season, weather and save contracts (**design only**).
+3. `docs/V03_VILLAGE_GROWTH.md`: planned building state, plots and growth contracts (**design only**).
+4. `docs/V03_PLAYER_AGENCY.md`: planned guardian interventions and replay safety (**design only**).
+5. `docs/V03_ART_DIRECTION.md`: planned art, animation and performance contracts (**design only**).
+6. `docs/V02_*.md`: current shipped v0.2 brief, scene and story baseline.
+7. `src/simulation/world.ts`: authoritative testable current state; no Three.js here.
+8. `src/graphics/`: visuals only; no save/clock/decision mutations.
 
 ## Hard rules
 
@@ -23,10 +25,13 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen хо
 - Never imply visiting travelers are permanent population. Use stage-dependent visibility.
 - Optimize for browser and mobile; don't cover the miniature world with large panels.
 - Maintain regression tests for `host`, `observe`, automated default, fast forward, and persistence.
+- v0.3: one authoritative clock, stable building IDs, causal player opportunities, recoverable offline hazards.
+- v0.3: distinguish day-scale activity from multi-year life milestones; do not regress to the v0.2 four-day life arc.
+- Treat all v0.3 markdown as planned contracts, not as code already in production; develop substantial changes on feature branches.
 
 ## Skills
 
-Read `.agents/skills/threejs-game-director/SKILL.md` and relevant siblings under `.agents/skills/` when making substantial changes. For 0.2 the most relevant are `threejs-gameplay-systems`, `threejs-aaa-graphics-builder` (authoring recipes, technical art), `threejs-game-ui-designer` and `threejs-qa-release`. See `docs/SKILLS.md` for provenance. Runtime needs none of these skills.
+Read `.agents/skills/threejs-game-director/SKILL.md` and relevant siblings under `.agents/skills/` when making substantial changes. For v0.3 the most relevant are `threejs-gameplay-systems`, `threejs-aaa-graphics-builder` (authoring recipes, technical art), `threejs-game-ui-designer` and `threejs-qa-release`. See `docs/SKILLS.md` for provenance. Runtime needs none of these skills.
 
 ## Verification / PR checklist
 
@@ -34,4 +39,5 @@ Read `.agents/skills/threejs-game-director/SKILL.md` and relevant siblings under
 - `npm run check`
 - `npm run build:pages`
 - Real desktop/browser smoke: initial vista, visitor arrival, player choice, both ending buildings, persistence/reload, no canvas blank/error. Mobile viewport when possible.
+- For v0.3: verify season/year boundaries, building wear/repair, guardian opportunities, migrations and representative real-browser captures.
 - Avoid commits of `node_modules`, `dist`, generated reports, or credentials. Document unverified items plainly.
