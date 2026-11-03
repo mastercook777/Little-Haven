@@ -247,7 +247,12 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  for(let i=0;i<48;i++){const a=i/48*Math.PI*2,r=1+.032*Math.sin(i*2.9)+.020*Math.cos(i*5.8);edge.push([Math.cos(a)*16.8*r,Math.sin(a)*12.2*r]);}
  const shape=new THREE.Shape();shape.moveTo(...edge[0]);for(let i=1;i<edge.length;i++)shape.lineTo(...edge[i]);shape.closePath();
  const dirt=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:1.75,bevelEnabled:true,bevelThickness:.28,bevelSize:.34,bevelSegments:2,steps:1}),[mat('#8b7663'),mat('#716150')]);
- dirt.rotation.x=Math.PI/2;dirt.position.y=.02;dirt.castShadow=true;dirt.receiveShadow=true;root.add(dirt);
+ dirt.rotation.x=Math.PI/2;
+  // ExtrudeGeometry's front bevel extends .28 ABOVE its origin. Previously
+  // position.y=.02 raised an opaque dirt cap to y≈.30, completely masking the
+  // recessed river and most of the new green terrain (grass y=.17).
+  // Keep the retaining walls and under-island thickness below the real top mesh.
+  dirt.position.y=-.29;dirt.castShadow=true;dirt.receiveShadow=true;root.add(dirt);
  const turfMaterial=new THREE.MeshStandardMaterial({color:'#8baa79',side:THREE.DoubleSide});
  const turf=buildCarvedTerrain(edge,turfMaterial);root.add(turf);
  // Terraced mountain silhouettes along the rear rim, away from the camera-facing tavern.
