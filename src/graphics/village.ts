@@ -143,13 +143,13 @@ function pine(p:THREE.Object3D,x:number,z:number,s:number){
 function bamboo(p:THREE.Object3D,x:number,z:number,s:number,animated:THREE.Group[]){
  const g=group(p,x,.18,z);g.scale.setScalar(s);
  for(let i=0;i<3;i++){
-  const a=i*2.4,xx=Math.cos(a)*.28,zz=Math.sin(a)*.28;const stalk=group(g,xx,0,zz);const tall=2.6+random(i+x)*1.4;
+  const a=i*2.4,xx=Math.cos(a)*.28,zz=Math.sin(a)*.28;const stalk=g;const tall=2.6+random(i+x)*1.4;
   for(let j=0;j<5;j++){
-   cylinder(stalk,.062,.075,tall/5,0,(j+.5)*tall/5,0,i%2?C.bamboo:C.bambooLight,7);
-   cylinder(stalk,.09,.09,.055,0,(j+1)*tall/5,0,C.bambooDark,7);
+   cylinder(stalk,.062,.075,tall/5,xx,(j+.5)*tall/5,zz,i%2?C.bamboo:C.bambooLight,7);
+   cylinder(stalk,.09,.09,.055,xx,(j+1)*tall/5,zz,C.bambooDark,7);
   }
   for(let j=0;j<4;j++){
-   const ang=j*1.7+i;const leaf=sphere(stalk,.44,Math.cos(ang)*.38,tall-.22+j*.10,Math.sin(ang)*.38,j%2?C.bambooLight:C.bambooDark);
+   const ang=j*1.7+i;const leaf=sphere(stalk,.44,xx+Math.cos(ang)*.38,tall-.22+j*.10,zz+Math.sin(ang)*.38,j%2?C.bambooLight:C.bambooDark);
    leaf.scale.set(.92,.16,1.95);leaf.rotation.y=ang;leaf.rotation.z=(j%2?-.30:.28);
   }
  }
