@@ -117,7 +117,8 @@ export function makeVillageCoreGrowth(parent:THREE.Object3D,
  tavern.renovated.visible=false;
  for(const slot of homes)slot.renovated.visible=false;
  update({choice:null,phase:'quiet',decisionAt:0,deadlineAt:0,chosenAt:null,
-  automatic:false,workDays:0,lastDayProcessed:0,wood:0,food:0,trade:0,prosperity:0,completedStages:[]});
+  automatic:false,workDays:0,lastDayProcessed:0,wood:0,food:0,trade:0,prosperity:0,completedStages:[],
+  plannerSeed:0,settlementLots:[],lastPlotAttemptDay:0,lastMigrationDay:0});
  return {
   update,signature:()=>signature,stage:()=>tier,
   centerBounds:()=>{
