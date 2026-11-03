@@ -175,7 +175,7 @@ export function importWorld(raw:string):WorldState|null{
 /** Migration copies the old world and preserves its branch/chronicle; never touches the v0.2 key. */
 function migrateV2(raw:string,now:number):WorldState|null{
  try{
-  const old=JSON.parse(raw) as Partial<WorldState>&{version:number};
+  const old=JSON.parse(raw) as Omit<Partial<WorldState>,'version'>&{version:number};
   if(old.version!==2||!Number.isFinite(old.minutes)||!Array.isArray(old.journal)
    ||!old.storyStage||!(old.storyStage in stageIndex)||![null,'host','observe'].includes(old.choice??null))return null;
   const fresh=createWorld(now);
