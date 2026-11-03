@@ -198,10 +198,15 @@ try{
  };
  const morning=await crowdAt('morning');
  const poseA=await page.evaluate(()=>window.__HAVEN_DEBUG__.getCharacterPose(8));
- await page.waitForTimeout(720);
+ if(!poseA||poseA.clipMode!=='sword-form')throw Error('Sword clip was not playing: '+JSON.stringify(poseA));
+ await page.waitForFunction(previous=>{
+  const pose=window.__HAVEN_DEBUG__.getCharacterPose(8);
+  return pose&&pose.clipMode==='sword-form'&&pose.clipPhase!==previous.phase
+   &&Math.abs(pose.rightArmX-previous.rightArmX)>.07;
+ },{phase:poseA.clipPhase,rightArmX:poseA.rightArmX},{timeout:12000});
  const poseB=await page.evaluate(()=>window.__HAVEN_DEBUG__.getCharacterPose(8));
- if(!poseA||!poseB||Math.abs(poseA.rightArmX-poseB.rightArmX)<.04)
-  throw Error('Practice motion not moving through phases: '+JSON.stringify({poseA,poseB}));
+ if(!poseB||Math.abs(poseA.rightArmX-poseB.rightArmX)<.07)
+  throw Error('Sword clip phase never changed: '+JSON.stringify({poseA,poseB}));
  await page.screenshot({path:out+'/sword-practice.png'});
  results.push({swordPoseDelta:Math.abs(poseA.rightArmX-poseB.rightArmX)});
 
