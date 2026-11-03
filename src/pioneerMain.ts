@@ -87,11 +87,11 @@ function renderUI(){
  $('pioneerReason').textContent=cause;
  $('founderTasks').innerHTML=world.founders.map(f=>
   '<div class="founder-task"><b>'+safe(f.name)+'</b><span>'+safe(labels[f.activity])+'</span></div>').join('');
- for(const btn of document.querySelectorAll<HTMLButtonElement>('[data-policy]'))
+ for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]')))
   btn.classList.toggle('active',btn.dataset.policy===world.policy);
  $('pioneerJournal').innerHTML=world.journal.slice(-5).reverse().map(e=>
   '<div class="chronicle-line"><b>'+safe(e.title)+'</b><p>'+safe(e.text)+'</p></div>').join('');
- for(const button of document.querySelectorAll<HTMLButtonElement>('[data-speed]'))
+ for(const button of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-speed]')))
   button.classList.toggle('active',Number(button.dataset.speed)===speed);
  $('pioneerPause').textContent=paused?'▶':'Ⅱ';
  $('pioneerSlot1').classList.toggle('active',slot===1);
@@ -124,10 +124,10 @@ function switchSlot(next:number){
  replaceWorld(loaded);
  toast('已进入'+(slot===1?'一号谷':'二号谷')+'，开荒存档独立保存。');
 }
-for(const btn of document.querySelectorAll<HTMLButtonElement>('[data-speed]')){
+for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-speed]'))){
  btn.addEventListener('click',()=>{speed=Number(btn.dataset.speed)||1;renderUI();});
 }
-for(const btn of document.querySelectorAll<HTMLButtonElement>('[data-policy]')){
+for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]'))){
  btn.addEventListener('click',()=>{
   const changed=setPioneerPolicy(world,btn.dataset.policy as PioneerPolicy);
   if(changed){renderUI();persist();toast('建议已记入守望录，乡邻会自行安排劳动。');}
@@ -175,7 +175,7 @@ addEventListener('keydown',event=>{
   event.preventDefault();$('pioneerPause').click();
  }
  if(event.key==='Escape'){
-  const details=document.querySelector('details.save-menu');if(details)details.open=false;
+  const details=document.querySelector<HTMLDetailsElement>('details.save-menu');if(details)details.open=false;
  }
 });
 function lighting(){
