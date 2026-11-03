@@ -9,12 +9,12 @@ export interface WeatherArt{
  root:THREE.Group;setWeather(weather:Weather):void;animate(t:number):void;
  mode():Weather;streakCount:number;
 }
-const rnd=(n:number)=>{let x=Math.imul(n+31,1664525)+1013904223;x=(x^(x>>>15))>>>0;return x/4294967296;};
+const rnd=(n:number)=>{let x=(n+31)>>>0;x=Math.imul(x^(x>>>16),0x85ebca6b);x=Math.imul(x^(x>>>13),0xc2b2ae35);return ((x^(x>>>16))>>>0)/4294967296;};
 export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMotion=false):WeatherArt{
  const root=new THREE.Group();parent.add(root);
  const rainGroup=new THREE.Group();root.add(rainGroup);
  const fogGroup=new THREE.Group();root.add(fogGroup);
- const count=reducedMotion?180:mobile?540:1320;
+ const count=reducedMotion?140:mobile?340:730;
  const geometry=new THREE.BufferGeometry(),vertices=new Float32Array(count*6);
  const bases=new Float32Array(count*3);
  for(let i=0;i<count;i++){
@@ -25,19 +25,19 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
  function setStreak(i:number,y:number){
   const a=i*6,x=bases[3*i],z=bases[3*i+2];
   vertices[a]=x;vertices[a+1]=y;vertices[a+2]=z;
-  vertices[a+3]=x-.20;vertices[a+4]=y-.82;vertices[a+5]=z+.055;
+  vertices[a+3]=x-.055;vertices[a+4]=y-.58;vertices[a+5]=z+.025;
  }
  for(let i=0;i<count;i++)setStreak(i,bases[3*i+1]);
  geometry.setAttribute('position',new THREE.BufferAttribute(vertices,3).setUsage(THREE.DynamicDrawUsage));
  const rain=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({
-  color:'#c4dbe1',transparent:true,opacity:.74,depthWrite:false,depthTest:true}));
+  color:'#b7d0d7',transparent:true,opacity:.41,depthWrite:false,depthTest:true}));
  rain.frustumCulled=false;rainGroup.add(rain);
  // Darkened cloud banks remain overhead / behind the buildings rather than tinting the entire UI.
- const cloud=new THREE.MeshStandardMaterial({color:'#84949b',transparent:true,opacity:.55,roughness:1,depthWrite:false});
- for(let i=0;i<6;i++){
+ const cloud=new THREE.MeshStandardMaterial({color:'#84949b',transparent:true,opacity:.19,roughness:1,depthWrite:false});
+ for(let i=0;i<5;i++){
   const puff=new THREE.Mesh(new THREE.IcosahedronGeometry(1.0,1),cloud);
-  puff.position.set(-10+i*3.6,10.1+(i%2)*.45,-9.1);
-  puff.scale.set(2.7,.65,1.15);rainGroup.add(puff);
+  puff.position.set(-9+i*4.2,7.8+(i%2)*.28,-10.1);
+  puff.scale.set(1.85,.35,.85);rainGroup.add(puff);
  }
  const rippleGeo=new THREE.RingGeometry(.62,.78,16);
  const rippleMat=new THREE.MeshBasicMaterial({color:'#d3e7e7',side:THREE.DoubleSide,transparent:true,opacity:.53,depthWrite:false});
@@ -53,7 +53,7 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
   puddle.rotation.x=-Math.PI/2;puddle.position.set(x,.294,z);
   puddle.scale.set(w,d,1);rainGroup.add(puddle);
  }
- const roofStreamMat=new THREE.LineBasicMaterial({color:'#d8e7e8',transparent:true,opacity:.72,depthWrite:false});
+ const roofStreamMat=new THREE.LineBasicMaterial({color:'#bfd8d9',transparent:true,opacity:.54,depthWrite:false});
  const dripStart:[number,number,number][]=[];
  for(let i=0;i<12;i++)dripStart.push([-5.55+i*.41,3.95,2.33]);
  for(let i=0;i<6;i++)dripStart.push([-10.4+i*.51,2.91,-4.03]);
