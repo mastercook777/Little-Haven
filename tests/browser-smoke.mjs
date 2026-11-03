@@ -137,6 +137,8 @@ try{
    const fullyGrown=await page.evaluate(()=>window.__HAVEN_DEBUG__.getGrowthVisual());
    if(fullyGrown.core.stage!==4||fullyGrown.state.phase!=='thriving')
     throw Error('Core village never reached fully grown stage: '+JSON.stringify(fullyGrown));
+   if(fullyGrown.core.collisions.length>coreBefore.collisions.length)
+    throw Error('House renovations created new inter-building clipping: '+JSON.stringify({before:coreBefore,after:fullyGrown.core}));
    await captureLandscape('four-years-grown-town-center');
    results.push({coreRenovation:{base:coreBefore,landmark:visual.core,thriving:fullyGrown.core}});
   }
