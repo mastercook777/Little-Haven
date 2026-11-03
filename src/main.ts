@@ -26,7 +26,9 @@ const fill=new THREE.DirectionalLight('#b4c5cc',.60);fill.position.set(15,10,-17
 const village=buildVillage(scene);
 const people=makePeople(scene,VILLAGERS);
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+const ACTIVE_SLOT_KEY='little-haven-v03-active-slot';
 let activeSlot=1;
+try{activeSlot=localStorage.getItem(ACTIVE_SLOT_KEY)==='2'?2:1;}catch{}
 let world:WorldState;try{world=loadWorld(window.localStorage,Date.now(),activeSlot);}catch{world=createWorld();}
 let speed=1,paused=false,selected:number|null=null,elapsed=0,last=performance.now(),lastSave=performance.now();
 let lastDaylight=-1,lastLightingKey='',lastDecisionKey='',lastChronicleId=0,lastTimeShown=-1;
@@ -143,7 +145,8 @@ function persist(){try{saveWorld(world,localStorage,Date.now(),activeSlot);}catc
 for(const slot of [1,2]){
  $('saveSlot'+slot).addEventListener('click',()=>{
   if(slot===activeSlot)return;
-  persist();activeSlot=slot;world=loadWorld(localStorage,Date.now(),activeSlot);
+  persist();activeSlot=slot;try{localStorage.setItem(ACTIVE_SLOT_KEY,String(slot));}catch{}
+  try{world=loadWorld(localStorage,Date.now(),activeSlot);}catch{world=createWorld();}
   refreshWorld();toast('走进了'+(slot===1?'一号谷':'二号谷')+'。');
  });
 }
@@ -229,6 +232,9 @@ document.addEventListener('visibilitychange',()=>{
 });
 window.addEventListener('pagehide',persist);
 renderStats();renderDecision();renderJournal();renderClock();village.updateStory(world);
+$('currentSlot').textContent=activeSlot===1?'一号谷':'二号谷';
+$('saveSlot1').classList.toggle('active',activeSlot===1);
+$('saveSlot2').classList.toggle('active',activeSlot===2);
 // Browser-level tests can inspect deterministic state without controlling the render-loop clock.
 (window as typeof window&{__HAVEN_DEBUG__?:unknown}).__HAVEN_DEBUG__={
  getState:()=>structuredClone(world),
