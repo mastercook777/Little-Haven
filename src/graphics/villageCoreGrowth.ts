@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type {VillageGrowthState,VillageDirection} from '../simulation/villageGrowth.ts';
-import {batchStaticSubtree} from './batchStatic';
+import {batchStaticSubtree} from './batchStatic.ts';
 
 /**
  * Makes the *original* village core evolve. Former versions only appended a
