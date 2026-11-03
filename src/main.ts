@@ -358,14 +358,21 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
    const x=(projected.x+1)*window.innerWidth/2,y=(1-projected.y)*window.innerHeight/2;
    const ray=new THREE.Raycaster();
    ray.setFromCamera(new THREE.Vector2(projected.x,projected.y),camera);
-   const visible=ray.intersectObject(village.riverSurface,false).length>0;
-   const allHits=ray.intersectObjects(village.root.children,true);
-   const first=allHits[0];
-   let rootName=first?.object.name||first?.object.type||'none';
-   if(first&&!rootName)rootName=first.object.parent?.name||'unnamed-mesh';
-   return {u,x,y,world:[point.x,point.y,point.z],surfaceHit:visible,
-    closestMesh:rootName,closestY:first?.point.y??null,nearestDistance:first?.distance??null,
-    riverDistance:ray.intersectObject(village.riverSurface,false)[0]?.distance??null};
+   const waterHit=ray.intersectObject(village.riverSurface,false)[0];
+   const isOpaque=(o:THREE.Object3D)=>{
+    let p:THREE.Object3D|null=o;
+    while(p){if(!p.visible)return false;p=p.parent;}
+    if(!(o instanceof THREE.Mesh))return false;
+    const materials=Array.isArray(o.material)?o.material:[o.material];
+    return materials.some(m=>!m.transparent||m.opacity>=.92);
+   };
+   const nearest=ray.intersectObjects(village.root.children,true)
+    .find(hit=>isOpaque(hit.object));
+   const unobstructed=!!waterHit&&(!nearest||waterHit.distance<=nearest.distance+.09);
+   return {u,x,y,world:[point.x,point.y,point.z],surfaceHit:!!waterHit,
+    unobstructed,closestMesh:nearest?.object.name||nearest?.object.type||'none',
+    closestY:nearest?.point.y??null,nearestDistance:nearest?.distance??null,
+    riverDistance:waterHit?.distance??null};
   });
   return {surfaceY:village.riverSurfaceY,surfaceName:village.riverSurface.name,samples};
  },
