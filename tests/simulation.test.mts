@@ -500,3 +500,27 @@ test('sprint5: clip mixer crossfades modes and drives named wrist, hip and arm j
  anim.update(.05,'walk');
  assert.equal(anim.currentMode(),'walk');
 });
+
+
+test('sprint5: completed districts change how real residents commute and work',()=>{
+ const cases=[
+  {direction:'bridge',villager:VILLAGERS[4],x:10.7,z:4.55,target:'valley-bridge'},
+  {direction:'ferry',villager:VILLAGERS[6],x:7.1,z:-5.4,target:'valley-ferry'},
+  {direction:'grove',villager:VILLAGERS[2],x:-3.9,z:8.1,target:'valley-grove'}
+ ] as const;
+ for(const item of cases){
+  const before=createWorld(0);
+  const base=dailyRoutePoints(item.villager,99);
+  to(before,24*DAY_MINUTES+600);
+  assert.equal(chooseVillageDevelopment(before,item.direction),true);
+  to(before,100*DAY_MINUTES+600);
+  assert.ok(['landmark','thriving'].includes(before.villageGrowth.phase));
+  const route=dailyRoutePoints(item.villager,99,before.villageGrowth);
+  assert.notDeepEqual(route,base);
+  const end=route.at(-1)!;
+  assert.equal(end[0],item.x);assert.equal(end[1],item.z);
+  const work=residentMotion(item.villager,before);
+  assert.equal(work.interactionTargetId,item.target);
+  assert.ok(Math.hypot(work.x-item.x,work.z-item.z)<.01);
+ }
+});
