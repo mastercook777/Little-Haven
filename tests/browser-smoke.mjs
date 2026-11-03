@@ -110,4 +110,7 @@ try{
 }finally{
  if(browser)await browser.close();
  child.kill('SIGTERM');
+ // npm may leave a Vite grandchild holding stdout pipes open on CI.
+ await delay(200);
+ process.exit(process.exitCode||0);
 }
