@@ -84,3 +84,6 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
 }
 @media(max-width:400px){.pioneer-panel{bottom:143px}.pioneer-chronicle{bottom:143px}.toolbar-group button{padding:6px 7px}.toolbar-group.tools button{padding:5px 6px}}
 @media(prefers-reduced-motion:reduce){.pioneer-toast{transition:none}}
+
+.pioneer-growth{padding:9px 0 2px;color:#6f8772;font-size:11px;line-height:1.6;text-align:center;font-weight:700}
+@media(max-width:760px){.pioneer-growth{padding:4px 0 0;font-size:9px}.founder-tasks{max-height:110px;overflow-y:auto}}
