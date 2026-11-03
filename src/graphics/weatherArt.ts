@@ -33,9 +33,12 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
   color:'#b7d0d7',transparent:true,opacity:.41,depthWrite:false,depthTest:true}));
  rain.frustumCulled=false;rainGroup.add(rain);
  // Darkened cloud banks remain overhead / behind the buildings rather than tinting the entire UI.
+ const cloudGeo=new THREE.IcosahedronGeometry(1,1);
+ const fogGeo=new THREE.IcosahedronGeometry(1.1,1);
+ const poolGeo=new THREE.CircleGeometry(1,24);
  const cloud=new THREE.MeshStandardMaterial({color:'#84949b',transparent:true,opacity:.19,roughness:1,depthWrite:false});
  for(let i=0;i<5;i++){
-  const puff=new THREE.Mesh(new THREE.IcosahedronGeometry(1.0,1),cloud);
+  const puff=new THREE.Mesh(cloudGeo,cloud);
   puff.position.set(-9+i*4.2,7.8+(i%2)*.28,-10.1);
   puff.scale.set(1.85,.35,.85);rainGroup.add(puff);
  }
@@ -49,7 +52,7 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
  const poolMat=new THREE.MeshStandardMaterial({color:'#638d91',metalness:.10,roughness:.22,transparent:true,opacity:.74,depthWrite:false,side:THREE.DoubleSide});
  for(const [x,z,w,d] of [[-6.15,3.8,1.3,.63],[-3.4,4.3,.86,.5],[-8.0,-2.9,1.0,.38],
   [3.7,2.4,1.35,.5],[6.3,2.9,.95,.37],[-10.1,5.5,.67,.35]] as const){
-  const puddle=new THREE.Mesh(new THREE.CircleGeometry(1,24),poolMat);
+  const puddle=new THREE.Mesh(poolGeo,poolMat);
   puddle.rotation.x=-Math.PI/2;puddle.position.set(x,.294,z);
   puddle.scale.set(w,d,1);rainGroup.add(puddle);
  }
@@ -68,7 +71,7 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
  // Fog stays in the valley floor: landmarks remain readable above a mist bank.
  const mistMat=new THREE.MeshBasicMaterial({color:'#d5dedc',transparent:true,opacity:.26,depthWrite:false});
  for(let i=0;i<7;i++){
-  const puff=new THREE.Mesh(new THREE.IcosahedronGeometry(1.1,1),mistMat);
+  const puff=new THREE.Mesh(fogGeo,mistMat);
   puff.position.set(-14+i*4.25,.55,-8+(i%3)*7);
   puff.scale.set(2.6,.32,1.6);fogGroup.add(puff);
  }
