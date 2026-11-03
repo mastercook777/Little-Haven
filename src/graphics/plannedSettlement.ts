@@ -45,10 +45,25 @@ function createLot(root:THREE.Group,lot:VillageParcel,windows:THREE.MeshStandard
  // Reuse the same complete-shape factory as the rebuilt core rather than
  // adding box trim over the existing, already rendered roof.
  const variant=lot.kind==='workshop'?1:lot.kind==='store'?2:
-  Math.abs(Math.round(lot.x*5+lot.z*7))%4;
+  Math.abs(Math.round(lot.x*5+lot.z*7))%2===0?0:3;
  createMountainHome(finished,0,0,w,d,lot.kind==='workshop'?1.68:1.48,
   variant,windows,emissive);
+ // This is the actual rendered model's full roof, veranda and step envelope,
+ // NOT its nominal wall footprint. Center the whole building so the reserved
+ // planner rectangle encloses both the front porch and the rear eaves.
+ finished.updateWorldMatrix(true,true);
+ const envelope=new THREE.Box3().setFromObject(finished);
+ const offsetX=-(envelope.min.x+envelope.max.x)/2;
+ const offsetZ=-(envelope.min.z+envelope.max.z)/2;
+ const actualWidth=envelope.max.x-envelope.min.x;
+ const actualDepth=envelope.max.z-envelope.min.z;
+ if(actualWidth>lot.width+lot.clearance*2+.02||
+    actualDepth>lot.depth+lot.clearance*2+.02)
+  throw new Error('Model footprint larger than reserved parcel: '+lot.id+
+   ' roof '+actualWidth.toFixed(2)+'×'+actualDepth.toFixed(2)+
+   ' reserved '+lot.width.toFixed(2)+'×'+lot.depth.toFixed(2));
  for(const layer of [foundation,frame,finished]){
+  layer.position.x=offsetX;layer.position.z=offsetZ;
   batchStaticSubtree(layer,{disposeOriginals:false});layer.visible=false;
  }
  return {group:site,foundation,frame,finished,age:0,phase:'foundation'};
