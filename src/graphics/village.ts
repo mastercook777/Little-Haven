@@ -287,7 +287,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  // Roof snow now derives from the actual mesh profile, not old absolute Y
  // coordinates that floated above the rebuilt tavern and home rooftops.
  const seasonallyFrostedRoofs:THREE.Object3D[]=[];
- root.traverse(o=>{if(o.userData.seasonalRoofSnow)seasonallyFrostedRoofs.push(o);});
+
  for(const [x,z] of [[-13.0,-4.2],[-12.7,1.9],[.4,-8.7],[3.3,9.3],[11.8,5.1]] as const){
   const patch=sphere(winterTrim,.52,x,.225,z,frost);patch.scale.set(1,.07,.76);
  }
@@ -309,6 +309,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
   typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
  const buildingRenderer=makeBuildingRenderer(root);
  const growthArt=buildVillageEvolution(root);
+ root.traverse(o=>{if(o.userData.seasonalRoofSnow)seasonallyFrostedRoofs.push(o);});
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
