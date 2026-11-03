@@ -97,7 +97,7 @@ export function advanceBuildingsDay(buildings:BuildingState[],calendar:CalendarV
    changes.push({buildingId:b.id,title:'院里晾起衣裳',text:'秦婶将洗净的衣裳挂在竹竿上，院落终于有了人住的模样。',tag:'life'});
   }
   // The one unprompted home repair ensures non-intervention still preserves village life.
-  if(b.type==='home'&&b.conditionScore<43&&!b.props.includes('autonomous-repair-started')){
+  if(b.type==='home'&&b.conditionScore<43){
    if(startRepair(b,'autonomy')){
     addProp(b,'autonomous-repair-started');
     changes.push({buildingId:b.id,title:'乡邻合力修屋',text:'柳下小屋屋檐旧了，梁伯和秦婶商量后自发开始修补。',tag:'repair'});
