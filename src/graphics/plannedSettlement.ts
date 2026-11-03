@@ -59,13 +59,15 @@ function createLot(root:THREE.Group,lot:VillageParcel,windows:THREE.MeshStandard
  const rotated=Math.abs(Math.sin(lot.rotation))>.5;
  const actualWidth=rotated?along:across;
  const actualDepth=rotated?across:along;
- if(actualWidth>lot.width+lot.clearance*2+.02||
-    actualDepth>lot.depth+lot.clearance*2+.02)
-  throw new Error('Model footprint larger than reserved parcel: '+lot.id+
-   ' roof '+actualWidth.toFixed(2)+'×'+actualDepth.toFixed(2)+
-   ' reserved '+lot.width.toFixed(2)+'×'+lot.depth.toFixed(2));
+ // An awning or porch can overhang beyond the nominal wall shape.
+ // Derive the final fit from the actual rendered mesh, never silently permit
+ // the eaves to violate the clearance that the sim reserved for this parcel.
+ const fit=Math.min(1,(lot.width+lot.clearance*2-.12)/actualWidth,
+  (lot.depth+lot.clearance*2-.12)/actualDepth);
+ if(fit<.76)throw new Error('Building asset cannot fit reserved lot '+lot.id);
  for(const layer of [foundation,frame,finished]){
-  layer.position.x=offsetX;layer.position.z=offsetZ;
+  layer.scale.x=fit;layer.scale.z=fit;
+  layer.position.x=offsetX*fit;layer.position.z=offsetZ*fit;
   batchStaticSubtree(layer,{disposeOriginals:false});layer.visible=false;
  }
  return {group:site,foundation,frame,finished,age:0,phase:'foundation'};
