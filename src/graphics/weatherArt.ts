@@ -33,18 +33,11 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
   color:'#b7d0d7',transparent:true,opacity:.41,depthWrite:false,depthTest:true}));
  rain.frustumCulled=false;rainGroup.add(rain);
  // Darkened cloud banks remain overhead / behind the buildings rather than tinting the entire UI.
- const cloudGeo=new THREE.IcosahedronGeometry(1,1);
  const fogGeo=new THREE.IcosahedronGeometry(1.1,1);
  const poolGeo=new THREE.CircleGeometry(1,24);
- const cloud=new THREE.MeshStandardMaterial({color:'#84949b',transparent:true,opacity:.19,roughness:1,depthWrite:false});
- for(let i=0;i<5;i++){
-  const puff=new THREE.Mesh(cloudGeo,cloud);
-  puff.position.set(-9+i*4.2,7.8+(i%2)*.28,-10.1);
-  puff.scale.set(1.85,.35,.85);rainGroup.add(puff);
- }
- const rippleGeo=new THREE.RingGeometry(.62,.78,16);
- const rippleMat=new THREE.MeshBasicMaterial({color:'#d3e7e7',side:THREE.DoubleSide,transparent:true,opacity:.53,depthWrite:false});
- const splashCount=mobile?22:44;
+ const rippleGeo=new THREE.RingGeometry(.23,.30,14);
+ const rippleMat=new THREE.MeshBasicMaterial({color:'#d3e7e7',side:THREE.DoubleSide,transparent:true,opacity:.30,depthWrite:false});
+ const splashCount=mobile?12:22;
  const splashes=new THREE.InstancedMesh(rippleGeo,rippleMat,splashCount);
  const dummy=new THREE.Object3D();
  splashes.frustumCulled=false;rainGroup.add(splashes);
@@ -92,7 +85,7 @@ export function createWeatherArt(parent:THREE.Object3D,mobile:boolean,reducedMot
     const x=-12+rnd(i*41+2)*25,z=-9+rnd(i*23+1)*18;
     const phase=(t*1.9+rnd(i*7)*2.1)%2.1;
     dummy.position.set(x,.32,z);dummy.rotation.set(-Math.PI/2,0,0);
-    dummy.scale.setScalar(.2+phase*.45);dummy.updateMatrix();splashes.setMatrixAt(i,dummy.matrix);
+    dummy.scale.setScalar(.45+phase*.38);dummy.updateMatrix();splashes.setMatrixAt(i,dummy.matrix);
    }
    splashes.instanceMatrix.needsUpdate=true;
   }else if(current==='fog'){
