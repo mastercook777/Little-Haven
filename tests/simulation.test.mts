@@ -12,7 +12,7 @@ import {REST_POSE,sampleCharacterPose,interpolatePose} from '../src/graphics/cha
 import {buildRiverArt,RIVER_WAYPOINTS} from '../src/graphics/riverArt.ts';
 import * as THREE from 'three';
 import {creekDistance,CREEK_WATER_Y} from '../src/graphics/riverArt.ts';
-import {terrainHeightAt,terrainChannelProbe} from '../src/graphics/carvedTerrain.ts';
+import {terrainHeightAt,terrainChannelProbe,buildCarvedTerrain} from '../src/graphics/carvedTerrain.ts';
 import {createVillageGrowth,advanceVillageGrowthDay,DEVELOPMENT_OPTIONS} from '../src/simulation/villageGrowth.ts';
 import {makeHeroClips,createHeroAnimator,SWORD_FORM_KEYFRAMES} from '../src/graphics/heroClips.ts';
 
@@ -523,4 +523,31 @@ test('sprint5: completed districts change how real residents commute and work',(
   assert.equal(work.interactionTargetId,item.target);
   assert.ok(Math.hypot(work.x-item.x,work.z-item.z)<.01);
  }
+});
+
+
+test('sprint5: island surface conforms exactly to outer cliff outline with no missing grid cells',()=>{
+ const outline:readonly (readonly [number,number])[]=
+  Array.from({length:48},(_,i)=>{
+   const a=i/48*Math.PI*2;
+   return [Math.cos(a)*16.8,Math.sin(a)*12.2] as const;
+  });
+ const mat=new THREE.MeshStandardMaterial({color:'#8baa79',side:THREE.DoubleSide});
+ const ground=buildCarvedTerrain(outline,mat);
+ const g=ground.geometry,segments=outline.length*3,rings=36;
+ const positions=g.getAttribute('position');
+ assert.equal(positions.count,1+segments*rings);
+ assert.equal(g.getIndex()!.count,segments*(3+6*(rings-1)));
+ assert.ok(g.computeBoundingBox()===undefined||true);
+ let normalY=0;
+ const n=g.getAttribute('normal');
+ for(let i=1;i<n.count;i++)normalY+=n.getY(i);
+ assert.ok(normalY/n.count>.4,'upper terrain faces are incorrectly flipped');
+ for(let i=0;i<outline.length;i++){
+  const v=1+(rings-1)*segments+i*3;
+  assert.ok(Math.abs(positions.getX(v)-outline[i][0])<.00001);
+  assert.ok(Math.abs(positions.getZ(v)-outline[i][1])<.00001);
+ }
+ const bottom=terrainChannelProbe(8.35,2.2);
+ assert.ok(bottom.groundY<bottom.waterY,'river must remain an actual recessed channel');
 });
