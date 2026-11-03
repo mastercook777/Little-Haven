@@ -13,9 +13,9 @@ Open this repository as the Codex project and ask:
 
 ```
 Use $threejs-game-director and the relevant sibling skills to implement the
-v0.2 autonomous village-development loop. Preserve the v0.1 pastel visual
-identity; start from ROADMAP.md and AGENTS.md. Keep simulation independent from
-Three.js, add tests, and verify that choices alter the visible world.
+v0.2 Jianghu tavern life-arc prototype. Follow the wuxia scene and story
+briefs in docs/V02_*.md and the guardrails in AGENTS.md. Keep the simulated
+Jianghu independent from Three.js, add tests, and verify both endings visually.
 ```
 
 If your Codex environment does not automatically discover repository-local skills, the upstream-supported global installation is:

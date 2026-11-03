@@ -1,36 +1,33 @@
-# v0.1 QA / Verification Evidence
+# 守望谷 v0.2 QA & release record
 
-## 已运行的检查（本次生成环境）
+## Automated tests
 
-- `npm run test:sim`：**通过，7/7**。覆盖初始状态、木桥分支、花园分支、居民时间表变化、存档/离线结算、无效存档与不合法时间推进。
-- TypeScript 语法级转译：通过（使用环境内全局 TypeScript 的 `transpileModule` 检查所有 `.ts` 文件）。
-- 静态项目检查：检查了 Vite 项目结构、HTML 中的交互 ID、GitHub Pages 资源前缀和工作流配置。
+Simulation tests in `tests/simulation.test.mts` verify initial state, visitor timing, two distinct branches, passive automatic default, deterministic threshold order under large vs small deltas, character stage visibility, persistence and old save namespace preservation, and bad-input fallback.
 
-## 尚不能证明的项目
-
-环境无法访问 npm Registry，`npm install --offline` 返回 `ENOTCACHED`（依赖不在本机缓存）。因此此处**未能执行 `npm run build`，也未能真正载入 Three.js WebGL 页面执行 Chromium/Playwright 画面、操作、性能回归**。静态模拟通过并不等于整个前端已通过浏览器验收。开发者应在可连接 npm 的环境中依次运行：
+Commands:
 
 ```bash
-npm install
+npm run test:sim
 npm run check
-npm run build
-npm run dev
+npm run build:pages
 ```
 
-手动验收目标：
-1. 1440×900 桌面浏览器能够看到完整村庄（不是空白画布）；无控制台报错。
-2. 旋转、缩放、点击居民正常；浏览器设备像素比为 1/2 时画面正常。
-3. 点击修桥，切换到 4×，在约 11 秒内看到成桥、人口 8→10、编年史更新；重置存档后选花园能看到不同建筑结果。
-4. 等待夜间，屋灯与路灯变暖，村民按时回家；1× / 4× / 12× 和暂停生效。
-5. 刷新页面后保留选择、建设进度、人口和日志；浏览器后台 30 秒再回来能结算进度。
-6. 390×844 手机上 UI 不遮挡全部可拖动地图，点击守护者事件和工具栏可用。
-7. 观察 `__HAVEN_DEBUG__.getRendererInfo()` 的 calls/triangles，并按设备实际性能进行批量化优化。
+The first command needs Node 22 and no installed dependencies. The other two need npm to install Vite, TypeScript and Three.js.
 
-## 尚无的证据
+## Browser acceptance scenarios
 
-- 截图及像素质量分数；
-- GPU 渲染性能和移动设备 FPS；
-- 自动化浏览器执行的交互证据；
-- 正式生产构建产物 `dist/`。
+1. Fresh launch: scene shows gray tiled tavern and wine sign, bridge, bamboo, exercise ground and residents, no blank canvas.
+2. 1× / 4× / 12× / 流年 speed and pause work; changing viewpoint does not break resident picking.
+3. After the visitor event, both guardian choices can be clicked. UI updates from the world state.
+4. Host ending visibly adds the sword study; Observe ending adds a tea pavilion on the east bank.
+5. A-Qing is absent in `departed`/`rumor` and visible again in `returned`/`legacy`.
+6. Reload preserves story and chapter, and `little-haven-prototype-v01` remains untouched.
+7. Test desktop 1440×900 and touch viewport 390×844, including long Chinese strings.
 
-这些事项需要在依赖可下载、WebGL 可用的环境中补齐，不能将模拟测试通过表述成完整游戏验收通过。
+## Residual limitations
+
+- A story arc can be observed in fast forward, but the game is not yet a repeatable, infinite wuxia narrative engine.
+- Residents walk between routine destinations by linear paths; no complete navmesh, collision system or crowds.
+- No real combat, intergenerational systems, cross-device save or AI-generation cost.
+- Roadside traveler uses a simple waypath and the bridge; movement between all ordinary home/job points is not guaranteed to avoid every obstruction.
+- Very long inactive sessions cap each offline catch-up to 120 real seconds equivalent; there is no silent destructive event.

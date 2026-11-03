@@ -1,26 +1,33 @@
-# Little Haven — Development Roadmap
+# 守望谷 | Development Roadmap
 
-## v0.1: Living Valley (baseline)
-- [x] Pastel procedural Three.js diorama, orbit/zoom and camera reset
-- [x] Resident schedules and simple activity animation
-- [x] Day/night cycle, adjustable time speed, pause and local save
-- [x] One mutually exclusive guardian decision: bridge vs. garden
-- [x] Visible construction progress and valley chronicle
-- [x] Pure simulation regression tests
-- [ ] Verify installed production build in CI and actual WebGL/mobile browser QA
+## v0.1 — Living Valley (archive)
 
-## v0.2: The Valley Grows (P0)
-1. **Autonomous development loop.** Resource/need -> villager proposal -> support/decline -> construction -> new activity -> next proposal; repeatable without resetting the game.
-2. **Resident navigation.** Use simple walkable graph/navmesh with obstacle and shoreline avoidance. Movement should follow consistent paths instead of passing through houses.
-3. **Lived-in interactions.** Two or more residents can meet, chat and then resume independent routines. Player can zoom in to discover their work and short-term goals.
-4. **Consequences.** Guardian decisions should meaningfully affect visible construction, NPC destinations and journal, with at least two distinct branch outcomes.
-5. **Testing.** Add determinism, persistence, offline-resume and automated browser smoke checks (desktop first, mobile if available).
+- [x] Bright Low-poly island prototype, orbital camera and resident routine
+- [x] One-shot bridge/garden guardian choice; local save and chronicle
+- [x] 7 logic tests and GitHub Actions build
 
-## Later possibilities (not v0.2 commitments)
-- Natural footpath growth based on traffic; evolving market spaces
-- Resident relationships, memory, multi-generational history
-- Multiple village characters (merchant outpost, farming hamlet, fortress)
-- Seasonal rituals and richer miniature storytelling
+## v0.2 — 江湖初现 / The Mountain Tavern
+
+- [x] Design brief, scene art specification, first causal story design
+- [x] Procedural Chinese timber-and-tile buildings, tavern with wine banner, lanterns, bamboo, practice ground, bridge, mountain path
+- [x] Named wuxia villagers, training animation, traveler and merchant visibility
+- [x] Story system: visitor, guardian choice, sword study, departure, rumor, return, and branching building outcomes
+- [x] Autonomous fallback when the player ignores the invitation
+- [x] New save namespace; no destruction of v0.1 progress
+- [x] Story-specific UI and fast-forward, chronicle and resident details
+- [x] Deterministic simulation regression tests
+- [ ] Finish CI TypeScript/Vite build and Pages release verification
+- [ ] Capture active-play browser screenshots, test both branches visually, check touch layouts and frame budget
+
+## v0.3 — 江湖因缘 (next)
+
+1. Replace one-off plot with **composable storylets**: visitor occupation, personality, intention, relation and world tension act as inputs.
+2. Expand resident relationships and return-from-travel state, without making every resident a legendary hero.
+3. Add a repeatable tavern traveler loop; one visitor can influence later visits and word-of-mouth.
+4. Introduce gradual visible growth of facilities based on social/use conditions, rather than stat-only unlocks.
+5. Add simple path graph / non-intersecting routes and resident conversations.
+6. Begin long-horizon lightweight choices: shelter, rumors, safety and scarcity, with warning/recovery rather than destructive idle punishment.
 
 ## Design guardrail
-Do not chase more buildings, larger maps, elaborate economy or AAA assets before the first repeatable self-growth loop is fun to watch.
+
+Maintain the visual center: an ordinary tavern and ordinary lives. No elaborate martial arts combat, distant open-world rendering, AI API or faction simulator until the first life arc is enjoyable to **watch**.

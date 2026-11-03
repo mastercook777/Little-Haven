@@ -1,64 +1,83 @@
 import * as THREE from 'three';
-import { type Villager,type WorldState,residentMotion } from '../simulation/world';
+import {type Villager,type WorldState,residentMotion} from '../simulation/world';
 
-const mat=(color:string)=>new THREE.MeshStandardMaterial({color,roughness:1});
-const skin=mat('#ebc5a5'),face=mat('#493e34'),shoes=mat('#6c635c');
-const skinVariants=[mat('#e8bd99'),mat('#c99575'),mat('#f0cda8'),mat('#d7ac8c')];
-function piece(parent:THREE.Group,geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number){
+const fabric=new Map<string,THREE.MeshStandardMaterial>();
+const mat=(color:string)=>{let m=fabric.get(color);if(!m){m=new THREE.MeshStandardMaterial({color,roughness:1});fabric.set(color,m);}return m;};
+const skinColors=['#e7be9f','#d4a484','#eac6a6','#cfa18a'];
+function piece(parent:THREE.Object3D,geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number){
  const o=new THREE.Mesh(geometry,material);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;
 }
-export interface PersonModel {villager:Villager;group:THREE.Group;legs:THREE.Group[];arms:THREE.Group[];}
+export interface PersonModel {villager:Villager;group:THREE.Group;legs:THREE.Group[];arms:THREE.Group[];grownGear:THREE.Group|null;}
 export function makePeople(scene:THREE.Scene,villagers:Villager[]):PersonModel[]{
- return villagers.map((villager)=>{
-   const g=new THREE.Group();g.userData.villagerId=villager.id;scene.add(g);
-   const skinColor=skinVariants[(villager.id-1)%skinVariants.length];
-   const shirt=mat(villager.color),hair=mat(villager.hair);
-   const torso=piece(g,new THREE.CylinderGeometry(.18,.24,.52,8),shirt,0,.69,0);torso.rotation.z=-.04;
-   // Apron/vest, neck scarf and tiny buttons make the characters readable at scale.
-   piece(g,new THREE.BoxGeometry(.25,.31,.055),villager.occupation==='面包师'?mat('#f6ebd1'):mat('#d7c6ab'),0,.63,.2);
-   piece(g,new THREE.BoxGeometry(.3,.08,.12),hair,0,.96,.025);
-   const head=piece(g,new THREE.SphereGeometry(.25,11,9),skinColor,0,1.12,0);
-   piece(g,new THREE.SphereGeometry(.254,11,7,0,Math.PI*2,0,Math.PI*.44),hair,0,1.18,0);
-   for(const s of [-1,1]){
-     piece(g,new THREE.SphereGeometry(.027,5,5),face,s*.10,1.15,.222);
-     piece(g,new THREE.SphereGeometry(.029,5,5),skinColor,s*.24,1.09,0);
-   }
-   const arms:THREE.Group[]=[], legs:THREE.Group[]=[];
-   for(const s of [-1,1]){
-     const arm=new THREE.Group();arm.position.set(s*.235,.86,0);g.add(arm);
-     piece(arm,new THREE.CapsuleGeometry(.068,.31,3,6),shirt,0,-.20,0);
-     piece(arm,new THREE.SphereGeometry(.07,7,6),skinColor,0,-.39,.02);arms.push(arm);
-     const leg=new THREE.Group();leg.position.set(s*.115,.40,0);g.add(leg);
-     piece(leg,new THREE.CapsuleGeometry(.079,.25,2,6),mat('#7e7b77'),0,-.19,0);
-     piece(leg,new THREE.BoxGeometry(.2,.10,.30),shoes,0,-.38,.06);legs.push(leg);
-   }
-   if(villager.occupation==='农夫' || villager.occupation==='花匠'){
-     piece(g,new THREE.CylinderGeometry(.33,.33,.08,12),mat('#b99b6e'),0,1.34,0);
-     piece(g,new THREE.CylinderGeometry(.19,.26,.29,12),mat('#bc9a6d'),0,1.47,0);
-   }
-   if(villager.occupation==='信使'){
-     const bag=piece(g,new THREE.BoxGeometry(.23,.28,.16),mat('#9c7057'),-.25,.61,.12);bag.rotation.z=.16;
-   }
-   // Contact shadow: small soft-ish dark disk, does not require high shadow map resolution.
-   const shadow=new THREE.Mesh(new THREE.CircleGeometry(.32,12),new THREE.MeshBasicMaterial({color:'#334f3c',transparent:true,opacity:.20,depthWrite:false}));
-   shadow.rotation.x=-Math.PI/2;shadow.position.y=.015;g.add(shadow);
-   return {villager,group:g,legs,arms};
+ return villagers.map(v=>{
+  const g=new THREE.Group();g.userData.villagerId=v.id;scene.add(g);
+  const cloth=mat(v.color),hair=mat(v.hair),skin=mat(skinColors[(v.id-1)%4]),dark=mat('#4e4a46');
+  const robe=piece(g,new THREE.CylinderGeometry(.19,.36,.77,8),cloth,0,.59,0);robe.rotation.z=-.035;
+  piece(g,new THREE.CylinderGeometry(.19,.19,.34,8),cloth,0,1.02,0);
+  piece(g,new THREE.BoxGeometry(.44,.095,.10),mat('#d8c4a2'),0,.81,.25);
+  const lapel=piece(g,new THREE.BoxGeometry(.09,.37,.07),mat('#eee1c6'),-.09,1.05,.18);lapel.rotation.z=.39;
+  const head=piece(g,new THREE.SphereGeometry(.25,10,9),skin,0,1.38,0);
+  piece(g,new THREE.SphereGeometry(.255,11,7,0,Math.PI*2,0,Math.PI*.46),hair,0,1.46,0);
+  piece(g,new THREE.SphereGeometry(.115,8,6),hair,0,1.67,-.045);
+  // Tied-up hair / topknots, readable at tiny camera scale.
+  cylinderIn(g,.07,.10,.19,0,1.74,-.02,hair);
+  for(const side of [-1,1])piece(g,new THREE.SphereGeometry(.026,5,5),dark,side*.095,1.40,.222);
+  const arms:THREE.Group[]=[],legs:THREE.Group[]=[];
+  for(const side of [-1,1]){
+    const arm=new THREE.Group();arm.position.set(side*.235,1.14,0);g.add(arm);
+    piece(arm,new THREE.CapsuleGeometry(.073,.29,2,6),cloth,0,-.24,0);
+    piece(arm,new THREE.CylinderGeometry(.14,.11,.13,7),mat('#e0d2bd'),0,-.43,0);
+    arms.push(arm);
+    const leg=new THREE.Group();leg.position.set(side*.14,.29,0);g.add(leg);
+    piece(leg,new THREE.CapsuleGeometry(.085,.19,2,6),mat('#5e6163'),0,-.12,0);
+    piece(leg,new THREE.BoxGeometry(.21,.11,.31),mat('#554e47'),0,-.34,.08);legs.push(leg);
+  }
+  if(v.id===1||v.id===3||v.id===4){
+    cylinderIn(g,.39,.39,.065,0,1.71,0,mat('#c1aa7c'));cylinderIn(g,.14,.27,.30,0,1.86,0,mat('#b7a175'));
+  }
+  if(v.id===2){piece(g,new THREE.BoxGeometry(.44,.37,.10),mat('#d7c39a'),0,.72,.28);}
+  if(v.id===8){
+    const sword=new THREE.Group();arms[1].add(sword);
+    piece(sword,new THREE.BoxGeometry(.055,.92,.075),mat('#b99c73'),0,-.80,.20);
+    piece(sword,new THREE.BoxGeometry(.30,.075,.10),mat('#7a5949'),0,-.40,.20);
+  }
+  if(v.id===9){
+    const straw=mat('#9f9070');cylinderIn(g,.56,.56,.065,0,1.75,0,straw,11);
+    const hat=cylinderIn(g,.04,.48,.30,0,1.93,0,straw,11);hat.rotation.z=.06;
+    piece(g,new THREE.BoxGeometry(.16,1.26,.14),mat('#514b4e'),-.30,.84,-.14).rotation.z=-.20;
+  }
+  if(v.id===10){piece(g,new THREE.BoxGeometry(.40,.38,.30),mat('#947051'),-.35,.88,-.10);}
+  const grownGear=v.id===8?new THREE.Group():null;
+  if(grownGear){g.add(grownGear);piece(grownGear,new THREE.BoxGeometry(.17,1.18,.12),mat('#556773'),-.35,.84,-.20).rotation.z=-.18;
+    piece(grownGear,new THREE.BoxGeometry(.56,.09,.14),mat('#b6ad9d'),-.35,1.28,-.18).rotation.z=-.18;
+    grownGear.visible=false;
+  }
+  const shadow=new THREE.Mesh(new THREE.CircleGeometry(.35,14),new THREE.MeshBasicMaterial({color:'#304637',transparent:true,opacity:.18,depthWrite:false}));
+  shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;g.add(shadow);
+  return {villager:v,group:g,legs,arms,grownGear};
  });
 }
-export function updatePeople(people:PersonModel[],world:WorldState,t:number,selected:number|null){
+function cylinderIn(p:THREE.Object3D,a:number,b:number,h:number,x:number,y:number,z:number,m:THREE.Material,seg=8){return piece(p,new THREE.CylinderGeometry(a,b,h,seg),m,x,y,z);}
+export function updatePeople(people:PersonModel[],state:WorldState,t:number,selected:number|null){
  for(const person of people){
-   const v=person.villager;
-   person.group.visible=v.id<=world.population;
-   if(!person.group.visible)continue;
-   const motion=residentMotion(v,world);
-   person.group.visible=motion.visible || v.id===selected;
-   person.group.position.set(motion.x,.21+(motion.walking?Math.max(0,Math.sin(t*12+v.id))*0.05:Math.sin(t*2+v.id)*.016),motion.z);
-   person.group.rotation.y=motion.heading || (Math.sin(t*.32+v.id)*.28);
-   const amp=motion.walking?.50:.04;
-   person.legs[0].rotation.x=Math.sin(t*9+v.id)*amp;
-   person.legs[1].rotation.x=-Math.sin(t*9+v.id)*amp;
-   person.arms[0].rotation.x=-Math.sin(t*9+v.id)*amp*.72;
-   person.arms[1].rotation.x=Math.sin(t*9+v.id)*amp*.72;
-   person.group.scale.setScalar(v.id===selected?1.1:1.0);
+  const v=person.villager;const movement=residentMotion(v,state);
+  person.group.visible=movement.visible;
+  if(!movement.visible)continue;
+  person.group.position.set(movement.x,.19+(movement.walking?Math.max(0,Math.sin(t*10+v.id))*.035:Math.sin(t*1.8+v.id)*.011),movement.z);
+  person.group.rotation.y=movement.heading||(Math.sin(t*.31+v.id)*.23);
+  const grown=v.id===8&&(state.storyStage==='returned'||state.storyStage==='legacy');
+  if(person.grownGear)person.grownGear.visible=grown;
+  const walking=movement.walking;
+  const amplitude=walking?.43:.025;
+  person.legs[0].rotation.x=Math.sin(t*8+v.id)*amplitude;person.legs[1].rotation.x=-Math.sin(t*8+v.id)*amplitude;
+  person.arms[0].rotation.x=-Math.sin(t*8+v.id)*amplitude*.72;
+  person.arms[1].rotation.x=Math.sin(t*8+v.id)*amplitude*.72;
+  if(movement.practicing){
+   person.arms[1].rotation.x=-.50+Math.sin(t*3.7+v.id)*.95;
+   person.arms[1].rotation.z=-.2+Math.sin(t*1.8)*.35;
+   person.arms[0].rotation.x=-.2+Math.sin(t*2)*.30;
+  }else person.arms[1].rotation.z=0;
+  const scale=(grown?1.16:v.id===8?.91:1)*(selected===v.id?1.08:1);
+  person.group.scale.setScalar(scale);
  }
 }
