@@ -83,3 +83,40 @@
 - 模拟自动回归新增 9 项建筑/机缘/迁移用例，覆盖无人干预、重复修屋、每日 vs 大步长、两分支不同视觉道具。
 - Chromium 桌面/移动自动化集成在 GitHub Actions 中，截图上传为 artifact；最终结果以 CI 工作流为准。
 - v0.3 Sprint 3 中的大型村庄重排、建筑 Kit 全量升级、五种以上职业动作仍未完成。
+
+---
+
+# Sprint 3：季相、风雨与村民生活（2026-11-03）
+
+## 用户反馈 / 根因
+- 夏秋区别不足：旧版只有草地和竹叶色；新增形态可读的树冠、晒场、落叶、遮荫与农事季相。
+- 雨天辨识度不足：旧版 Point 粒子在正交视角太小；新增雨线、檐滴、积水、地面涟漪、云层调光。
+- NPC 轨迹固定、聚集酒馆门口：旧版所有村民共享酒馆午间和夜间节点；按职业和日期编写互不依赖的日常路线。
+
+## 实际加载的 Three.js Skills
+- threejs-game-director：真实可玩、浏览器证据和最终发布。
+- threejs-aaa-graphics-builder：visual-scorecard、authoring-recipes、technical-art、shader-cookbook；优先形态、道具、合批和低成本 VFX。
+- threejs-debug-profiler：debug-playbook；对比相同视口渲染调用、几何、纹理和截图。
+- threejs-gameplay-systems、threejs-qa-release：确定性行为、移动端与视觉回归。
+- threejs-3d-generator：已阅读；按项目既定程序化美术风格，本轮不调用付费外部模型服务。
+
+## 实际落地
+- src/simulation/routines.ts：按职业、日期、天气确定家/工位/午间杂事/回家；不再全员到酒馆门口集合。
+- src/simulation/world.ts：NPC 活动语义和交互目标；保留江湖客过桥抵达酒馆的合理路线。
+- src/graphics/people.ts：扫帚、茶盘、柴捆、茶药筐、织锭、鱼竿、冬季围巾和分段练剑，关节平滑过渡。
+- src/graphics/seasonArt.ts：春花、夏荫和芦苇、秋叶和晒场、冬雪枯枝炉烟；物件按季切换，不是屏幕调色。
+- src/graphics/weatherArt.ts：清雨雾三态、低成本雨线/檐滴/积水/低谷薄雾；移除过大的白色雨带及云团。
+- src/graphics/lifeDetails.ts：木料工位、茶叶晒架、鱼篓/渔具、织机、酒架、院落踏石。
+- src/graphics/batchStatic.ts：静态几何按组/材质合批，动画组、可点建筑保留；谨慎回收共享几何。
+- src/main.ts：季节化天空/照明、雨天云层阴影、移动 DPR 降级、渲染诊断接口。
+- tests：NPC 位置、全天职业路径、四季同天气像素差、晴雨雾差、桌面/手机和原主线回归。
+
+## 可观测的图形进展（首轮 CI 测量，仍需最终复核）
+- v0.3 Sprint2 单帧约 1176 draw calls；合批后约 416 春、471 夏、510 秋、461 冬。三角形约 3.4–4.2 万。
+- 初轮四季像素差（含天气差异）14.9、34.9、47.4；后来已经把季节比较锁定相同晴天。
+- 仍超出美术 Skills 建议的桌面 300、手机 150 起始 draw-call 预算，不能宣称已经达到高级性能目标。
+
+## 未完成
+- 住宅通用 Kit 与整村道路/地块大调整尚未全部完成，当前精修重点为酒肆周边、职业工位和季相。
+- 路径仍是确定性的手工道路节点，而不是带精细碰撞和对向避让的 A* 寻路。
+- 手机需要更多中低端设备真实帧率数据，Chromium 软件渲染不等于真机 GPU 性能。
