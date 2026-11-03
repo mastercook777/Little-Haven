@@ -308,7 +308,7 @@ export function buildVillage(scene:THREE.Scene):VillageGraphics{
  const legacyHost=endingBuilding(root,'host',emissive);
  const legacyObserve=endingBuilding(root,'observe',emissive);
  let lastStage='';
- return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets,livingSettlement.root],settlementStages:()=>livingSettlement.stages(),growthVisualSignature:()=>growthArt.visualSignature(),coreVisualSignature:()=>coreGrowth.signature(),coreMaturity:()=>coreGrowth.stage(),coreBounds:()=>coreGrowth.centerBounds(),coreDeferredExpansions:()=>coreGrowth.deferredExpansions(),groundProbe:terrainChannelProbe,
+ return {root,batchStats,riverAt:u=>riverArt.pointAt(u),riverSurfaceY:riverArt.getSurfaceHeight(),riverSurface:riverArt.surface,rainSample:(count:number)=>weatherArt.sampleDrops(count),buildingTargets:[innModel,homeModel,yardModel,...buildingRenderer.targets,...growthArt.targets,livingSettlement.root],settlementStages:()=>livingSettlement.stages(),growthVisualSignature:()=>growthArt.visualSignature(),coreVisualSignature:()=>coreGrowth.signature(),coreMaturity:()=>coreGrowth.stage(),coreBounds:()=>coreGrowth.centerBounds(),coreDeferredExpansions:()=>coreGrowth.deferredExpansions(),coreCollisionPairs:()=>coreGrowth.collidingPairs(),groundProbe:terrainChannelProbe,
   updateStory(s:WorldState){
    buildingRenderer.update(s.buildings);
    growthArt.update(s.villageGrowth);
