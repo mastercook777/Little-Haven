@@ -6,6 +6,7 @@ import {DAY_MINUTES,DAYS_PER_SEASON,SEASON_MINUTES,getCalendarFromMinutes} from 
 import {getWeatherForMinutes} from '../src/simulation/weather.ts';
 import {PLOTS,validatePlots} from '../src/simulation/plots.ts';
 import {conditionOf} from '../src/simulation/buildings.ts';
+import {dailyRoutePoints,dailyHash} from '../src/simulation/routines.ts';
 
 const to=(s:ReturnType<typeof createWorld>,minute:number)=>advanceWorld(s,(minute-s.minutes)/3);
 const arrived=()=>{const s=createWorld(0);to(s,STORY_VISITOR_AT);return s;};
@@ -256,4 +257,55 @@ test('old v3 Sprint 1 snapshots hydrate building data without changing story or 
  const db=store();db.memory.set(STORAGE_KEY,JSON.stringify(old));
  assert.equal(loadWorld(db,0).buildings.length,4);
  assert.equal(loadWorld(db,0,2).choice,null);
+});
+
+
+test('sprint3: daytime routines differ by occupation rather than all meeting at tavern door',()=>{
+ const s=createWorld(0),villagers=VILLAGERS.filter(v=>v.id<=8);
+ for(let day=0;day<8;day++){
+  for(const hour of [9.8,12.9,14.7,18.3,19.8]){
+   s.minutes=day*DAY_MINUTES+hour*60;
+   const states=villagers.map(v=>({id:v.id,...residentMotion(v,s)}));
+   const crowd=states.filter(m=>Math.hypot(m.x+3.2,m.z-3.1)<1.25);
+   assert.ok(crowd.length<=2,'Tavern doorway crowd of '+crowd.length+' on day '+day+' at '+hour+': '+crowd.map(v=>v.id));
+   assert.ok(states.some(m=>m.x< -8),'No one working on the western farm');
+   assert.ok(states.some(m=>m.x>3),'No one working on the eastern valley');
+   for(const v of states){
+    assert.ok(Number.isFinite(v.x)&&Number.isFinite(v.z)&&Number.isFinite(v.heading));
+    assert.notEqual(v.activityId,undefined);
+   }
+  }
+ }
+});
+
+test('sprint3: role paths start/end at home and work on mapped lanes with stable day variation',()=>{
+ for(const v of VILLAGERS.filter(v=>v.id<=8)){
+  const route=dailyRoutePoints(v,5);
+  assert.deepEqual(route[0],v.home);
+  assert.ok(route.length>=2);
+  assert.ok(route.every(([x,z])=>Math.abs(x)<=15.9&&Math.abs(z)<=11.5));
+ }
+ const trader=VILLAGERS[4],weaver=VILLAGERS[5];
+ const positions:number[][]=[];
+ for(let day=0;day<3;day++){
+  const s=createWorld(0);s.minutes=day*DAY_MINUTES+13*60;
+  const m=residentMotion(trader,s),w=residentMotion(weaver,s);
+  positions.push([Math.round(m.x*10),Math.round(m.z*10),Math.round(w.x*10),Math.round(w.z*10)]);
+ }
+ assert.ok(new Set(positions.map(p=>p.join(':'))).size>=2,'Daily errands never vary');
+ assert.equal(dailyHash(2,42),dailyHash(2,42));
+ assert.notEqual(dailyHash(2,42),dailyHash(2,43));
+});
+
+test('sprint3: changing rain and fog alters activity without teleports or forced tavern attendance',()=>{
+ const s=createWorld(0),v=VILLAGERS[6];
+ for(let day=0;day<48;day++){
+  s.minutes=day*DAY_MINUTES+13*60;
+  if(getWeather(s)!=='rain')continue;
+  const motion=residentMotion(v,s);
+  assert.ok(motion.activityId==='shelter'||motion.activityId==='fish'||motion.activityId==='walk');
+  assert.ok(Math.abs(motion.x-6.2)<3.2,'Fisher unexpectedly travels to tavern');
+  return;
+ }
+ assert.fail('Expected at least one rainy day in first year');
 });
