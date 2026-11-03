@@ -16,13 +16,16 @@ export interface VillageCoreGrowth{
  stage():number;centerBounds():THREE.Box3;deferredExpansions():string[];collidingPairs():string[];
 }
 /** Drawn volume (not just wall dimensions) is the safety envelope. */
-export function modelOverlapXZ(a:THREE.Object3D,b:THREE.Object3D,minArea=.10):boolean{
+export function modelOverlapAreaXZ(a:THREE.Object3D,b:THREE.Object3D):number{
  a.updateWorldMatrix(true,true);b.updateWorldMatrix(true,true);
  const x=new THREE.Box3().setFromObject(a),y=new THREE.Box3().setFromObject(b);
- if(x.isEmpty()||y.isEmpty())return false;
+ if(x.isEmpty()||y.isEmpty()||Math.min(x.max.y,y.max.y)-Math.max(x.min.y,y.min.y)<=.22)return 0;
  const dx=Math.max(0,Math.min(x.max.x,y.max.x)-Math.max(x.min.x,y.min.x));
  const dz=Math.max(0,Math.min(x.max.z,y.max.z)-Math.max(x.min.z,y.min.z));
- return dx*dz>minArea&&Math.min(x.max.y,y.max.y)-Math.max(x.min.y,y.min.y)>.22;
+ return dx*dz;
+}
+export function modelOverlapXZ(a:THREE.Object3D,b:THREE.Object3D,minArea=.10):boolean{
+ return modelOverlapAreaXZ(a,b)>minArea;
 }
 export function maturityTier(g:VillageGrowthState):number{
  if(!g.choice)return 0;
@@ -122,9 +125,11 @@ export function makeVillageCoreGrowth(parent:THREE.Object3D,
    const slot=slots[slotIndex],original=slot.original,expanded=slot.renovated;
    for(let j=0;j<active.length;j++){
     if(j===slotIndex)continue;
-    const already=modelOverlapXZ(original,active[j]);
-    const proposed=modelOverlapXZ(expanded,active[j]);
-    if(proposed&&!already){
+    const oldArea=modelOverlapAreaXZ(original,active[j]);
+    const newArea=modelOverlapAreaXZ(expanded,active[j]);
+    // Existing legacy clipping is not a license to make the shared volume
+    // even worse. Deferral can later trigger a smaller or relocated extension.
+    if(newArea>Math.max(.10,oldArea+.045)){
      deferred.push(slot.name);return;
     }
    }
