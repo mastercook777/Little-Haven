@@ -365,7 +365,8 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
  },
  getCharacterPose:(id:number)=>{
   const person=people.find(p=>p.villager.id===id);
-  return person?{...person.pose,groupPosition:person.group.position.toArray(),upperPosition:person.upper.position.toArray()}:null;
+  return person?{...person.pose,groupPosition:person.group.position.toArray(),upperPosition:person.upper.position.toArray(),
+   clipMode:person.heroAnimator?.currentMode()||null,clipPhase:person.heroAnimator?.currentPhase()||null}:null;
  }
 };
 requestAnimationFrame(tick);
