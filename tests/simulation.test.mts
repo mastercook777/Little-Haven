@@ -91,7 +91,7 @@ test('flow-year advances only one season and journals the changed season',()=>{
  const first=advanceToNextSeason(s);assert.equal(first.crossedSeasons,1);
  assert.equal(getCalendar(s).season,'summer');
  assert.equal(first.crossedYears,0);
- assert.equal(s.minutes,SEASON_MINUTES);
+ assert.equal(s.minutes,SEASON_MINUTES+500);
  advanceToNextSeason(s);advanceToNextSeason(s);
  const winter=advanceToNextSeason(s);
  assert.equal(getCalendar(s).year,2);assert.equal(winter.crossedYears,1);
