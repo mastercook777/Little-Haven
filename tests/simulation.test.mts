@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {advanceToNextSeason,advanceWorld,chapterProgress,chooseFate,createWorld,getCalendar,getClock,getDay,getWeather,
- importWorld,loadWorld,residentMotion,saveWorld,SLOT_KEYS,STORAGE_KEY,PREVIOUS_STORAGE_KEY,STORY_VISITOR_AT,VILLAGERS} from '../src/simulation/world.ts';
+import {advanceToNextSeason,advanceWorld,buildingById,chapterProgress,chooseFate,chooseOpportunity,createWorld,getCalendar,getClock,getDay,getWeather,
+ importWorld,loadWorld,pendingOpportunities,residentMotion,saveWorld,SLOT_KEYS,STORAGE_KEY,PREVIOUS_STORAGE_KEY,STORY_VISITOR_AT,VILLAGERS} from '../src/simulation/world.ts';
 import {DAY_MINUTES,DAYS_PER_SEASON,SEASON_MINUTES,getCalendarFromMinutes} from '../src/simulation/calendar.ts';
 import {getWeatherForMinutes} from '../src/simulation/weather.ts';
+import {PLOTS,validatePlots} from '../src/simulation/plots.ts';
+import {conditionOf} from '../src/simulation/buildings.ts';
 
 const to=(s:ReturnType<typeof createWorld>,minute:number)=>advanceWorld(s,(minute-s.minutes)/3);
 const arrived=()=>{const s=createWorld(0);to(s,STORY_VISITOR_AT);return s;};
@@ -133,4 +135,125 @@ test('imports reject invalid or unsupported snapshots',()=>{
  assert.equal(importWorld(JSON.stringify(s))?.version,3);
  advanceWorld(s,Number.NaN);advanceWorld(s,-1);assert.equal(s.minutes,500);
  assert.equal(loadWorld({getItem:()=>'{broken'},0).version,3);
+});
+
+
+test('stable plot registry has unique sockets and no floating unknown building IDs',()=>{
+ assert.equal(validatePlots(),true);
+ const s=createWorld(0);
+ assert.deepEqual(s.buildings.map(b=>b.id),PLOTS.map(plot=>plot.occupiedBy));
+ assert.equal(new Set(s.buildings.map(b=>b.id)).size,4);
+ for(const b of s.buildings)assert.equal(PLOTS.find(p=>p.id===b.plotId)?.occupiedBy,b.id);
+});
+
+test('daily work generates a firewood pile, laundry and a physically staged tavern bench',()=>{
+ const s=createWorld(0);
+ to(s,4*DAY_MINUTES);
+ assert.ok(buildingById(s,'home-001')?.props.includes('firewood'));
+ assert.equal(buildingById(s,'bench-001')?.phase,'planned');
+ to(s,8*DAY_MINUTES);
+ assert.equal(buildingById(s,'bench-001')?.phase,'construction');
+ to(s,14*DAY_MINUTES);
+ const bench=buildingById(s,'bench-001')!;
+ assert.equal(bench.phase,'occupied');
+ assert.ok(bench.props.includes('rest-bench'));
+ assert.ok(buildingById(s,'home-001')!.props.includes('laundry'));
+ assert.ok(bench.causeEventIds.length>=2);
+ assert.ok(s.journal.some(e=>e.title==='歇脚长凳落成'));
+});
+
+function findOpportunity(s:ReturnType<typeof createWorld>,kind:'rain-guest'|'roof-repair'){
+ for(let i=0;i<180;i++){
+  const found=pendingOpportunities(s).find(o=>o.kind===kind);
+  if(found)return found;
+  to(s,(Math.floor(s.minutes/DAY_MINUTES)+1)*DAY_MINUTES);
+ }
+ throw Error('Opportunity never appeared: '+kind);
+}
+
+test('rain guest appears only on a rainy day and supports three one-shot consequences',()=>{
+ const paths=['stay','guide','observe'] as const;
+ for(const option of paths){
+  const s=createWorld(0),o=findOpportunity(s,'rain-guest');
+  assert.equal(getWeather(s),'rain');
+  assert.equal(chooseOpportunity(s,o.id,option),true);
+  assert.equal(chooseOpportunity(s,o.id,option),false);
+  assert.equal(s.guardianMemories.length,1);
+  const inn=buildingById(s,'inn-001')!;
+  assert.ok(inn.props.includes(option==='stay'?'guest-umbrella':option==='guide'?'road-sign':'warm-tea'));
+  assert.ok(s.guardianMemories[0].producedEventIds.every(id=>inn.causeEventIds.includes(id)));
+ }
+});
+
+test('unanswered rainy opportunity resolves autonomously instead of blocking the valley',()=>{
+ const s=createWorld(0),o=findOpportunity(s,'rain-guest');
+ to(s,o.deadlineMinutes);
+ assert.equal(o.state,'resolved');
+ assert.ok(s.guardianMemories.some(m=>m.opportunityId===o.id&&m.automatic===true));
+ assert.ok(buildingById(s,'inn-001')!.props.includes('warm-tea'));
+});
+
+test('old tavern roof requests aid and gradually repairs; drainage leaves a durable benefit',()=>{
+ const s=createWorld(0),o=findOpportunity(s,'roof-repair');
+ const inn=buildingById(s,'inn-001')!;
+ assert.ok(inn.conditionScore<55);
+ assert.equal(conditionOf(inn),'worn');
+ assert.equal(chooseOpportunity(s,o.id,'drainage'),true);
+ assert.equal(inn.phase,'repairing');assert.equal(inn.workProgress,0);
+ to(s,s.minutes+4*DAY_MINUTES);
+ assert.equal(inn.phase,'repairing');
+ to(s,s.minutes+6*DAY_MINUTES);
+ assert.equal(inn.phase,'occupied');
+ assert.ok(inn.props.includes('drainage')&&inn.props.includes('repaired-tiles'));
+ assert.ok(inn.conditionScore>55);
+ assert.ok(inn.causeEventIds.length>0);
+ assert.ok(s.journal.some(e=>e.title==='无名酒肆修缮完成'));
+});
+
+test('ignoring roof invitation still starts non-destructive autonomous maintenance',()=>{
+ const s=createWorld(0),o=findOpportunity(s,'roof-repair');
+ to(s,o.deadlineMinutes);
+ assert.equal(o.state,'resolved');
+ assert.ok(s.guardianMemories.some(m=>m.opportunityId===o.id&&m.automatic));
+ assert.equal(buildingById(s,'inn-001')!.phase,'repairing');
+ to(s,s.minutes+14*DAY_MINUTES);
+ assert.equal(buildingById(s,'inn-001')!.phase,'occupied');
+ assert.ok(buildingById(s,'inn-001')!.conditionScore>30);
+});
+
+test('home gradually weathers and villagers repair it without a guardian order',()=>{
+ const s=createWorld(0);
+ to(s,120*DAY_MINUTES);
+ const home=buildingById(s,'home-001')!;
+ assert.ok(home.lastRepairYear!==null);
+ assert.ok(home.props.includes('repaired-tiles'));
+ assert.ok(home.props.includes('firewood')&&home.props.includes('laundry'));
+ assert.ok(s.journal.some(e=>e.title==='乡邻合力修屋'));
+});
+
+test('one leap versus daily steps includes matching weather, buildings, opportunities and memories',()=>{
+ const a=createWorld(0),b=createWorld(0);
+ to(a,118*DAY_MINUTES);
+ for(let day=1;day<=117;day++)to(b,day*DAY_MINUTES);
+ to(b,118*DAY_MINUTES);
+ assert.deepEqual(a.buildings,b.buildings);
+ assert.deepEqual(a.opportunities,b.opportunities);
+ assert.deepEqual(a.guardianMemories,b.guardianMemories);
+ assert.deepEqual(a.journal,b.journal);
+ assert.deepEqual(pendingOpportunities(a),pendingOpportunities(b));
+});
+
+test('old v3 Sprint 1 snapshots hydrate building data without changing story or save slots',()=>{
+ const s=arrived();chooseFate(s,'host');
+ const old=JSON.parse(JSON.stringify(s));
+ delete old.buildings;delete old.opportunities;delete old.guardianMemories;
+ const upgraded=importWorld(JSON.stringify(old))!;
+ assert.equal(upgraded.version,3);
+ assert.equal(upgraded.choice,'host');
+ assert.equal(upgraded.buildings.length,4);
+ assert.deepEqual(upgraded.opportunities,[]);
+ assert.equal(upgraded.guardianMemories.length,0);
+ const db=store();db.memory.set(STORAGE_KEY,JSON.stringify(old));
+ assert.equal(loadWorld(db,0).buildings.length,4);
+ assert.equal(loadWorld(db,0,2).choice,null);
 });
