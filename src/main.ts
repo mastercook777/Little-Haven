@@ -359,7 +359,13 @@ $('saveSlot2').classList.toggle('active',activeSlot===2);
    const ray=new THREE.Raycaster();
    ray.setFromCamera(new THREE.Vector2(projected.x,projected.y),camera);
    const visible=ray.intersectObject(village.riverSurface,false).length>0;
-   return {u,x,y,world:[point.x,point.y,point.z],surfaceHit:visible};
+   const allHits=ray.intersectObjects(village.root.children,true);
+   const first=allHits[0];
+   let rootName=first?.object.name||first?.object.type||'none';
+   if(first&&!rootName)rootName=first.object.parent?.name||'unnamed-mesh';
+   return {u,x,y,world:[point.x,point.y,point.z],surfaceHit:visible,
+    closestMesh:rootName,closestY:first?.point.y??null,nearestDistance:first?.distance??null,
+    riverDistance:ray.intersectObject(village.riverSurface,false)[0]?.distance??null};
   });
   return {surfaceY:village.riverSurfaceY,surfaceName:village.riverSurface.name,samples};
  },
