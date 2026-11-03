@@ -230,22 +230,30 @@ function orchardCourt(p:THREE.Object3D,x:number,z:number){
  orchardTree(g,2.1,1.25,1.12);
  return g;
 }
+/** Authored safe parcels on the east bank; footprints fit the island and
+ * keep at least ~2.4 world units clear of the centerline river surface.
+ */
+export const BRIDGE_DISTRICT_PARCELS={
+ market:{x:12.35,z:-1.15,w:3.85,d:2.85},
+ merchant:{x:12.58,z:3.38,w:3.10,d:2.68},
+ guest:{x:12.0,z:-5.25,w:2.65,d:2.20}
+} as const;
 function routeObjects(parent:THREE.Group,direction:VillageDirection){
  const foundationStage=group(parent),constructionStage=group(parent),
   landmarkStage=group(parent),thrivingStage=group(parent);
- const origin=direction==='bridge'?[12.35,-1.15]:direction==='ferry'?[10.55,-6.1]:[-5.5,-8.1];
+ const origin=direction==='bridge'?[BRIDGE_DISTRICT_PARCELS.market.x,BRIDGE_DISTRICT_PARCELS.market.z]:direction==='ferry'?[10.55,-6.1]:[-5.5,-8.1];
  const [x,z]=origin;
  foundation(foundationStage,x,z,4.0,3.3);
  timberFrame(constructionStage,x,z,4.0,3.3,2.1);
  if(direction==='bridge'){
   foundation(foundationStage,8.0,-2.3,5.8,2.2);
-  steps(constructionStage,7.4,-2.30);timberFrame(constructionStage,12.35,-1.15,3.5,2.5,2.0);
+  steps(constructionStage,7.4,-2.30);timberFrame(constructionStage,BRIDGE_DISTRICT_PARCELS.market.x,BRIDGE_DISTRICT_PARCELS.market.z,3.5,2.5,2.0);
   stoneBridge(landmarkStage,7.85,-2.38);
-  tradeCourt(landmarkStage,12.35,-1.15);
-  house(landmarkStage,12.58,3.38,3.10,2.68,2.55,'merchant');
+  tradeCourt(landmarkStage,BRIDGE_DISTRICT_PARCELS.market.x,BRIDGE_DISTRICT_PARCELS.market.z);
+  house(landmarkStage,BRIDGE_DISTRICT_PARCELS.merchant.x,BRIDGE_DISTRICT_PARCELS.merchant.z,BRIDGE_DISTRICT_PARCELS.merchant.w,BRIDGE_DISTRICT_PARCELS.merchant.d,2.55,'merchant');
   // Later growth expands the upper bank without covering the foreground
   // bridge, creek or the area reserved for public footpaths.
-  house(thrivingStage,12.0,-5.25,2.65,2.20,3.02,'guest');
+  house(thrivingStage,BRIDGE_DISTRICT_PARCELS.guest.x,BRIDGE_DISTRICT_PARCELS.guest.z,BRIDGE_DISTRICT_PARCELS.guest.w,BRIDGE_DISTRICT_PARCELS.guest.d,3.02,'guest');
  }else if(direction==='ferry'){
   foundation(foundationStage,6.5,-5.55,3.9,2.0);
   timberDock(constructionStage,6.9,-5.75,3.7);
