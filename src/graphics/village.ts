@@ -6,7 +6,7 @@ import {buildVillageWorkplaces} from './lifeDetails';
 import {buildRiverArt} from './riverArt';
 import {buildCarvedTerrain,terrainChannelProbe} from './carvedTerrain';
 import {buildVillageEvolution} from './villageEvolution';
-import {detailTavern,detailHome} from './architectureKit';
+import {createMountainHome,createMountainTavern} from './villageBuildings';
 import {createWeatherArt} from './weatherArt';
 import {batchStaticSubtree,type BatchStats} from './batchStatic';
 
@@ -83,64 +83,17 @@ function paintedSign(p:THREE.Object3D,x:number,y:number,z:number,word:string){
  const plane=new THREE.Mesh(new THREE.PlaneGeometry(.86,1.16),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
  plane.position.set(x,y,z);p.add(plane);return plane;
 }
+// Core buildings are authored as cohesive forms, not old boxes with
+// additional duplicate roof and facade kits appended on top.
 function home(p:THREE.Object3D,x:number,z:number,w=2.9,d=2.5,h=1.9,variation=0,windows:THREE.MeshStandardMaterial[]=[],emissive:THREE.MeshStandardMaterial[]=[]){
- const g=group(p,x,.16,z);box(g,w+.35,.22,d+.35,0,.13,0,C.bank);
- box(g,w,h,d,0,h/2+.25,0,variation%2?mat('#d8c9b3'):C.plaster);
- for(const sx of [-1,1])for(const sz of [-1,1])box(g,.14,h+.2,.14,sx*w*.45,h*.5+.27,sz*d*.43,C.wood);
- tileRoof(g,w,d,h+.27,.72,variation===1?C.darkTile:C.tile);
- box(g,.67,1.12,.085,0,.83,d/2+.07,C.wood);
- box(g,.47,.66,.09,w*.31,1.34,d/2+.07,C.timber);
- const lit=new THREE.MeshStandardMaterial({color:'#e9c48b',emissive:'#f8ad68',emissiveIntensity:.25});windows.push(lit);
- box(g,.33,.43,.065,w*.31,1.35,d/2+.125,lit);
- box(g,.07,.46,.10,w*.31,1.36,d/2+.18,C.wood);
- for(let i=0;i<2;i++)box(g,.41,.04,.27,random(i+x)*.4-.2,.04,d/2+.52+i*.4,C.slate);
- if(variation===2){ // herb-drying rack
-  for(const side of [-1,1])box(g,.09,1.17,.09,side*.9,.6,-d/2-.25,C.lightWood);
-  box(g,2,.08,.10,0,1.18,-d/2-.25,C.lightWood);
-  for(let i=0;i<5;i++){const herb=sphere(g,.18,(i-2)*.36,.85,-d/2-.25,C.bambooDark);herb.scale.y=.6;}
- }
- if(variation===3){lantern(g,-w*.38,h+.4,d*.40,emissive);}
- detailHome(g,w,d,h,variation);
- return g;
+ return createMountainHome(p,x,z,w,d,h,variation,windows,emissive);
 }
 function tavern(p:THREE.Object3D,windows:THREE.MeshStandardMaterial[],emissive:THREE.MeshStandardMaterial[],swings:THREE.Group[]){
- const x=-3.4,z=-.2;const g=group(p,x,.16,z);const w=5.3,d=3.8;
- box(g,6.3,.28,4.9,0,.14,.30,C.bank);
- box(g,w,2.8,d,0,1.56,0,C.plaster);
- for(const sx of [-1,1])for(const sz of [-1,1])box(g,.23,3.0,.23,sx*2.45,1.6,sz*1.74,C.timber);
- for(const i of [-1,0,1])box(g,.15,2.5,.15,i*1.75,1.5,d*.51,C.wood);
- tileRoof(g,5.7,4.3,3.02,.9);
- // An upper loft gives the tavern an unmistakable two-storey silhouette.
- box(g,3.8,1.7,2.5,0,3.91,-.32,mat('#d6c9ae'));
- for(const sx of [-1,1])box(g,.16,1.7,.14,sx*1.68,3.91,.92,C.timber);
- tileRoof(g,4.15,2.9,4.78,1.02,C.darkTile);
- for(const tx of [-1.75,1.75]){
-  box(g,.63,.78,.08,tx,1.82,d/2+.035,C.timber);
-  const light=new THREE.MeshStandardMaterial({color:'#ebc795',emissive:'#e99e5a',emissiveIntensity:.45});windows.push(light);
-  box(g,.44,.57,.10,tx,1.83,d/2+.10,light);box(g,.05,.63,.12,tx,1.83,d/2+.16,C.wood);
- }
- box(g,1.15,1.77,.10,0,1.22,d/2+.09,C.timber);
- for(const tx of [-1.4,1.4])box(g,.33,.66,.10,tx,3.92,.95,C.wood);
- for(const tx of [-2.7,2.7]){
-  box(g,.13,2.4,.13,tx,1.22,2.45,C.wood);
-  const gLantern=lantern(g,tx,2.83,2.47,emissive);swings.push(gLantern);
- }
- box(g,6.0,.17,1.2,0,2.58,2.45,C.wood);
- box(g,6.0,.13,.14,0,2.55,3.08,C.lightWood);
- const sign=paintedSign(g,-1.9,2.02,3.13,'酒');sign.rotation.y=-.10;
- // earthenware wine jars, benches and the covered porch.
- for(let i=0;i<4;i++){
-  const x=2.17+(i%2)*.53,z=2.9+Math.floor(i/2)*.45;
-  sphere(g,.31,x,.39,z,C.ceramic);cylinder(g,.16,.16,.13,x,.70,z,mat('#98846b'));
- }
- for(const x of [-1.08,1.02]){
-  box(g,1.28,.14,.49,x,.55,3.25,C.lightWood);
-  for(const v of [-.4,.4])box(g,.11,.49,.11,x+v,.3,3.25,C.wood);
- }
- const flag=group(g,3.08,2.85,2.2);box(flag,.075,2.85,.075,0,.32,0,C.wood);
- const banner=box(flag,.08,.96,.74,-.02,.15,.40,mat('#b87058'));banner.rotation.y=.12;swings.push(flag);
- detailTavern(g);
- return g;
+ return createMountainTavern(p,{
+  windows,emissive,swings,
+  createLantern:(parent,x,y,z)=>lantern(parent,x,y,z,emissive),
+  createSign:(parent,x,y,z,word)=>paintedSign(parent,x,y,z,word)
+ });
 }
 function pine(p:THREE.Object3D,x:number,z:number,s:number){
  const g=group(p,x,.17,z);g.scale.setScalar(s);cylinder(g,.16,.23,1.65,0,.82,0,C.wood);
