@@ -112,7 +112,7 @@ const branches:Record<VillageDirection,readonly VillageParcel[]>={
  bridge:[
   {id:'bridge-market',kind:'protected',x:12.35,z:-1.15,width:4.4,depth:3.55,rotation:0,clearance:.25,accessX:11.0,accessZ:2.0,builtAt:0},
   {id:'bridge-merchant',kind:'protected',x:12.58,z:3.38,width:3.85,depth:3.60,rotation:0,clearance:.15,accessX:12.6,accessZ:2.1,builtAt:0},
-  {id:'bridge-guest',kind:'protected',x:12,z:-5.25,width:3.40,depth:3.25,rotation:0,clearance:.15,accessX:12,z:0,builtAt:0}
+  {id:'bridge-guest',kind:'protected',x:12,z:-5.25,width:3.40,depth:3.25,rotation:0,clearance:.15,accessX:12,accessZ:0,builtAt:0}
  ],
  ferry:[
   {id:'ferry-yard',kind:'protected',x:10.8,z:-2.55,width:4.5,depth:4.0,rotation:0,clearance:.25,accessX:11.4,accessZ:1.0,builtAt:0},
@@ -121,7 +121,7 @@ const branches:Record<VillageDirection,readonly VillageParcel[]>={
  ],
  grove:[
   {id:'grove-orchard',kind:'protected',x:-3.4,z:8.25,width:6.2,depth:5.0,rotation:0,clearance:.18,accessX:-4.0,accessZ:5.1,builtAt:0},
-  {id:'grove-house-1',kind:'protected',x:-5.6,z:-8.1,width:4.1,depth:3.75,rotation:0,clearance:.15,accessX:-5,z:-5.9,builtAt:0},
+  {id:'grove-house-1',kind:'protected',x:-5.6,z:-8.1,width:4.1,depth:3.75,rotation:0,clearance:.15,accessX:-5,accessZ:-5.9,builtAt:0},
   {id:'grove-house-2',kind:'protected',x:-1.75,z:-9.35,width:3.35,depth:3.15,rotation:0,clearance:.15,accessX:-1.7,accessZ:-6.8,builtAt:0}
  ]
 };
