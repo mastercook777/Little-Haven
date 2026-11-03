@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type {VillageDirection,VillageGrowthState,VillagePhase} from '../simulation/villageGrowth.ts';
+import type {VillageDirection,VillageGrowthState} from '../simulation/villageGrowth.ts';
 import {batchStaticSubtree} from './batchStatic';
 
 /**
@@ -137,8 +137,6 @@ function timberDock(p:THREE.Object3D,x:number,z:number,length=3.7){
 }
 function fishingBoat(p:THREE.Object3D,x:number,z:number,scale=1){
  const g=group(p,x,.25,z);g.scale.setScalar(scale);
- const vertices=[-1.05,0,-.38,1.05,0,-.38,1.32,.12,0,.78,-.25,0,
- -1.05,0,.38,1.05,0,.38,1.32,.12,0,.78,-.25,0];
  // A single shared low-poly hull shell and rails. Distinct from rectangular
  // houses so ferry district reads from a distance.
  const shape=new THREE.Shape();
@@ -238,6 +236,8 @@ export function buildVillageEvolution(parent:THREE.Object3D):VillageGrowthGraphi
   if(signature===desired)return;signature=desired;
   for(const [key,layers] of roots){
    const show=s.choice===key;
+   const site=layers.foundationStage.parent;
+   if(site)site.visible=show&&s.phase!=='quiet'&&s.phase!=='invitation';
    layers.foundationStage.visible=show&&s.phase==='foundation';
    layers.constructionStage.visible=show&&s.phase==='construction';
    layers.landmarkStage.visible=show&&(s.phase==='landmark'||s.phase==='thriving');
