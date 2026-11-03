@@ -168,7 +168,8 @@ export function updatePeople(people:PersonModel[],state:WorldState,t:number,sele
   const v=person.villager,movement=residentMotion(v,state),g=person.group;
   g.visible=movement.visible;
   if(!movement.visible){person.lastT=t;continue;}
-  const dt=Math.min(.06,Math.max(0,t-person.lastT));person.lastT=t;
+  const rawDt=Math.max(0,t-person.lastT);
+  const dt=Math.min(.06,rawDt);person.lastT=t;
   const alpha=1-Math.exp(-dt*8.5);
   const action=movement.activityId,walking=movement.walking;
   const hero=person.heroAnimator;
