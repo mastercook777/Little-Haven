@@ -70,12 +70,11 @@ function pointInConvex(point:GroundPoint,poly:GroundPoint[]){
  return true;
 }
 export function parcelLineDistance(parcel:VillageParcel,polyline:readonly GroundPoint[]):number{
- const corners=parcelCorners(parcel),center=P(parcel.x,parcel.z);
+ const corners=parcelCorners(parcel);
  let nearest=Infinity;
  for(let i=0;i<polyline.length-1;i++){
   const p=polyline[i],q=polyline[i+1];
-  if(pointInConvex(p,corners)||pointInConvex(q,corners)||pointInConvex(center,[p,q,
-   P(q[0]+.00001,q[1]+.00001),P(p[0]+.00001,p[1]+.00001)]))return 0;
+  if(pointInConvex(p,corners)||pointInConvex(q,corners))return 0;
   for(let j=0;j<4;j++)
    nearest=Math.min(nearest,edgeDistance(corners[j],corners[(j+1)%4],p,q));
  }
