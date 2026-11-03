@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildVillage} from './graphics/village';
 import {makePeople,updatePeople} from './graphics/people';
-import {advanceWorld,chapterProgress,chooseFate,createWorld,getClock,getDay,getDaylight,loadWorld,residentMotion,saveWorld,STORAGE_KEY,VILLAGERS,type Decision,type WorldState} from './simulation/world';
+import {advanceToNextSeason,advanceWorld,chapterProgress,chooseFate,createWorld,getCalendar,getClock,getDaylight,getWeather,importWorld,loadWorld,residentMotion,saveWorld,SLOT_KEYS,VILLAGERS,type Decision,type WorldState} from './simulation/world';
+import {SEASON_NAMES} from './simulation/calendar';
+import {WEATHER_NAMES} from './simulation/weather';
 import './styles.css';
 
 const $=<T extends HTMLElement=HTMLElement>(id:string):T=>{const el=document.getElementById(id);if(!el)throw Error(`Missing UI element #${id}`);return el as T;};
@@ -24,9 +26,10 @@ const fill=new THREE.DirectionalLight('#b4c5cc',.60);fill.position.set(15,10,-17
 const village=buildVillage(scene);
 const people=makePeople(scene,VILLAGERS);
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
-let world:WorldState;try{world=loadWorld(window.localStorage);}catch{world=createWorld();}
+let activeSlot=1;
+let world:WorldState;try{world=loadWorld(window.localStorage,Date.now(),activeSlot);}catch{world=createWorld();}
 let speed=1,paused=false,selected:number|null=null,elapsed=0,last=performance.now(),lastSave=performance.now();
-let lastDaylight=-1,lastDecisionKey='',lastChronicleId=0,lastTimeShown=-1;
+let lastDaylight=-1,lastLightingKey='',lastDecisionKey='',lastChronicleId=0,lastTimeShown=-1;
 let toastTimer:number|undefined;let audio:AudioContext|null=null,oscillator:OscillatorNode|null=null;
 const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
 function resize(){
@@ -36,10 +39,10 @@ function resize(){
 }
 window.addEventListener('resize',resize);resize();
 function toast(message:string){const el=$('toast');el.textContent=message;el.classList.add('show');window.clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>el.classList.remove('show'),4200);}
-const formatDay=(day:number)=>`流年 · 第 ${day} 日`;
+const formatDay=()=>{const c=getCalendar(world);return '第 '+c.year+' 年 · '+SEASON_NAMES[c.season]+' '+c.dayOfSeason+' 日';};
 function renderJournal(){
  $('journalEntries').innerHTML=world.journal.slice(-2).reverse().map(e=>`<p><span class="journal-bullet">✦</span>${escapeHtml(e.text)}</p>`).join('');
- $('dayLabel').textContent=formatDay(getDay(world));
+ $('dayLabel').textContent=formatDay();
  $('journalAll').innerHTML=[...world.journal].reverse().map(e=>`<div class="event-row"><div class="event-day">DAY ${String(e.day).padStart(2,'0')} <span>· ${String(Math.floor(e.time/60)).padStart(2,'0')}:${String(e.time%60).padStart(2,'0')}</span></div><h3>${escapeHtml(e.title)}</h3><p>${escapeHtml(e.text)}</p></div>`).join('');
 }
 function renderDecision(){
@@ -82,7 +85,7 @@ function renderProgress(){
 function renderStats(){ $('population').textContent=String(world.population);$('houses').textContent=String(world.houses);$('renown').textContent=String(world.renown);}
 function renderClock(){
  const c=getClock(world),h=c.hour;$('clock').textContent=c.text;
- $('period').textContent=h<6?'万籁俱寂':h<10?'山中晨光':h<16?'烟火人间':h<19?'竹影斜阳':'酒旗灯火';
+ const cal=getCalendar(world);$('period').textContent='第'+cal.year+'年 · '+SEASON_NAMES[cal.season]+cal.dayOfSeason+'日 · '+WEATHER_NAMES[getWeather(world)];
  $('dayIcon').textContent=h<6||h>=19?'☾':h<10?'☼':'☀';
 }
 function renderResident(){
@@ -109,9 +112,16 @@ for(const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.ch
 }
 for(const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.speed-btn'))){
  button.addEventListener('click',()=>{
+  if(button.dataset.speed==='48'){
+   const from=getCalendar(world),result=advanceToNextSeason(world),to=getCalendar(world);
+   lastDecisionKey='';renderDecision();renderJournal();renderStats();renderClock();village.updateStory(world);
+   toast('流年小记 · 第'+to.year+'年'+SEASON_NAMES[to.season]+'至 · '+result.crossedSeasons+'次换季'+(from.year!==to.year?'，新的一年开始了':''));
+   try{saveWorld(world,localStorage,Date.now(),activeSlot);}catch{}
+   return;
+  }
   speed=Number(button.dataset.speed)||1;
   document.querySelectorAll('.speed-btn').forEach(el=>el.classList.toggle('active',el===button));
-  toast(speed===1?'山谷回到了悠闲的节奏。':speed===48?'流年加速，看看江湖如何走过。':`时间正在以 ${speed} 倍速度流动。`);
+  toast(speed===1?'山谷回到了悠闲的节奏。':'时间正在以 '+speed+' 倍速度流动。');
  });
 }
 $('pause').addEventListener('click',()=>{paused=!paused;$('pause').textContent=paused?'▶':'Ⅱ';toast(paused?'时间暂停了。':'山谷又开始活动了。');});
@@ -122,11 +132,42 @@ $('closeResident').addEventListener('click',()=>selectResident(null));
 $('journalExpand').addEventListener('click',()=>{$('journalModal').hidden=false;renderJournal();});
 $('closeJournal').addEventListener('click',()=>{$('journalModal').hidden=true;});
 $('journalModal').addEventListener('click',e=>{if(e.target===$('journalModal'))$('journalModal').hidden=true;});
+function refreshWorld(){
+ selected=null;lastDecisionKey='';lastChronicleId=0;lastLightingKey='';lastDaylight=-1;
+ renderResident();renderDecision();renderJournal();renderStats();renderClock();village.updateStory(world);
+ $('currentSlot').textContent=activeSlot===1?'一号谷':'二号谷';
+ $('saveSlot1').classList.toggle('active',activeSlot===1);
+ $('saveSlot2').classList.toggle('active',activeSlot===2);
+}
+function persist(){try{saveWorld(world,localStorage,Date.now(),activeSlot);}catch{}}
+for(const slot of [1,2]){
+ $('saveSlot'+slot).addEventListener('click',()=>{
+  if(slot===activeSlot)return;
+  persist();activeSlot=slot;world=loadWorld(localStorage,Date.now(),activeSlot);
+  refreshWorld();toast('走进了'+(slot===1?'一号谷':'二号谷')+'。');
+ });
+}
 $('resetGame').addEventListener('click',()=>{
- if(!confirm('重新开启一段江湖？当前《江湖初现》记录将被清空，旧版 v0.1 存档不会受影响。'))return;
- world=createWorld();try{localStorage.removeItem(STORAGE_KEY);}catch{}
- selected=null;lastDecisionKey='';renderResident();renderDecision();renderJournal();renderStats();$('journalModal').hidden=true;village.updateStory(world);
- toast('山中的故事，从一个清晨重新开始。');
+ if(!confirm('在'+(activeSlot===1?'一号谷':'二号谷')+'重新开档？当前槽的记录会被覆盖，另一个槽与 v0.2 旧档均保留。'))return;
+ world=createWorld();persist();refreshWorld();$('journalModal').hidden=true;
+ toast('新的山谷，从一个清晨重新开始。');
+});
+$('exportGame').addEventListener('click',()=>{
+ persist();const content=JSON.stringify(world,null,2);
+ const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+ const link=document.createElement('a');link.href=url;link.download='little-haven-v03-slot-'+activeSlot+'.json';link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ toast('当前山谷的备份已导出。');
+});
+$('importTrigger').addEventListener('click',()=>$<HTMLInputElement>('importFile').click());
+$<HTMLInputElement>('importFile').addEventListener('change',async e=>{
+ const input=e.currentTarget as HTMLInputElement,file=input.files?.[0];input.value='';
+ if(!file)return;
+ if(file.size>2_000_000){toast('存档文件过大。');return;}
+ const restored=importWorld(await file.text());
+ if(!restored){toast('无法读取：需要有效的 v0.3 存档 JSON。');return;}
+ if(!confirm('将导入的进度覆盖当前槽吗？请先导出现有存档备份。'))return;
+ world=restored;persist();refreshWorld();$('journalModal').hidden=true;toast('山谷记录已恢复。');
 });
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){$('journalModal').hidden=true;selectResident(null);}if(e.key===' '&&!(e.target instanceof HTMLButtonElement)){e.preventDefault();$('pause').click();}});
 // Gentle sine-tone ambience is opt-in; no external audio files.
@@ -150,10 +191,14 @@ canvas.addEventListener('pointerup',e=>{
  }else selectResident(null);
 });
 function lighting(daylight:number){
- if(Math.abs(daylight-lastDaylight)<.01)return;lastDaylight=daylight;
- hemi.intensity=.95+daylight*1.45;sun.intensity=.22+daylight*3.10;fill.intensity=.26+daylight*.38;
- sun.color.set(daylight<.40?'#edb890':'#fff1d5');renderer.toneMappingExposure=.92+daylight*.39;
- const night=new THREE.Color('#263449'),morning=new THREE.Color('#d9b79a'),day=new THREE.Color('#d8e5d7');
+ const weather=getWeather(world),season=getCalendar(world).season,key=season+'/'+weather;
+ if(Math.abs(daylight-lastDaylight)<.01&&lastLightingKey===key)return;
+ lastDaylight=daylight;lastLightingKey=key;
+ const cloud=weather==='rain'?.72:weather==='fog'?.82:1;
+ hemi.intensity=(.95+daylight*1.45)*cloud;
+ sun.intensity=(.22+daylight*3.10)*cloud;fill.intensity=.26+daylight*.38;
+ sun.color.set(season==='winter'?'#d5e2ef':daylight<.40?'#edb890':'#fff1d5');renderer.toneMappingExposure=(.92+daylight*.39)*(weather==='fog'?.94:1);
+ const night=new THREE.Color('#263449'),morning=new THREE.Color('#d9b79a'),day=new THREE.Color(season==='winter'?'#d6e4e8':season==='autumn'?'#e8dec9':'#d8e5d7');
  const sky=daylight<.35?night.clone().lerp(morning,daylight/.35):morning.clone().lerp(day,(daylight-.35)/.65);
  document.documentElement.style.setProperty('--sky-top',`#${sky.getHexString()}`);
  document.documentElement.style.setProperty('--sky-bottom',`#${sky.clone().lerp(new THREE.Color(daylight<.4?'#8f8d97':'#f3e8d4'),.6).getHexString()}`);
@@ -165,24 +210,24 @@ function tick(now:number){
   const events=advanceWorld(world,dt*speed);elapsed+=dt*speed;
   if(events.visitor)toast('山道上来了位佩剑客。');
   if(events.milestones.length){const last=events.milestones.at(-1);toast(last==='legacy'?'山谷里有了新的归处。':last==='returned'?'阿青归来了。':'谷中又传来一段江湖消息。');}
-  if(events.newDay&&!events.visitor&&!events.milestones.length)toast('清晨又到了，山谷仍然安宁。');
-  if(events.visitor||events.milestones.length||events.newDay){lastDecisionKey='';renderDecision();renderJournal();renderStats();}
+  if(events.crossedSeasons)toast('新的一季到了，山谷的景色也变了。');
+  if(events.visitor||events.milestones.length||events.crossedSeasons){lastDecisionKey='';renderDecision();renderJournal();renderStats();}
  }
  const daylight=getDaylight(world);lighting(daylight);village.updateStory(world);village.animate(elapsed,daylight);updatePeople(people,world,elapsed,selected);
  controls.update();renderer.render(scene,camera);
  if(now-lastTimeShown>260){lastTimeShown=now;renderClock();renderProgress();if(selected!==null)renderResident();}
  if(world.journal.at(-1)?.id!==lastChronicleId){lastChronicleId=world.journal.at(-1)?.id||0;renderJournal();}
- if(now-lastSave>5000){lastSave=now;try{saveWorld(world,localStorage);}catch{}}
+ if(now-lastSave>5000){lastSave=now;persist();}
  requestAnimationFrame(tick);
 }
 let hiddenSince:number|null=null;
 document.addEventListener('visibilitychange',()=>{
- if(document.hidden){hiddenSince=Date.now();try{saveWorld(world,localStorage);}catch{}}
- else if(hiddenSince!==null){const away=Math.min(120,Math.max(0,(Date.now()-hiddenSince)/1000));hiddenSince=null;
+ if(document.hidden){hiddenSince=Date.now();persist();}
+ else if(hiddenSince!==null){const away=Math.min(4*1440/3,Math.max(0,(Date.now()-hiddenSince)/1000));hiddenSince=null;
   advanceWorld(world,away);lastDecisionKey='';renderDecision();renderStats();renderJournal();village.updateStory(world);last=performance.now();
  }
 });
-window.addEventListener('pagehide',()=>{try{saveWorld(world,localStorage);}catch{}});
+window.addEventListener('pagehide',persist);
 renderStats();renderDecision();renderJournal();renderClock();village.updateStory(world);
 // Browser-level tests can inspect deterministic state without controlling the render-loop clock.
 (window as typeof window&{__HAVEN_DEBUG__?:unknown}).__HAVEN_DEBUG__={
@@ -190,6 +235,7 @@ renderStats();renderDecision();renderJournal();renderClock();village.updateStory
  choose:(choice:Decision)=>{const ok=chooseFate(world,choice);lastDecisionKey='';renderDecision();renderJournal();return ok;},
  advance:(seconds:number)=>{const result=advanceWorld(world,seconds);lastDecisionKey='';renderDecision();renderStats();renderJournal();village.updateStory(world);return result;},
  reset:()=>{world=createWorld();lastDecisionKey='';renderDecision();renderJournal();renderStats();village.updateStory(world);return true;},
+ flowSeason:()=>{const result=advanceToNextSeason(world);refreshWorld();return result;},
  getRendererInfo:()=>({calls:renderer.info.render.calls,triangles:renderer.info.render.triangles})
 };
 requestAnimationFrame(tick);
