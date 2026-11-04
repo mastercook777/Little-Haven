@@ -443,7 +443,8 @@ export interface PioneerGraphics{
  setSelected(selection:PioneerSelection|null):void;
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
-  forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number};
+  forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
+   seedMarkers:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -615,7 +616,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     visual.arms[0].rotation.z=.22*Math.sin(seconds*3+i);
     visual.arms[1].rotation.x=-.44+.22*Math.cos(seconds*2+i);
     visual.head.rotation.y=.22*Math.sin(seconds*1.8+i);
-   }else if((f.activity==='forage'||f.activity==='farm')&&!moving){
+   }else if((f.activity==='forage'||f.activity==='farm'||f.activity==='seed-trial')&&!moving){
     visual.root.position.y-=.15;visual.head.rotation.x=.12;
     visual.arms[0].rotation.x=-.55;visual.arms[1].rotation.x=-.55;
    }else visual.head.rotation.x=0;
@@ -637,7 +638,10 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   forestTrees:forest.signatures().standing,
   forestStumps:forest.signatures().stumps,
   fallingTree:forest.signatures().falling,
-  clearings:forest.signatures().clearings,clearedPlots:forest.signatures().cleared
+  clearings:forest.signatures().clearings,clearedPlots:forest.signatures().cleared,
+  seedMarkers:constructionLayer.children.filter(b=>b.getObjectByName('persisted-seed-trial-resolved')||
+   b.getObjectByName('persisted-seed-trial-working')||
+   b.getObjectByName('persisted-seed-trial-abandoned')).length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
