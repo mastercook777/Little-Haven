@@ -414,11 +414,13 @@ function step(s:PioneerWorld){
  const livelihoodWorkers=new Set<number>();
  // Real fishing means a resident works at the reached bank, using one
  // exclusive hour. Fishing stock is seasonal and never minted by the model.
- if((hour===11||hour===16)&&!crisis){
+ if(hour===8||hour===11||hour===16){
   const reach=s.sites.find(x=>x.kind==='fish'&&x.stock>.08);
   const fisher=s.founders.find(f=>f.id===6)??s.founders.find(f=>f.id===3);
-  const limit=Math.max(9,s.founders.length*(s.livelihood.direction==='river'?4:3));
-  if(reach&&fisher&&s.resources.food<Math.min(pioneerFoodCapacity(s)-1,limit)&&
+  // Fishers try a genuine morning shift before the usual farmers replenish
+  // every basket; if the store is full they cannot mint surplus food.
+  const freeSpace=pioneerFoodCapacity(s)-s.resources.food;
+  if(reach&&fisher&&freeSpace>=.55&&
    gather(s,fisher,'fish',weather==='rain'?.58:1.05,'fish',reach))
    livelihoodWorkers.add(fisher.id);
  }
