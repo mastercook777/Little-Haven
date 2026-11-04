@@ -1,4 +1,4 @@
-import {VALLEY_BOUNDS} from './valleyGeography.ts';
+import {pioneerIslandFraction} from './pioneerGeography.ts';
 import {parcelCorners,parcelLineDistance,parcelOverlaps,riverDistance,
  type VillageParcel} from './villagePlanning.ts';
 import type {PioneerRoad} from './pioneerPaths.ts';
@@ -13,8 +13,7 @@ export interface PioneerParcelResult{
 export function validatePioneerParcel(parcel:VillageParcel,
  occupied:readonly VillageParcel[],roads:readonly PioneerRoad[]=[]):PioneerParcelResult{
  const corners=parcelCorners(parcel,.90);
- if(corners.some(([x,z])=>(x/(VALLEY_BOUNDS.radiusX-1.05))**2+
-  (z/(VALLEY_BOUNDS.radiusZ-1.05))**2>=1))
+ if(corners.some(([x,z])=>pioneerIslandFraction(x,z,1.05,1.05)>=1))
   return {ok:false,reason:'outside-island'};
  if(riverDistance(parcel)<.72)return {ok:false,reason:'river-bank'};
  if(occupied.some(other=>other.id!==parcel.id&&parcelOverlaps(parcel,other)))
