@@ -38,8 +38,10 @@ export function notePioneerFarmCoWork(s:PioneerWorld,a:PioneerFounder,b:PioneerF
  if(a.activity!=='farm'||b.activity!=='farm')return;
  const garden=s.buildings.find(bld=>bld.kind==='garden'&&
   s.sites.some(site=>site.id==='field-'+bld.id&&
-   Math.abs(a.target[0]-pioneerEntrance(bld.parcel)[0])<.005&&
-   Math.abs(a.target[1]-pioneerEntrance(bld.parcel)[1])<.005));
+   Math.hypot(a.target[0]-pioneerEntrance(bld.parcel)[0],
+    a.target[1]-pioneerEntrance(bld.parcel)[1])<.65&&
+   Math.hypot(b.target[0]-pioneerEntrance(bld.parcel)[0],
+    b.target[1]-pioneerEntrance(bld.parcel)[1])<.65));
  if(!garden)return;
  const key=farmPairKey(garden.id,a.id,b.id);
  s.livingFates.farmCoWorkHours[key]=Math.min(100000,
