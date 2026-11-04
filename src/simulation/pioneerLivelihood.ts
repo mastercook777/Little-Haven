@@ -108,6 +108,10 @@ export function pioneerMilestoneBoard(s:PioneerWorld):PioneerMilestoneView[]{
    requirement:'菜圃建成，至少有人实际收一次菜',progress:'菜圃 '+counts('garden')+' 处'},
   {id:'commons',label:'村心渐成',done:s.commons.stage>=3,
    requirement:'住房、人口、灶台与木坊支撑公共议事',progress:s.commons.stage+' / 3 阶'},
+  {id:'loft',label:'老屋新阁',done:s.buildings.some(b=>b.kind==='cottage'&&b.loftAddedAt!==undefined),
+   requirement:'旧山居土地不够时，村民投入四份木料和八小时改造，才可添一名常住者',
+   progress:s.buildings.filter(b=>b.kind==='cottage'&&b.loftAddedAt!==undefined).length+
+    ' 座木阁 · 眼下 '+s.founders.length+' 位常住乡邻'},
   {id:'fish',label:'靠河吃饭',done:!!fish&&fish.totalGathered>0,
    requirement:'四位居民、菜圃与村心 → 安全河岸渔棚 → 真实捕鱼',
    progress:fish?'累计捕鱼 '+round(fish.totalGathered)+' 份':counts('fish-hut')?'渔棚已落成':'尚无渔棚'},
