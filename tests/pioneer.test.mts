@@ -198,7 +198,8 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
   accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
  occupied.push(camp);
  for(const b of s.buildings){
-  assert.ok(validatePioneerParcel(b.parcel,occupied,s.roads.filter(r=>r.buildingId!==b.id)).ok,'unsafe '+b.id);
+  const review=validatePioneerParcel(b.parcel,occupied,s.roads.filter(r=>r.buildingId!==b.id));
+  assert.ok(review.ok,'unsafe '+b.id+' '+review.reason+' x='+b.parcel.x+' z='+b.parcel.z);
   occupied.push(b.parcel);
  }
  // The one wood source cannot become landlocked behind an otherwise
