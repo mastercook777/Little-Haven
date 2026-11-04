@@ -347,7 +347,7 @@ const councilOpen=$<HTMLButtonElement>('pioneerCouncilOpen');
 councilOpen.addEventListener('click',()=>{
  councilPanel.open=!councilPanel.open;
  councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
- if(councilPanel.open)councilPanel.scrollIntoView({block:'end',behavior:'auto'});
+ if(councilPanel.open)$('pioneerDirections').scrollIntoView({block:'center',behavior:'auto'});
 });
 councilPanel.addEventListener('toggle',()=>{
  councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
