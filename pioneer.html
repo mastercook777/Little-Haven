@@ -18,11 +18,12 @@
       <a href="./index.html">旧谷 · 经典观察</a><span class="mode-current">新谷 · 开荒纪元</span>
     </nav>
   </header>
-  <aside class="pioneer-intro">
-    <span class="eyebrow">THE FIRST FIRE</span>
-    <h2>三人一火，<br /><em>山谷从此有人家。</em></h2>
-    <p>没有酒肆，也没有预先画好的小镇。山林里的每一根木料，都将由乡邻亲自采集。</p>
-    <div class="small-note">点击房屋/林地查看状态 · 左键旋转/右键平移 · 双指平移缩放</div>
+  <aside class="pioneer-intro" aria-label="眼前的村庄变化">
+    <span id="pioneerIntroChapter" class="eyebrow">第 1 年 · 初来乍到</span>
+    <h2 id="pioneerIntroTitle">第一间屋，<em>要从一捆柴开始。</em></h2>
+    <p id="pioneerIntroDetail">梁伯、陆娘和阿禾还只有一处营火。劳动与生活会逐渐改变这片山谷。</p>
+    <button type="button" id="pioneerSpotlightFocus" class="pioneer-spotlight-focus">看看这里 <span aria-hidden="true">⌕</span></button>
+    <div class="small-note">点击具体房屋或乡邻可追溯经历 · 拖动旋转 · 双指平移</div>
   </aside>
   <aside class="pioneer-panel" aria-label="营地近况">
     <div class="panel-kicker"><span class="small-sun">✦</span> 营地手记 <span id="pioneerWeather">春 · 晴</span></div>
@@ -89,7 +90,7 @@
     </details>
   </footer>
   <div id="pioneerToast" class="pioneer-toast" role="status"></div>
-  <div class="build-mark">v0.4.4 · LIVING FATES</div>
+  <div class="build-mark">v0.4.5 · VISIBLE VILLAGE</div>
 </div>
 <script type="module" src="/src/pioneerMain.ts"></script>
 </body>
