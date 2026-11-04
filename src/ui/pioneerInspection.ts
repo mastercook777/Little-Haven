@@ -38,7 +38,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
   });
   const fields=[
    {label:'眼前的营生',value:f.role},
-   {label:'来谷之后',value:date(person.arrivalAt)},
+   {label:'来谷记录',value:person.arrivalKnown?date(person.arrivalAt):'旧档已有乡邻 · 来时未详'},
    {label:'落脚住处',value:f.homeBuildingId?
     (s.buildings.find(b=>b.id===f.homeBuildingId)?.kind==='cottage'?'山居':'避雨棚'):'尚在营地'},
    {label:'此刻正在',value:f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
