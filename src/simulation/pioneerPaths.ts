@@ -1,4 +1,5 @@
-import {VALLEY_BOUNDS,VALLEY_RIVER,type GroundPoint} from './valleyGeography.ts';
+import {VALLEY_RIVER,type GroundPoint} from './valleyGeography.ts';
+import {PIONEER_VALLEY,pioneerIslandFraction} from './pioneerGeography.ts';
 import {parcelCorners,type VillageParcel} from './villagePlanning.ts';
 
 /** The dirt trails in pioneer mode are actual saved walkable connections. No
@@ -8,7 +9,7 @@ export interface PioneerRoad{
  id:string;buildingId:string;points:WalkPoint[];uses:number;
  grade:'track'|'dirt';createdAt:number;
 }
-const GRID=.68,MIN_X=-15.2,MIN_Z=-10.65,NX=46,NZ=33;
+const GRID=.68,MIN_X=-19.2,MIN_Z=-10.65,NX=54,NZ=33;
 const round=(n:number)=>Math.round(n*1000)/1000;
 const ix=(x:number)=>Math.max(0,Math.min(NX-1,Math.round((x-MIN_X)/GRID)));
 const iz=(z:number)=>Math.max(0,Math.min(NZ-1,Math.round((z-MIN_Z)/GRID)));
@@ -29,7 +30,7 @@ const insideParcel=(point:WalkPoint,p:VillageParcel,extra=0)=>{
 };
 export function pioneerWalkable(p:WalkPoint,occupied:readonly VillageParcel[],allowRiver=false):boolean{
  const [x,z]=p;
- if((x/(VALLEY_BOUNDS.radiusX-1.30))**2+(z/(VALLEY_BOUNDS.radiusZ-1.25))**2>.96)return false;
+ if(pioneerIslandFraction(x,z,PIONEER_VALLEY.walkMarginX,PIONEER_VALLEY.walkMarginZ)>.96)return false;
  if(!allowRiver&&riverClear(p)<2.47)return false;
  return !occupied.some(parcel=>insideParcel(p,parcel,.13));
 }
