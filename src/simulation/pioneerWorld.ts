@@ -493,7 +493,8 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   s.roads??=[];s.nextResidentId??=Math.max(...s.founders.map(f=>f.id))+1;
   s.nextSurveyAt??=0;s.lastArrivalAt??=0;
   // Old slots get only present-day profiles; do not invent historical memories.
-  s.livingFates??=createLivingFates(s.seed,s.founders,s.minutes);
+  if(s.livingFates===undefined)
+   s.livingFates=createLivingFates(s.seed,s.founders,s.minutes,true);
   if(!validateLivingFates(s))return null;
   if(!Array.isArray(s.roads)||s.roads.length>12||
    !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||
