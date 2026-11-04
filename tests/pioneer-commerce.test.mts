@@ -5,6 +5,7 @@ import {createPioneerWorld,advancePioneerWorld,importPioneerWorld} from '../src/
 import {setPioneerGuestPolicy,pioneerVisitorPosition,validPioneerCommerce,
  PIONEER_GUEST_POLICIES} from '../src/simulation/pioneerCommerce.ts';
 import {pioneerMilestoneBoard,setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
+import {surveyPioneerPlot} from '../src/simulation/pioneerGrowth.ts';
 import {inspectPioneerSelection} from '../src/ui/pioneerInspection.ts';
 
 const round=(v:number)=>Math.round(v*1000)/1000;
@@ -28,7 +29,10 @@ test('v0.5.1: 5 years create real tea shed and bounded distinct visitors, not ph
  assert.ok(tea,'year-five autonomous village must have genuinely built a tea stop: '+
   JSON.stringify({built:s.buildings.map(b=>b.kind),stage:s.commons.stage,
    people:s.founders.length,wood:s.resources.wood,roads:s.roads.length,
-   intent:s.intent?.kind,journal:s.journal.slice(-4)}));
+   intent:s.intent?.kind,journal:s.journal.slice(-4),
+   survey:surveyPioneerPlot(s,'tea-stop')?.parcel??null,
+   nextSurveyAt:s.nextSurveyAt,latestSurveys:s.journal.filter(e=>e.title==='勘地暂缓').slice(-4),
+   elapsed:s.minutes,route:s.commerce.nextVisitorAt}));
  assert.ok(tea!.materialsSpent.wood>=9&&tea!.workHours>=12);
  assert.ok(s.roads.some(r=>r.buildingId===tea!.id&&r.points.length>=2));
  assert.ok(c.totalArrivals>=2,'tea must actually receive named finite-time travelers');
