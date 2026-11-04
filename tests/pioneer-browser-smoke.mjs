@@ -130,7 +130,7 @@ try{
  if(!await page.locator('#pioneerLivelihoodPanel').evaluate(node=>node.open))
   throw Error('Quick village council cannot open development options');
  const available=await page.locator('#pioneerDirections button[data-livelihood]').count();
- if(available!==4)throw Error('Village council still offers only the old 3 advice buttons');
+ if(available!==5)throw Error('Village council must offer five paths including road trade');
  await page.locator('#pioneerDirections button[data-livelihood="river"]').click();
  const directionState=await page.evaluate(()=>({
   direction:window.__PIONEER_DEBUG__.getState().livelihood.direction,
@@ -529,7 +529,7 @@ try{
  await mpage.evaluate(()=>window.__PIONEER_DEBUG__.advance(1200));
  await mpage.locator('#pioneerCouncilOpen').tap();
  const touchChoices=await mpage.locator('#pioneerDirections button').count();
- if(touchChoices!==4)throw Error('Mobile council decisions not reachable');
+ if(touchChoices!==5)throw Error('Mobile council must include road trade as a fifth direction');
  await mpage.locator('#pioneerDirections button[data-livelihood="fields"]').tap();
  if(await mpage.evaluate(()=>window.__PIONEER_DEBUG__.getState().livelihood.direction)!=='fields')
   throw Error('Mobile village council vote did not change the model');
@@ -576,6 +576,30 @@ try{
  if(!commonsCard.open||!['临时营火','安家火塘','公共灶台','村心空地'].includes(commonsCard.title)||
   !commonsCard.contents?.includes('已耗木料'))
   throw Error('Mobile commons detail does not expose its real growth history: '+JSON.stringify(commonsCard));
+ // The mature village's guest reception must be touch-usable on a true 390px
+ // viewport, not only visible in desktop code or a disconnected mock panel.
+ await mpage.locator('#inspectClose').tap();
+ await mpage.evaluate(async()=>{
+  const d=window.__PIONEER_DEBUG__;
+  const {DAY_MINUTES}=await import('/src/simulation/calendar.ts');
+  d.reset(42);d.advance((48*4*DAY_MINUTES-d.getState().minutes)/3);
+ });
+ const hasTeaOnMobile=await mpage.evaluate(()=>
+  window.__PIONEER_DEBUG__.getState().buildings.some(b=>b.kind==='tea-stop'));
+ if(!hasTeaOnMobile)throw Error('No real road tea stop in four-year mobile settlement');
+ await mpage.locator('#pioneerCouncilOpen').tap();
+ const guestOptions=await mpage.locator('#pioneerGuestChoices button').count();
+ if(guestOptions!==3)throw Error('Mobile guest policy choices not reachable');
+ await mpage.locator('#pioneerGuestChoices button[data-guest-policy="hospitality"]').tap();
+ const mobileGuest=await mpage.evaluate(()=>{
+  const s=window.__PIONEER_DEBUG__.getState();
+  return {policy:s.commerce.guestPolicy,founders:s.founders.length,
+   visitors:s.commerce.totalArrivals,remaining:s.resources.food};
+ });
+ if(mobileGuest.policy!=='hospitality'||mobileGuest.founders>12)
+  throw Error('Mobile hospitality did not change real world state: '+JSON.stringify(mobileGuest));
+ await screenshot(mpage,'07-mobile-roadside-guest-decisions');
+ results.push({mobileGuestPolicy:mobileGuest});
  results.push({mobile:sizing,touchInspection:true,touchMethod:canvasVisible?'3d-canvas':'accessible-facility-list',
   commonsCard:true,frontmost});
  await mobile.close();
