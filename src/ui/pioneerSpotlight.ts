@@ -1,4 +1,4 @@
-import {DAY_MINUTES,SEASON_NAMES} from '../simulation/calendar.ts';
+import {DAY_MINUTES,SEASON_NAMES,getCalendarFromMinutes} from '../simulation/calendar.ts';
 import {pioneerBuildingLabel} from '../simulation/pioneerGrowth.ts';
 import {getPioneerCalendar,type PioneerJournal,type PioneerWorld} from '../simulation/pioneerWorld.ts';
 import type {PioneerSelection} from './pioneerInspection.ts';
@@ -17,7 +17,7 @@ const built=(id:string):PioneerSelection=>({kind:'building',id});
 const site=(id:string):PioneerSelection=>({kind:'site',id});
 const material=(n:number)=>n.toFixed(1).replace(/\.0$/,'');
 function fromEvent(s:PioneerWorld,e:PioneerJournal):PioneerSpotlight|null{
- const label=SEASON_NAMES[getPioneerCalendar(s).season];
+ const label=SEASON_NAMES[getCalendarFromMinutes(e.minute).season];
  const when='乡邻见闻 · '+label+'时';
  const b=s.buildings.find(x=>x.causeId===e.causeId||x.id===e.causeId);
  if((e.title==='避雨棚落成'||e.title==='菜圃落成'||
