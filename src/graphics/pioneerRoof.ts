@@ -36,7 +36,7 @@ function roofWedge(profile:PioneerRoofProfile,side:-1|1){
 export function buildPioneerRoof(parent:THREE.Object3D,
  profile:PioneerRoofProfile,
  roofMat:THREE.Material,beamMat:THREE.Material,
- ridgeMat:THREE.Material,reedMat?:THREE.Material){
+ ridgeMat:THREE.Material,reedMat?:THREE.Material,gableMat?:THREE.Material){
  const g=new THREE.Group();g.name='pioneer-roof-assembly';parent.add(g);
  const surface=roofMat.clone();surface.side=THREE.DoubleSide;
  for(const side of [-1,1] as const){
@@ -64,6 +64,22 @@ export function buildPioneerRoof(parent:THREE.Object3D,
     seam.position.set(x,pioneerRoofHeight(profile,x)+.024,0);
     seam.name='roof-reed-on-slope';seam.castShadow=true;g.add(seam);
    }
+  }
+ }
+ if(gableMat){
+  // Occupied cottages have real enclosed triangular end walls under the
+  // roof, unlike an open workshop or the founding shelter.
+  const wall=gableMat.clone();wall.side=THREE.DoubleSide;
+  for(const z of [-profile.halfDepth+.11,profile.halfDepth-.11]){
+   const geometry=new THREE.BufferGeometry();
+   geometry.setAttribute('position',new THREE.Float32BufferAttribute([
+    -profile.halfWidth+.11,profile.eaveY-.06,z,
+    profile.halfWidth-.11,profile.eaveY-.06,z,
+    0,profile.ridgeY-.095,z
+   ],3));
+   geometry.setIndex([0,1,2]);geometry.computeVertexNormals();
+   const mesh=new THREE.Mesh(geometry,wall);
+   mesh.name='enclosed-cottage-gable';mesh.castShadow=true;mesh.receiveShadow=true;g.add(mesh);
   }
  }
  const ridge=new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,profile.halfDepth*2+.16,9),
