@@ -182,6 +182,56 @@ try{
   .buildings.find(b=>b.id===id),gardenId);
  if(savedConfig?.productionMode!=='seed'||savedConfig.operating!==false)
   throw Error('Garden production settings lost after reload');
+
+ // Fate-C browser fixture: start from three REAL simulated years and use
+ // their real recorded co-farm evidence. Only the pantry is boosted to test
+ // the surplus branch; the simulator itself must spend the seeds and shifts.
+ const seedFate=await page.evaluate(async()=>{
+  const d=window.__PIONEER_DEBUG__,s=d.getState();
+  const {advancePioneerWorld,PIONEER_SLOT_KEYS}=await import('/src/simulation/pioneerWorld.ts');
+  const {considerSeedTrial}=await import('/src/simulation/livingFates/seedTrial.ts');
+  const {nextSeasonBoundary}=await import('/src/simulation/calendar.ts');
+  const entries=Object.entries(s.livingFates.farmCoWorkHours)
+   .filter(([,hours])=>hours>=8).sort((a,b)=>b[1]-a[1]);
+  const entry=entries.find(([key])=>s.buildings.some(b=>b.id===key.slice(0,key.lastIndexOf(':'))));
+  if(!entry)return {error:'three-year village has no same-garden experienced labor pair',
+   people:s.founders.length,farms:s.livingFates.farmCoWorkHours};
+  const gardenId=entry[0].slice(0,entry[0].lastIndexOf(':'));
+  const building=s.buildings.find(b=>b.id===gardenId);
+  building.operating=true;building.productionMode='seed';
+  s.resources.food=36;s.resources.water=Math.max(s.resources.water,s.founders.length*3);
+  if(!considerSeedTrial(s))return {error:'fate prerequisites not met',gardenId,pantry:s.resources,
+   workers:entry,calendar:s.minutes};
+  const first=structuredClone(s.livingFates.seedTrials.at(-1));
+  advancePioneerWorld(s,(nextSeasonBoundary(s.minutes)-s.minutes)/3);
+  const final=s.livingFates.seedTrials.at(-1);
+  if(final.phase!=='resolved')return {error:'real season trial failed',first,final,food:s.resources.food};
+  localStorage.setItem(PIONEER_SLOT_KEYS[0],JSON.stringify(s));
+  return {gardenId,first,final,legacy:s.livingFates.fieldLegacies.find(l=>l.gardenId===gardenId),
+   food:s.resources.food};
+ });
+ if(seedFate.error||seedFate.first.seedsSpent!==1.2||seedFate.final.phase!=='resolved'||
+  seedFate.legacy?.harvestBonus!==.06)
+  throw Error('Seasonal seed trial is not a real persistent causal chain: '+JSON.stringify(seedFate));
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
+ await page.locator('.pioneer-building-list').evaluate(el=>el.open=true);
+ await page.locator('button[data-pick-building="'+seedFate.gardenId+'"]').click();
+ const seedFateCard=await page.evaluate(()=>({
+  visible:!document.querySelector('#pioneerInspector').hidden,
+  facts:document.querySelector('#inspectFacts')?.textContent,
+  history:document.querySelector('#inspectHistory')?.textContent,
+  markers:window.__PIONEER_DEBUG__.getVisuals().seedMarkers,
+  persisted:window.__PIONEER_DEBUG__.getState().livingFates.fieldLegacies
+ }));
+ if(!seedFateCard.visible||!seedFateCard.facts?.includes('田间传承')||
+  !seedFateCard.history?.includes('试田有成')||seedFateCard.markers<1)
+  throw Error('True land legacy has no saved model or readable field history: '+JSON.stringify(seedFateCard));
+ await screenshot(page,'05b-field-seed-trial-living-fate');
+ await page.locator('#inspectClose').click();
+ results.push({seedFate:true,realShifts:seedFate.final.workBy,persistentSeedPlot:true,
+  actualFieldBonus:seedFate.legacy.harvestBonus});
+
  // Newly opened land and trees must appear as distinct, inspectable 3D
  // scenes, not just an expanding building count.
  const pioneerFelling=await page.evaluate(()=>{
