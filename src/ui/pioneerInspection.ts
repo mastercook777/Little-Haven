@@ -112,8 +112,13 @@ export function inspectPioneerSelection(s:PioneerWorld,
   );
   else if(commons.stage<3)facts.push({label:'接下来',value:commons.stage===0?
    '首间避雨棚入住':'菜圃和新邻居 / 更多住户、工坊'});
+  // Commons milestones must remain inspectable even after hundreds of
+  // routine conversations have pushed older journal lines out of the ring.
+  const completed=commons.stageCompletedAt.flatMap((minute,i)=>
+   minute===null?[]:[date(minute)+' · '+pioneerCommonsNames[i+1]+'落成']).reverse();
+  const recent=relevant(s,commons.id).filter(line=>!line.includes('落成')).slice(0,2);
   return {title,kicker:'原始营火所在地 · '+commons.id,description,facts,
-   history:relevant(s,commons.id)};
+   history:[...completed,...recent]};
  }
  return null;
 }
