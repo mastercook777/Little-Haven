@@ -22,7 +22,8 @@ export interface SeedFatesState{
 const round=(x:number)=>Math.round(x*1000)/1000;
 const SEEDS=1.2,SHIFT_HOURS=5,MIN_CO_FARM=8;
 const maxTrials=36;
-const safeFood=(s:PioneerWorld)=>s.resources.food>=Math.max(6,s.founders.length*2.4);
+const safeToStart=(s:PioneerWorld)=>s.resources.food>=Math.max(6,s.founders.length*2.4);
+const safeToWork=(s:PioneerWorld)=>s.resources.food>=Math.max(2,s.founders.length*.75);
 const journal=(s:PioneerWorld,title:string,content:string,causeId:string)=>{
  if(s.journal.length>=160)s.journal.shift();
  const id=s.nextEventId++;
@@ -75,7 +76,7 @@ function eligiblePair(s:PioneerWorld,gardenId:string):[number,number]|null{
  * reachable operational garden. Other good villages can simply never do it. */
 export function considerSeedTrial(s:PioneerWorld){
  if(activeSeedTrial(s)||s.livingFates.seedTrials.length>=maxTrials||
-  !safeFood(s)||s.resources.water<s.founders.length*.6)return false;
+  !safeToStart(s)||s.resources.water<s.founders.length*.6)return false;
  const boundary=nextSeasonBoundary(s.minutes);
  if(boundary-s.minutes<10*DAY_MINUTES)return false;
  for(const garden of s.buildings.filter(b=>b.kind==='garden'&&isPioneerFacilityActive(b))){
@@ -113,7 +114,7 @@ export function performSeedTrialShift(s:PioneerWorld,f:PioneerFounder,
  field:PioneerResourceSite){
  const trial=activeSeedTrial(s);
  if(!trial||field.kind!=='field'||field.id!=='field-'+trial.gardenId||
-  s.minutes>=trial.resolveAt||!safeFood(s)||f.activity!=='seed-trial')return false;
+  s.minutes>=trial.resolveAt||!safeToWork(s)||f.activity!=='seed-trial')return false;
  const index=trial.actorIds.indexOf(f.id);
  if(index<0||trial.lastWorkAt[index]===s.minutes)return false;
  const garden=s.buildings.find(b=>b.id===trial.gardenId);
