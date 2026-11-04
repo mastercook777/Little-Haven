@@ -530,7 +530,7 @@ export interface PioneerGraphics{
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
    seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
-   fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number};
+   fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -801,7 +801,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   grainJars:[...grainProps.values()].reduce((n,items)=>
    n+items.filter(p=>p.visible).length,0),
   sawbenches:constructionLayer.children.filter(g=>g.getObjectByName('actual-crafted-sawbench')).length,
-  fishingActors:latestWorld.founders.filter(f=>f.activity==='fish').length
+  fishingActors:latestWorld.founders.filter(f=>f.activity==='fish').length,
+  loftDormers:constructionLayer.children.filter(g=>g.getObjectByName('paid-residential-loft')).length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
