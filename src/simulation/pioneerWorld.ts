@@ -615,9 +615,14 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    ids.add(b.id);occupied.push(b.parcel);
   }
   if(s.intent){
-   if(s.intent.kind==='loft'&&!s.buildings.some(b=>b.kind==='cottage'&&
+   if(s.intent.kind==='loft'&&(
+    s.intent.woodRequired!==4||s.intent.workRequired!==8||
+    ![0,4].includes(s.intent.woodCommitted)||
+    (s.intent.phase==='materials'&&s.intent.woodCommitted!==0)||
+    (['foundation','frame'].includes(s.intent.phase)&&s.intent.woodCommitted!==4)||
+    !s.buildings.some(b=>b.kind==='cottage'&&
      b.id===s.intent?.targetBuildingId&&b.loftAddedAt===undefined&&
-     b.parcel.id===s.intent?.parcel?.id))return null;
+     b.parcel.id===s.intent?.parcel?.id)))return null;
    if(!['survey','materials','foundation','frame'].includes(s.intent.phase)||
     !Number.isFinite(s.intent.woodCommitted)||!Number.isFinite(s.intent.workDone)||
     s.intent.woodCommitted<0||s.intent.woodCommitted>20||
