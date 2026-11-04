@@ -47,6 +47,20 @@ try{
   throw Error('New forest lacks genuine initial vegetation or starts pre-cleared: '+JSON.stringify(initial.scene));
  if(initial.mode!=='pioneer'||initial.founders!==3||initial.buildings!==0||
   initial.scene.renderedStructures!==0||!initial.gl)throw Error('Not a genuine empty WebGL start: '+JSON.stringify(initial));
+ // v0.4.4: public person inspection must be accessible without leaks.
+ await page.locator('#founderTasks button[data-pick-person="1"]').click();
+ const personCard=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,p=d.getState().livingFates.people[1];
+  return {title:document.querySelector('#inspectTitle')?.textContent,
+   facts:document.querySelector('#inspectFacts')?.textContent,
+   description:document.querySelector('#inspectDescription')?.textContent,
+   privateTags:p.privateFacts.tags};
+ });
+ if(personCard.title!=='梁伯'||!personCard.facts?.includes('眼前的营生')||
+  personCard.privateTags.some(tag=>
+   (personCard.facts+personCard.description).includes(tag)))
+  throw Error('Public identity inspector leaks or fails: '+JSON.stringify(personCard));
+ await page.locator('#inspectClose').click();
  const startDigest=await screenshot(page,'01-three-founders-and-camp');
  await page.locator('[data-policy="shelter"]').click();
  let sawConstruction=false,constructed=null;

@@ -1,4 +1,5 @@
 import {DAY_MINUTES} from './calendar.ts';
+import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
 import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {pioneerBuildingPath,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
@@ -209,20 +210,24 @@ const newcomers=[
 ] as const;
 export function considerPioneerMigration(s:PioneerWorld){
  if(s.founders.length>=9||s.minutes<s.lastArrivalAt+7*DAY_MINUTES)return false;
+ const idx=s.founders.length-3;const data=newcomers[idx%newcomers.length];
+ // A stable visitor exists before acceptance, even while a house or food is
+ // missing. Returning later never changes this person's seed, history or ID.
+ s.livingFates.pendingCandidate??=makePioneerCandidate(
+  s.seed,s.nextResidentId,data,s.minutes);
+ const candidate=s.livingFates.pendingCandidate;
  const cottage=s.buildings.find(b=>b.kind==='cottage'&&b.occupants.length<2);
  if(!cottage||!pioneerHasFacility(s,'garden')||
-  // A house being empty is not enough. The grain stores must cover the
-  // prospective mouth for several days before a new resident may arrive.
   s.resources.food<Math.max(6,(s.founders.length+1)*1.5)||
   s.resources.water<Math.max(2,s.founders.length*.6)||
   s.sites.filter(site=>site.kind==='field').length<Math.ceil((s.founders.length+1)/4))
   return false;
- const idx=s.founders.length-3;const data=newcomers[idx%newcomers.length];
  const id=s.nextResidentId++;
- const next:PioneerFounder={id,name:data[0],role:data[1],color:data[2],
+ const next:PioneerFounder={id,name:candidate.name,role:candidate.role,color:candidate.color,
   activity:'shelter',target:[cottage.parcel.x,cottage.parcel.z],
   homeBuildingId:cottage.id};
  s.founders.push(next);cottage.occupants.push(id);s.lastArrivalAt=s.minutes;
+ welcomePioneerCandidate(s,candidate);
  record(s,'又添一位乡邻',next.name+'听说此地有屋、有粮、有工作，循着新踏出的村路在山居安顿。',cottage.causeId);
  return true;
 }
