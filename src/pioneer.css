@@ -32,6 +32,11 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
 .resource-row span{font-size:11px;color:#7b897a}.resource-row b{font:700 19px system-ui;color:#536a55;font-variant-numeric:tabular-nums}
 .founder-heading,.policy-heading{font-size:11px;letter-spacing:.7px;font-weight:800;color:#758275;margin:14px 0 10px}
 .founder-tasks{display:grid;gap:8px}.founder-task{display:flex;align-items:center;gap:10px;font-size:12px}
+.founder-task{width:100%;border:1px solid transparent;background:transparent;
+ padding:5px 7px;text-align:left;border-radius:8px;cursor:pointer;font:inherit;
+ transition:background .14s ease,border-color .14s ease}
+.founder-task:hover,.founder-task:focus-visible{background:#eaf0e3;border-color:#c6d6bf}
+.founder-task:focus-visible{outline:2px solid #7d9e79;outline-offset:2px}
 .founder-task b{min-width:34px;color:#435848}.founder-task span{color:#78877b}
 .policy-heading{margin-top:17px}.policy-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .policy-actions button{padding:9px 4px;font-size:11px}
