@@ -87,31 +87,121 @@ function resourceLandmarks(root:THREE.Group,s:PioneerWorld){
  }
 }
 function campVisual(root:THREE.Group,s:PioneerWorld){
- const g=group(root,s.camp.x,.19,s.camp.z);g.name='pioneer-temporary-camp';
+ const g=group(root,s.camp.x,.19,s.camp.z);
+ g.name='pioneer-commons-at-original-camp';
  g.userData.pioneerCamp=true;
- const pad=new THREE.Mesh(new THREE.CircleGeometry(1.05,22),
-  new THREE.MeshStandardMaterial({color:'#b8aa82',side:THREE.DoubleSide}));
- pad.rotation.x=-Math.PI/2;pad.position.y=.018;pad.scale.set(1.2,.85,1);g.add(pad);
- for(let i=0;i<8;i++){
-  const a=i*Math.PI/4;orb(g,Math.cos(a)*.4,.08,Math.sin(a)*.4,.16,stone,1.2,.60,.80);
- }
+ const stages:THREE.Group[]=[],flames:THREE.Mesh[]=[];
+ const stageRoot=(index:number,label:string)=>{
+  const parent=group(g);parent.name=label;stages[index]=parent;return parent;
+ };
+ const flame=(parent:THREE.Group,x:number,z:number,scale=1)=>{
+  const fire=orb(parent,x,.33,z,.22*scale,material('#ffc265','#ed6b32'),.75,1.44,.74);
+  fire.name='commons-hearth-flame';flames.push(fire);
+  return fire;
+ };
+ const ringStones=(parent:THREE.Group,x:number,z:number,r=.40,count=9)=>{
+  for(let i=0;i<count;i++){
+   const a=i*Math.PI*2/count;
+   orb(parent,x+Math.cos(a)*r,.075,z+Math.sin(a)*r,.14,stone,1.2,.52,.92);
+  }
+ };
+ const bench=(parent:THREE.Group,x:number,z:number,angle:number)=>{
+  const b=group(parent,x,0,z);b.rotation.y=angle;
+  box(b,0,.33,0,.82,.12,.23,lightWood);
+  for(const dx of [-.27,.27])box(b,dx,.16,0,.10,.29,.15,wood);
+  return b;
+ };
+ const pad=(parent:THREE.Group,r:number)=>{
+  const m=new THREE.Mesh(new THREE.CircleGeometry(r,32),
+   new THREE.MeshStandardMaterial({color:'#afa68a',side:THREE.DoubleSide,roughness:1}));
+  m.rotation.x=-Math.PI/2;m.position.y=.024;
+  parent.add(m);return m;
+ };
+ // 0: three bedrolls are visibly temporary. No permanent construction.
+ const temporary=stageRoot(0,'commons-stage-0-three-bedrolls');
+ pad(temporary,1.05);ringStones(temporary,0,0,.43,8);
  for(const sign of [-1,1]){
-  const log=box(g,sign*.23,.16,0,.13,.14,.78,wood);log.rotation.y=sign*.65;
+  const log=box(temporary,sign*.23,.16,0,.13,.14,.78,wood);log.rotation.y=sign*.65;
  }
- const fire=orb(g,0,.35,0,.25,material('#ffc265','#ed6b32'),.75,1.6,.74);
- fire.name='campfire-flame';
- const ember=orb(g,0,.16,0,.20,material('#d76335','#ff994d'),1,.35,1);
- ember.name='campfire-ember';
+ flame(temporary,0,0,1);
  for(const [x,z,angle] of [[-.95,.35,-.3],[.90,.30,.4],[0,1.03,0]]){
-  const bed=box(g,x,.07,z,.83,.11,.43,cloth);bed.rotation.y=angle;
-  box(g,x,.12,z-.22,.24,.16,.16,lightWood).rotation.y=angle;
+  const bed=box(temporary,x,.07,z,.83,.11,.43,cloth);bed.rotation.y=angle;
+  box(temporary,x,.12,z-.22,.24,.16,.16,lightWood).rotation.y=angle;
  }
- const supplies=group(g,-1.28,.05,-1.12);supplies.name='camp-supplies';
- const basket=pole(supplies,0,.22,0,.29,.42,material('#9c815f'));
- basket.name='rations-basket';
+ const supplies=group(temporary,-1.28,.05,-1.12);supplies.name='camp-supplies';
+ pole(supplies,0,.22,0,.29,.42,material('#9c815f'));
  for(let i=0;i<4;i++)orb(supplies,(i%2-.5)*.25,.49,
   Math.floor(i/2)*.19-.15,.12,material('#d2af68'));
- return {root:g,fire,supplies};
+ // 1: old grass beds disappear; residents now have a shared stone hearth.
+ const hearth=stageRoot(1,'commons-stage-1-stone-hearth');
+ pad(hearth,1.20);
+ ringStones(hearth,0,0,.48,12);flame(hearth,0,0,.82);
+ for(const [x,z,angle] of [[-1.04,.12,Math.PI/2],[1.04,.12,Math.PI/2],[0,1.02,0]]){
+  bench(hearth,x,z,angle);
+ }
+ box(hearth,-.87,.26,-.84,.40,.32,.42,wood);
+ for(let i=0;i<3;i++)orb(hearth,-.91+i*.23,.35,-.90,.14,material('#b39166'),1,.7,1);
+ // 2: functional communal kitchen with pottery, food prep and weather cover.
+ const kitchen=stageRoot(2,'commons-stage-2-open-community-kitchen');
+ pad(kitchen,1.35);
+ for(const z of [-.42,.38]){
+  box(kitchen,0,.20,z,1.45,.36,.39,stone);
+ }
+ const oven=box(kitchen,0,.47,-.32,1.02,.57,.66,material('#a29a89'));
+ oven.name='communal-oven';ringStones(kitchen,0,-.32,.32,8);
+ flame(kitchen,0,-.28,.52);
+ const ironPot=pole(kitchen,0,.85,-.30,.36,.30,material('#505a53'));
+ ironPot.name='community-cooking-pot';
+ orb(kitchen,0,.98,-.30,.32,material('#747870'),1,.30,1);
+ for(const x of [-1.13,1.13])for(const z of [-.87,.78])
+  pole(kitchen,x,1.12,z,.074,1.99,wood);
+ box(kitchen,0,2.12,0,2.45,.13,1.94,thatch).rotation.x=-.14;
+ box(kitchen,-.80,2.19,.78,.14,.13,2.1,lightWood);
+ const prep=box(kitchen,.90,.66,.78,.59,.12,.48,lightWood);
+ prep.name='kitchen-prep-table';
+ for(const x of [.70,.90,1.07])
+  orb(kitchen,x,.77,.80,.12,material('#a48d60'),1.2,.66,.9);
+ bench(kitchen,-.64,1.13,0);
+ // 3: social plaza with an off-center, small ceremonial ember, notice board,
+ // tables and paving, not the three-bed overnight camp.
+ const plaza=stageRoot(3,'commons-stage-3-village-square');
+ const pavement=pad(plaza,1.47);pavement.name='village-plaza-ground';
+ for(let i=0;i<18;i++){
+  const a=i*2.399,r=.53+(i%5)*.17;
+  const stoneP=orb(plaza,Math.cos(a)*r,.04,Math.sin(a)*r,.19,
+   i%3?stone:material('#b0a48b'),1.6,.20,1.04);
+  stoneP.rotation.y=a;
+ }
+ ringStones(plaza,-.96,-.76,.25,8);flame(plaza,-.96,-.76,.34);
+ const board=group(plaza,.92,0,-.70);
+ for(const x of [-.43,.43])pole(board,x,.89,0,.073,1.63,wood);
+ box(board,0,1.41,0,1.07,.73,.11,lightWood);
+ box(board,0,1.41,.08,.94,.60,.04,material('#bfb492'));
+ for(let i=0;i<3;i++)box(board,-.27,1.60-i*.18,.12,.43,.045,.02,wood);
+ box(board,0,1.87,0,1.26,.13,.17,wood);
+ for(const x of [-.62,.62])box(plaza,x,.52,.72,.66,.17,.33,lightWood);
+ box(plaza,0,.66,.69,.68,.10,.46,material('#a68d63'));
+ for(const [x,z] of [[-1.2,.10],[1.2,.35]])
+  pole(plaza,x,.59,z,.04,.96,lightWood);
+ const lantern=orb(plaza,1.2,1.04,.35,.13,material('#e5c58d','#a8734e'));
+ lantern.name='village-gathering-lantern';
+ // A separate scaffold is only displayed when a real material-paid job
+ // is in progress. It occupies this same reserved commons plot.
+ const scaffold=group(g);scaffold.name='commons-real-construction-scaffold';
+ for(const x of [-1.12,1.12]){
+  pole(scaffold,x,.77,-1.08,.06,1.36,lightWood);
+  box(scaffold,x,.17,-1.08,.22,.22,.20,stone);
+ }
+ box(scaffold,0,1.42,-1.08,2.35,.13,.14,wood);
+ const progress=box(scaffold,0,.11,1.18,1.28,.20,.31,lightWood);
+ progress.name='commons-actual-materials';
+ function setStage(index:number,building=false,percent=0){
+  for(let i=0;i<stages.length;i++)stages[i].visible=i===index;
+  scaffold.visible=building;
+  if(building)scaffold.scale.y=.45+.55*Math.min(1,Math.max(0,percent));
+ }
+ setStage(s.commons.stage);
+ return {root:g,flames,supplies,setStage,stages};
 }
 function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|'frame'|'complete',
  progress:number){
@@ -161,7 +251,7 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
  plinth.name='shelter-plinth';
  return g;
 }
-interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;}
+interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;}
 function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  const g=group(parent,0,.19,0);g.name='pioneer-'+founder.id;
  g.userData.founderId=founder.id;
@@ -186,7 +276,14 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
   orb(g,0,1.60,-.22,.23,material('#564d3b'),.9,.70,.90);
  }
  const tool=group(g,0,0,0);tool.name='occupational-gear';
- return {root:g,arms,legs,head,tool};
+ const ladle=box(tool,.33,1.17,.23,.055,.48,.07,wood);ladle.name='cooking-ladle';
+ orb(tool,.33,.95,.23,.11,stone,1,.30,1);
+ tool.visible=false;
+ const mealBowl=group(g,0,.74,.27);mealBowl.name='resident-meal-bowl';
+ orb(mealBowl,0,0,0,.21,material('#ad9671'),1,.36,1);
+ orb(mealBowl,0,.04,0,.16,material('#d6c392'),1,.12,1);
+ mealBowl.visible=false;
+ return {root:g,arms,legs,head,tool,mealBowl};
 }
 /** The facility models share eave limits with the space planner while
  * changing the actual silhouette, not merely swapping a material. */
@@ -315,7 +412,8 @@ function drawFootpaths(parent:THREE.Group,roads:readonly PioneerRoad[]){
 export interface PioneerGraphics{
  root:THREE.Group;update(s:PioneerWorld,seconds:number):void;
  setSelected(selection:PioneerSelection|null):void;
- signatures():{buildings:number;renderedStructures:number;phase:string;people:number;roads:number};
+ signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
+  roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -425,9 +523,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    (rainGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate=true;
   }
   const dayHour=getPioneerCalendar(s).hour;
-  const flame=camp.fire;
-  flame.scale.y=.30+Math.abs(Math.sin(seconds*6))*.16;
-  flame.visible=!(weather==='rain'&&s.resources.wood<=0);
+  const commonsProject=s.commons.project;
+  camp.setStage(s.commons.stage,commonsProject?.phase==='building',
+   commonsProject?commonsProject.workDone/commonsProject.workRequired:0);
+  camp.flames.forEach((flame,i)=>{
+   flame.scale.y=.30+Math.abs(Math.sin(seconds*6+i))*.16;
+   flame.visible=i===s.commons.stage&&!(weather==='rain'&&s.resources.wood<=0);
+  });
   camp.supplies.scale.setScalar(.84+Math.min(1,s.resources.food/14)*.2);
   people.forEach((visual,i)=>{
    const f=s.founders[i],night=dayHour>=20||dayHour<7;
@@ -448,13 +550,29 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    visual.arms[0].rotation.x=swing;visual.arms[1].rotation.x=-swing;
    visual.legs[0].rotation.x=-swing;visual.legs[1].rotation.x=swing;
    visual.root.scale.setScalar(i<3?1:.95);
-   if((f.activity==='build'||f.activity==='repair')&&!moving){
+   visual.tool.visible=f.activity==='cook';
+   visual.mealBowl.visible=f.activity==='eat'||f.activity==='eat-home';
+   if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build')&&!moving){
     const effort=Math.sin(seconds*5+i)*.20;
     visual.arms[0].rotation.x=-.72+effort;visual.arms[1].rotation.x=-.72-effort;
+   }else if(f.activity==='cook'&&!moving){
+    visual.arms[0].rotation.x=-1.0+.3*Math.sin(seconds*4+i);
+    visual.arms[1].rotation.x=-.50+.25*Math.cos(seconds*4+i);
+    visual.tool.rotation.z=.15*Math.sin(seconds*4+i);
+    visual.head.rotation.x=.13;
+   }else if((f.activity==='eat'||f.activity==='eat-home')&&!moving){
+    visual.arms[0].rotation.x=-.92+.16*Math.sin(seconds*5+i);
+    visual.arms[1].rotation.x=-.66;
+    visual.head.rotation.x=.16;
+   }else if(f.activity==='socialize'&&!moving){
+    visual.arms[0].rotation.z=.22*Math.sin(seconds*3+i);
+    visual.arms[1].rotation.x=-.44+.22*Math.cos(seconds*2+i);
+    visual.head.rotation.y=.22*Math.sin(seconds*1.8+i);
    }else if((f.activity==='forage'||f.activity==='farm')&&!moving){
     visual.root.position.y-=.15;visual.head.rotation.x=.12;
     visual.arms[0].rotation.x=-.55;visual.arms[1].rotation.x=-.55;
    }else visual.head.rotation.x=0;
+   if(f.activity!=='socialize'){visual.head.rotation.y=0;visual.arms[0].rotation.z=0;}
    visual.root.visible=true;
   });
   river.animate(seconds);
@@ -464,7 +582,11 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   signatures:()=>({
   buildings:latestWorld.buildings.length,renderedStructures,
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
-  people:people.length,roads:latestWorld.roads.length
+  people:people.length,roads:latestWorld.roads.length,
+  commonsStage:latestWorld.commons.stage,
+  commonsBeds:latestWorld.commons.stage===0?3:0,
+  cookingActors:latestWorld.founders.filter(f=>f.activity==='cook').length,
+  socialActors:latestWorld.founders.filter(f=>f.activity==='socialize').length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
