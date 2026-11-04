@@ -1,4 +1,5 @@
 import {DAY_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.ts';
+import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {createLivingFates,pioneerCultivationMultiplier,settleLivingFatesHour,validateLivingFates,
  type LivingFatesState} from './livingFates/peopleState.ts';
 import {activeSeedTrial,considerSeedTrial,dueSeedTrial,performSeedTrialShift,
@@ -99,8 +100,7 @@ export function choosePioneerCamp(seed:number):{x:number;z:number}{
  return {x:options[0].x,z:options[0].z};
 }
 function log(s:PioneerWorld,title:string,text:string,causeId:string|null=null){
- if(s.journal.length>=160)s.journal.shift();
- s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId});
+ appendPioneerJournal(s,title,text,causeId);
 }
 function resourceSites(seed:number,camp:{x:number;z:number}):PioneerResourceSite[]{
  const jitter=(n:number)=>(hash(seed+n)-.5)*1.05;
