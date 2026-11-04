@@ -228,14 +228,25 @@ try{
   const checked=importPioneerWorld(JSON.stringify(s));
   if(!checked)return {error:'Completed fate cannot survive save validation',gardenId:entry.gardenId,
    trial:final,seedFates:s.livingFates,buildings:s.buildings.map(x=>x.id)};
-  localStorage.setItem(PIONEER_SLOT_KEYS[0],JSON.stringify(s));
-  return {gardenId:entry.gardenId,first,final,
+  // Do not write into localStorage under a still-running old world: its
+  // pagehide/autosave would overwrite the fixture just before reload.
+  return {savedWorld:JSON.stringify(s),gardenId:entry.gardenId,first,final,
    legacy:s.livingFates.fieldLegacies.find(l=>l.gardenId===entry.gardenId),
    original};
  });
  if(seedFate.error||seedFate.first.seedsSpent!==1.2||seedFate.final.phase!=='resolved'||
   seedFate.legacy?.harvestBonus!==.06)
   throw Error('Seasonal seed fate not based on real work: '+JSON.stringify(seedFate));
+ // Import through the REAL user-facing file input: replaceWorld updates the
+ // authoritative runtime before its pagehide/autosave writes the save slot.
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#pioneerFile').setInputFiles({
+  name:'pioneer-seed-fate.json',mimeType:'application/json',
+  buffer:Buffer.from(seedFate.savedWorld,'utf8')
+ });
+ await page.waitForFunction(gardenId=>
+  window.__PIONEER_DEBUG__?.getState()?.livingFates?.fieldLegacies
+   ?.some(e=>e.gardenId===gardenId),seedFate.gardenId);
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
  await page.locator('.pioneer-building-list').evaluate(el=>el.open=true);
@@ -262,11 +273,15 @@ try{
   actualFieldBonus:seedFate.legacy.harvestBonus});
  // Restore the old developed village used by the remaining felling and
  // classics/mobile smoke tests; the test fixture must not contaminate them.
- await page.evaluate(prior=>{
-  if(prior)localStorage.setItem('little-haven-pioneer-v04-slot-1',prior);
- },seedFate.original);
- await page.reload({waitUntil:'domcontentloaded'});
- await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
+ // Restore through the same real import path; a raw storage write would be
+ // undone by the current world's pagehide save on the following reload.
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#pioneerFile').setInputFiles({
+  name:'pioneer-before-fate.json',mimeType:'application/json',
+  buffer:Buffer.from(seedFate.original,'utf8')
+ });
+ await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState()?.buildings
+  ?.some(b=>b.kind==='garden'&&b.operating===false));
  // Newly opened land and trees must appear as distinct, inspectable 3D
  // scenes, not just an expanding building count.
  const pioneerFelling=await page.evaluate(()=>{
