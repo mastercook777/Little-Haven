@@ -11,7 +11,8 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen хо
 3. `docs/LIVING_FATES_SYSTEM_V1.md`: **design-only implementation contract** for seeded characters, public/private identity, evidence-driven relationships, fate arcs and persistent real-world effects.
 4. `docs/V04_PIONEER_ERA.md`: v0.4 Phase A+B live-mode design baseline for independent zero-building pioneer mode; it supersedes prebuilt-town assumptions only in pioneer mode.
 5. `docs/V04X_PIONEER_POLISH_PLAN.md`: **next implementation backlog** grounded in a user's four-year browser playtest; fix model geometry, click-to-inspect, life behaviors, resource scarcity, forestry and opening land before scaling content.
-6. `docs/V05_SETTLEMENT_GROWTH_TREE.md`: future **design draft**, not shipped technology tree, for production branches, milestones, reputation and migration.
+6. `docs/V05_SETTLEMENT_GROWTH_TREE.md`: **partially implemented design baseline**; v0.5 fishing/wood/grain and v0.5.1 visitor/trade are actual narrow slices, the full six-branch tech tree is still design-only.
+6a. `docs/V051_VISITORS_TEA_STOP.md`: factual implementation/QA contract for saved nonresident visitors, a paid road tea hut, genuine road access, balanced barter and resident clearing before settlement growth.
 7. `docs/V03_WORLD_FRAMEWORK.md`: planned calendar, season, weather and save contracts (**design only**).
 8. `docs/V03_VILLAGE_GROWTH.md`: planned building state, plots and growth contracts (**design only**).
 9. `docs/V03_PLAYER_AGENCY.md`: planned guardian interventions and replay safety (**design only**).

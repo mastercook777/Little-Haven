@@ -41,6 +41,13 @@ const names=[
 ] as const;
 const trees=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
 const finite=(n:unknown)=>typeof n==='number'&&Number.isFinite(n);
+const legalDeltas=(outcome:PioneerVisitor['outcome'],food:number,wood:number,water:number)=>{
+ const near=(a:number,b:number)=>Math.abs(a-b)<.002;
+ if(outcome==='pending'||outcome==='passing')return near(food,0)&&near(wood,0)&&near(water,0);
+ if(outcome==='hosted')return near(food,-1.2)&&near(wood,0)&&near(water,-.5);
+ return outcome==='exchange'&&near(water,0)&&
+  ((near(food,-2)&&near(wood,3))||(near(food,2)&&near(wood,-3)));
+};
 const visitFields=(v:PioneerVisitor)=>{
  if(!v||typeof v.id!=='string'||!/^visitor-\d+-\d+$/.test(v.id)||
   !Number.isInteger(v.serial)||v.serial<1||!v.name||!v.origin||!v.occupation||
@@ -52,8 +59,9 @@ const visitFields=(v:PioneerVisitor)=>{
   v.route.length<2||v.route.length>200||
   !v.route.every(p=>Array.isArray(p)&&p.length===2&&p.every(finite)))return false;
  if(v.outcome==='pending')
-  return v.settledAt===null&&v.foodDelta===0&&v.woodDelta===0&&v.waterDelta===0;
- return v.settledAt!==null&&v.settledAt>=v.arrivalAt&&v.settledAt<=v.leaveAt;
+  return v.settledAt===null&&legalDeltas(v.outcome,v.foodDelta,v.woodDelta,v.waterDelta);
+ return v.settledAt!==null&&v.settledAt>=v.arrivalAt&&v.settledAt<=v.leaveAt&&
+  legalDeltas(v.outcome,v.foodDelta,v.woodDelta,v.waterDelta);
 };
 export function createPioneerCommerce():PioneerCommerce{
  return {guestPolicy:'exchange',policySetAt:0,nextVisitorAt:null,activeVisitor:null,
@@ -72,7 +80,18 @@ export function validPioneerCommerce(s:PioneerWorld){
   !c.visits.every(v=>v&&/^visitor-\d+-\d+$/.test(v.id)&&!!v.name&&!!v.origin&&
    finite(v.arrivedAt)&&finite(v.leftAt)&&v.leftAt>=v.arrivedAt&&
    v.leftAt<=s.minutes&&['exchange','hosted','passing'].includes(v.outcome)&&
-   [v.foodDelta,v.woodDelta,v.waterDelta].every(finite)))return false;
+   [v.foodDelta,v.woodDelta,v.waterDelta].every(finite)&&
+   legalDeltas(v.outcome,v.foodDelta,v.woodDelta,v.waterDelta)))return false;
+ // Every material inflow must be matched by a real outbound payment. A
+ // forged save cannot mint wood/food by changing only the account totals.
+ const exchangedWoodUnits=c.netWood/3;
+ if(!Number.isInteger(exchangedWoodUnits)||Math.abs(exchangedWoodUnits)>c.totalExchanges||
+  (c.totalExchanges+exchangedWoodUnits)%2!==0||
+  Math.abs(c.netWater+.5*c.totalHosted)>.002||
+  Math.abs(c.netFood+c.netWood*2/3+1.2*c.totalHosted)>.002||
+  c.totalArrivals<c.visits.length+(c.activeVisitor?1:0)||
+  c.totalExchanges<c.visits.filter(v=>v.outcome==='exchange').length||
+  c.totalHosted<c.visits.filter(v=>v.outcome==='hosted').length)return false;
  const hut=s.buildings.find(b=>b.kind==='tea-stop');
  if(c.activeVisitor){
   const v=c.activeVisitor;

@@ -65,6 +65,16 @@ test('v0.5.1: any paid visitor ledger survives save import without a second paym
  assert.equal(replay!.commerce.totalExchanges,c.totalExchanges);
  assert.equal(replay!.commerce.netWood,c.netWood);
  assert.deepEqual(replay!.commerce.visits,c.visits);
+ const forgedTotal=structuredClone(s);
+ forgedTotal.commerce.netFood+=2;
+ assert.equal(importPioneerWorld(JSON.stringify(forgedTotal)),null,
+  'a visit ledger cannot mint inventory without its reciprocal payment');
+ const forgedHistory=structuredClone(s);
+ const exchange=forgedHistory.commerce.visits.find(v=>v.outcome==='exchange');
+ assert.ok(exchange);
+ exchange!.woodDelta=0;
+ assert.equal(importPioneerWorld(JSON.stringify(forgedHistory)),null,
+  'an observed paid exchange must keep its actual per-visit materials');
  // Advancing less than an hour cannot materialize an additional arrival or exchange.
  const pre=replay!.commerce.totalExchanges,old=replay!.resources.food,wood=replay!.resources.wood;
  advancePioneerWorld(replay!,.08);
