@@ -163,8 +163,9 @@ function renderUI(){
  const trend=$('pioneerFoodTrend');trend.textContent=foodBalanceLabel();
  trend.classList.toggle('shortage',w.food<world.founders.length*1.2);
  $('pioneerStatus').textContent=pioneerSummary(world);
- $('pioneerLivelihoodLabel').textContent=
-  PIONEER_DIRECTIONS.find(d=>d.id===world.livelihood.direction)!.label;
+ const directionName=PIONEER_DIRECTIONS.find(d=>d.id===world.livelihood.direction)!.label;
+ $('pioneerLivelihoodLabel').textContent=directionName;
+ $('pioneerCouncilPreview').textContent=directionName;
  const livelihoodControls=PIONEER_DIRECTIONS.map(d=>
   '<button type="button" data-livelihood="'+d.id+'" title="'+safe(d.description)+
   '" '+(!world.buildings.some(b=>b.kind==='shelter')?'disabled':'')+'>'+
@@ -336,6 +337,16 @@ $('inspectActions').addEventListener('click',event=>{
 for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-speed]'))){
  btn.addEventListener('click',()=>{speed=Number(btn.dataset.speed)||1;renderUI();});
 }
+const councilPanel=$<HTMLDetailsElement>('pioneerLivelihoodPanel');
+const councilOpen=$<HTMLButtonElement>('pioneerCouncilOpen');
+councilOpen.addEventListener('click',()=>{
+ councilPanel.open=!councilPanel.open;
+ councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
+ if(councilPanel.open)councilPanel.scrollIntoView({block:'nearest',behavior:'smooth'});
+});
+councilPanel.addEventListener('toggle',()=>{
+ councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
+});
 $('pioneerDirections').addEventListener('click',event=>{
  const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-livelihood]');
  if(!btn||btn.disabled)return;
