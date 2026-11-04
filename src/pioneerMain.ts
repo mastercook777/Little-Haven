@@ -64,7 +64,8 @@ let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
 let selection:PioneerSelection|null=null;
 let spotlight:PioneerSpotlight=getPioneerSpotlight(world);
-let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number}|null=null;
+let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number;
+ fromZoom:number;toZoom:number}|null=null;
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
 let clickStart:{x:number;y:number;at:number}|null=null,lastHover=0;
 const labels:Record<PioneerWork,string>={
@@ -286,7 +287,8 @@ $('pioneerSpotlightFocus').addEventListener('click',()=>{
  // Preserve the current orbit angle. Shift toward the actual object without
  // creating another camera, resource or phantom piece of world history.
  focusMotion={from:orbit.target.clone(),to:new THREE.Vector3(x,0,z),
-  started:performance.now()};
+  started:performance.now(),fromZoom:camera.zoom,
+  toZoom:Math.max(camera.zoom,innerWidth<760?1.27:1.50)};
  chooseInspection(item);
 });
 function animateFocus(now:number){
@@ -296,6 +298,8 @@ function animateFocus(now:number){
  const next=focusMotion.from.clone().lerp(focusMotion.to,eased);
  const delta=next.sub(orbit.target);
  orbit.target.add(delta);camera.position.add(delta);
+ camera.zoom=focusMotion.fromZoom+(focusMotion.toZoom-focusMotion.fromZoom)*eased;
+ camera.updateProjectionMatrix();
  if(t>=1)focusMotion=null;
 }
 $('inspectClose').addEventListener('click',()=>chooseInspection(null));
@@ -327,7 +331,8 @@ $('pioneerSeasonSkip').addEventListener('click',()=>{
 });
 $('pioneerPause').addEventListener('click',()=>{paused=!paused;renderUI();});
 $('pioneerCamera').addEventListener('click',()=>{
- focusMotion=null;camera.position.copy(defaultEye);orbit.target.set(-1.7,0,0);orbit.update();
+ focusMotion=null;camera.position.copy(defaultEye);orbit.target.set(-1.7,0,0);
+ camera.zoom=1;camera.updateProjectionMatrix();orbit.update();
 });
 $('pioneerZoomIn').addEventListener('click',()=>{camera.zoom=Math.min(2.3,camera.zoom*1.15);camera.updateProjectionMatrix();});
 $('pioneerZoomOut').addEventListener('click',()=>{camera.zoom=Math.max(.72,camera.zoom/1.15);camera.updateProjectionMatrix();});
