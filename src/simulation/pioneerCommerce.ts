@@ -161,7 +161,7 @@ function transact(s:PioneerWorld,v:PioneerVisitor){
  c.netFood=round(c.netFood+v.foodDelta);
  c.netWood=round(c.netWood+v.woodDelta);
  c.netWater=round(c.netWater+v.waterDelta);
- appendPioneerJournal(s,v.outcome==='exchange'?'山谷第一次交换了货物':
+ appendPioneerJournal(s,v.outcome==='exchange'?(c.totalExchanges===1?'山谷第一次交换了货物':'茶棚又有真实换物'):
   v.outcome==='hosted'?'茶棚里有一杯热茶':'过客未曾留下交易',
   description,v.id);
 }
