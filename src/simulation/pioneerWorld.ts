@@ -603,7 +603,8 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
     (b.loftAddedAt!==undefined&&(b.kind!=='cottage'||!Number.isFinite(b.loftAddedAt)||
       b.loftAddedAt<b.completedAt||b.loftAddedAt>s.minutes||
-      b.loftWoodSpent!==4||!Number.isFinite(b.loftWorkHours)||b.loftWorkHours<8||
+      b.loftWoodSpent!==4||typeof b.loftWorkHours!=='number'||
+      !Number.isFinite(b.loftWorkHours)||b.loftWorkHours<8||
       b.loftWorkHours>8.001))||
     (b.loftAddedAt===undefined&&(b.loftWoodSpent!==undefined||b.loftWorkHours!==undefined))||
     (b.kind==='cottage'&&b.occupants.length>(b.loftAddedAt!==undefined?3:2))||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
