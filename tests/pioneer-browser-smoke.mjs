@@ -85,7 +85,21 @@ try{
  const restored=await page.evaluate(()=>window.__PIONEER_DEBUG__.getState());
  if(restored.buildings.length!==1||restored.buildings[0].id!==b.id)
   throw Error('Pioneer local save not restored after browser reload');
- results.push({restored:true});
+ // Verify the mesh, not a debug-only button, opens the actual registry card.
+ const firstPoint=await page.evaluate(id=>window.__PIONEER_DEBUG__.projectBuilding(id),b.id);
+ if(!firstPoint)throw Error('No projected first shelter model');
+ await page.mouse.click(firstPoint.x,firstPoint.y);
+ const firstCard=await page.evaluate(()=>({
+  selected:window.__PIONEER_DEBUG__.getSelection(),
+  title:document.querySelector('#inspectTitle')?.textContent,
+  visible:!document.querySelector('#pioneerInspector').hidden,
+  facts:document.querySelector('#inspectFacts')?.textContent
+ }));
+ if(!firstCard.visible||firstCard.selected?.id!==b.id||firstCard.title!=='避雨棚'||
+  !firstCard.facts?.includes('7 份'))
+  throw Error('Clicking a built 3D shelter did not reveal its actual status: '+JSON.stringify({firstPoint,firstCard}));
+ await page.locator('#inspectClose').click();
+ results.push({restored:true,shelterInspected:true});
  // Phase B is visible in real WebGL, not only an expanded JSON registry.
  await page.evaluate(()=>{
   const d=window.__PIONEER_DEBUG__,now=d.getState().minutes;
@@ -105,7 +119,33 @@ try{
   throw Error('Phase B did not produce a visible populated village: '+JSON.stringify(grown));
  const grownDigest=await screenshot(page,'05-third-year-living-village');
  if(grownDigest===startDigest)throw Error('Third-year village looks identical to the initial empty valley');
- results.push({phaseB:grown});
+ const gardenId=await page.evaluate(()=>window.__PIONEER_DEBUG__.getState()
+  .buildings.find(b=>b.kind==='garden')?.id);
+ const gardenPoint=await page.evaluate(id=>window.__PIONEER_DEBUG__.projectBuilding(id),gardenId);
+ if(!gardenPoint)throw Error('Garden missing projected 3D click target');
+ await page.mouse.click(gardenPoint.x,gardenPoint.y);
+ const gardenCard=await page.evaluate(()=>({
+  selected:window.__PIONEER_DEBUG__.getSelection(),
+  title:document.querySelector('#inspectTitle')?.textContent,
+  visible:!document.querySelector('#pioneerInspector').hidden
+ }));
+ if(!gardenCard.visible||gardenCard.selected?.id!==gardenId||gardenCard.title!=='菜圃')
+  throw Error('Garden Mesh cannot be inspected: '+JSON.stringify({gardenPoint,gardenCard}));
+ await page.locator('[data-inspect-pref="seed"]').click();
+ await page.locator('[data-inspect-toggle]').click();
+ const settings=await page.evaluate(id=>{
+  const state=window.__PIONEER_DEBUG__.getState();
+  return state.buildings.find(b=>b.id===id);
+ },gardenId);
+ if(settings?.productionMode!=='seed'||settings.operating!==false)
+  throw Error('Real facility controls did not update simulation/save: '+JSON.stringify(settings));
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
+ const savedConfig=await page.evaluate(id=>window.__PIONEER_DEBUG__.getState()
+  .buildings.find(b=>b.id===id),gardenId);
+ if(savedConfig?.productionMode!=='seed'||savedConfig.operating!==false)
+  throw Error('Garden production settings lost after reload');
+ results.push({phaseB:grown,gardenInspected:true,gardenControlsPersist:true});
  await page.goto(base,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__HAVEN_DEBUG__?.getState);
  const classic=await page.evaluate(()=>window.__HAVEN_DEBUG__.getState());
@@ -131,7 +171,17 @@ try{
   throw Error('Pioneer mobile overflow or blank WebGL: '+JSON.stringify(sizing));
  await mpage.evaluate(()=>window.__PIONEER_DEBUG__.advance(1200));
  await screenshot(mpage,'04-mobile-shelter');
- results.push({mobile:sizing});
+ // A touch gesture must still allow inspection without mouse hover.
+ const mobileShelter=await mpage.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,b=d.getState().buildings[0];
+  return b?d.projectBuilding(b.id):null;
+ });
+ if(mobileShelter){
+  await mpage.touchscreen.tap(mobileShelter.x,mobileShelter.y);
+  const opened=await mpage.evaluate(()=>!document.querySelector('#pioneerInspector').hidden);
+  if(!opened)throw Error('Touch cannot inspect a built 3D shelter');
+ }
+ results.push({mobile:sizing,touchInspection:!!mobileShelter});
  await mobile.close();
  if(errors.length)throw Error('Pioneer browser errors: '+errors.join('\n').slice(0,1500));
  await writeFile(output+'/report.json',JSON.stringify({pass:true,results,errors},null,2));
