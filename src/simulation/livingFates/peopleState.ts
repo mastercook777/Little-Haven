@@ -1,4 +1,6 @@
 import type {PioneerFounder,PioneerWork,PioneerWorld} from '../pioneerWorld.ts';
+import {notePioneerFarmCoWork,validateSeedFates,
+ type FieldLegacy,type SeedTrial} from './seedTrial.ts';
 
 /** v0.4.4-A/B: identity is an adjunct to the authoritative resident roster.
  * Truth never flows into public inspections unless a later earned reveal does it. */
@@ -17,7 +19,7 @@ export interface RelationshipEdge{
  sharedWorkHours:number;sharedMeals:number;memoryIds:string[];
 }
 export interface MajorMemory{
- id:string;minute:number;actorIds:number[];kind:'shared-work';
+ id:string;minute:number;actorIds:number[];kind:'shared-work'|'seed-trial';
  work:PioneerWork;placeId:string;sourceEventIds:number[];
 }
 export interface PioneerCandidate{
@@ -27,6 +29,8 @@ export interface LivingFatesState{
  schemaVersion:1;people:Record<string,PersonLife>;
  relationships:RelationshipEdge[];majorMemories:Record<string,MajorMemory>;
  pendingCandidate:PioneerCandidate|null;
+ farmCoWorkHours:Record<string,number>;seedTrials:SeedTrial[];
+ fieldLegacies:FieldLegacy[];appliedEffectIds:string[];
 }
 
 const ORIGINS:PersonOrigin[]=[
@@ -41,7 +45,7 @@ const pick=(seed:number,id:number,salt:number)=>
  hash(seed+Math.imul(id,0x9e3779b1)+salt);
 const clamp=(v:number,max=100)=>Math.max(0,Math.min(max,v));
 const relevantWork=new Set<PioneerWork>([
- 'farm','collect-wood','forage','fetch-water','build','repair','commons-build','clear-land'
+ 'farm','seed-trial','collect-wood','forage','fetch-water','build','repair','commons-build','clear-land'
 ]);
 
 /** Public presentation text is based on the present role, not secret origins. */
@@ -83,7 +87,8 @@ export function createLivingFates(seed:number,founders:PioneerFounder[],minute:n
   if(migratingOldSave&&f.id>3)person.arrivalKnown=false;
   people[f.id]=person;
  }
- return {schemaVersion:1,people,relationships:[],majorMemories:{},pendingCandidate:null};
+ return {schemaVersion:1,people,relationships:[],majorMemories:{},pendingCandidate:null,
+  farmCoWorkHours:{},seedTrials:[],fieldLegacies:[],appliedEffectIds:[]};
 }
 /** An identified traveler exists in the save before housing/food admission is checked.
  * Moving them into people does NOT reroll their identity or create a second citizen. */
@@ -120,7 +125,7 @@ export function settleLivingFatesHour(s:PioneerWorld){
  for(const f of s.founders){
   const person=lives.people[f.id];
   if(!person)continue;
-  if(f.activity==='farm')practice(person,'cultivation',s.minutes);
+  if(f.activity==='farm'||f.activity==='seed-trial')practice(person,'cultivation',s.minutes);
   if(f.activity==='collect-wood'||f.activity==='clear-land')
    practice(person,'wayfinding',s.minutes);
  }
@@ -137,7 +142,10 @@ export function settleLivingFatesHour(s:PioneerWorld){
    let edge=lives.relationships.find(e=>e.id===id);
    if(!edge){edge=makeEdge(a,b);lives.relationships.push(edge);}
    if(eating)edge.sharedMeals++;
-   if(working)edge.sharedWorkHours++;
+   if(working){
+    edge.sharedWorkHours++;
+    if(left.activity==='farm')notePioneerFarmCoWork(s,left,right);
+   }
    edge.trust=clamp(Math.floor(edge.sharedWorkHours/12),60);
    edge.closeness=clamp(Math.floor(edge.sharedMeals/24),60);
    if(working&&edge.sharedWorkHours===24){
@@ -161,8 +169,12 @@ export function publicPersonHistory(s:PioneerWorld,id:number){
   if(!m)return [];
   const partnerId=m.actorIds.find(other=>other!==id);
   const partner=s.founders.find(f=>f.id===partnerId);
-  return [{minute:m.minute,text:'与'+(partner?.name??'乡邻')+
-   '一同承担实际劳作，累计达到二十四小时。'}];
+  return [{minute:m.minute,text:m.kind==='seed-trial'?
+   '与'+(partner?.name??'乡邻')+'在菜圃留种试验，'+
+   (s.livingFates.seedTrials.find(t=>'fate-'+t.id===m.id)?.phase==='resolved'?
+    '经过真实工时与一季等待，将田间经验留给后人。':
+    '粮水与工时不足，试种中止，花掉的种粮不曾凭空返回。'):
+   '与'+(partner?.name??'乡邻')+'一同承担实际劳作，累计达到二十四小时。'}];
  }).sort((a,b)=>b.minute-a.minute).slice(0,5);
 }
 export function publicPersonRelations(s:PioneerWorld,id:number){
@@ -221,7 +233,7 @@ export function validateLivingFates(s:PioneerWorld):boolean{
   edgeIds.add(e.id);
  }
  for(const [id,m] of Object.entries(value.majorMemories)){
-  if(m?.id!==id||m.kind!=='shared-work'||!Number.isFinite(m.minute)||
+  if(m?.id!==id||!['shared-work','seed-trial'].includes(m.kind)||!Number.isFinite(m.minute)||
    m.minute<0||m.minute>s.minutes||!Array.isArray(m.actorIds)||
    m.actorIds.length!==2||!m.actorIds.every(p=>ids.has(p))||
    !Array.isArray(m.sourceEventIds)||m.sourceEventIds.length>20||
@@ -231,5 +243,6 @@ export function validateLivingFates(s:PioneerWorld):boolean{
  }
  return Object.values(value.people).every(p=>
   p.majorMemoryIds.every(id=>Boolean(value.majorMemories[id])))&&
-  value.relationships.every(e=>e.memoryIds.every(id=>Boolean(value.majorMemories[id])));
+  value.relationships.every(e=>e.memoryIds.every(id=>Boolean(value.majorMemories[id])))&&
+  validateSeedFates(s);
 }
