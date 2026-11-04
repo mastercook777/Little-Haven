@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DAY_MINUTES,nextSeasonBoundary} from '../src/simulation/calendar.ts';
 import {createWorld} from '../src/simulation/world.ts';
 import {parcelOverlaps,reservedParcels,validateVillageParcel} from '../src/simulation/villagePlanning.ts';
-import {pioneerWalkable,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
+import {pioneerWalkable,roadSegmentsSafe,findPioneerWalk,pioneerEntrance} from '../src/simulation/pioneerPaths.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {pioneerHousingCapacity} from '../src/simulation/pioneerGrowth.ts';
 import {createPioneerCommons,pioneerCommonsNames,validatePioneerCommons} from '../src/simulation/pioneerCommons.ts';
@@ -166,7 +166,17 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
   people:s.founders.length,buildings:s.buildings.map(b=>b.kind),
   food:s.resources.food,wood:s.resources.wood,sites:s.sites.filter(x=>x.kind==='field').map(x=>x.stock),
   intent:s.intent?.kind,paused:s.intent?.pauseReason,surveyAt:s.nextSurveyAt,
-  recent:s.journal.slice(-8).map(x=>x.title)
+  recent:s.journal.slice(-8).map(x=>x.title),
+  forest:s.sites.filter(x=>x.kind==='forest').map(site=>({
+   stock:site.stock,gathered:site.totalGathered,renew:site.renewPerDay,
+   campRoute:!!findPioneerWalk([s.camp.x,s.camp.z],[site.x,site.z],
+    [...reservedParcels(null).filter(x=>x.id.startsWith('pine-')||x.id.startsWith('bamboo-')),
+     ...s.buildings.map(x=>x.parcel)]),
+   liangRoute:!!findPioneerWalk(pioneerEntrance(s.buildings.find(x=>x.id===s.founders[0].homeBuildingId)!.parcel),
+    [site.x,site.z],
+    [...reservedParcels(null).filter(x=>x.id.startsWith('pine-')||x.id.startsWith('bamboo-')),
+     ...s.buildings.filter(x=>x.id!==s.founders[0].homeBuildingId).map(x=>x.parcel)])
+  }))
  }));
  assert.ok(s.founders.every(f=>f.homeBuildingId&&s.buildings.some(b=>b.id===f.homeBuildingId)));
  assert.ok(pioneerHousingCapacity(s)>=s.founders.length);
