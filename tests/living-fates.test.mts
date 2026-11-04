@@ -47,8 +47,11 @@ test('v0.4.4-A: old v4 saves gain profiles without fabricating history or changi
  assert.equal(restored.livingFates.relationships.length,0);
  assert.equal(Object.keys(restored.livingFates.majorMemories).length,0);
  for(const f of restored.founders){
-  assert.equal(restored.livingFates.people[f.id].arrivalAt,restored.minutes,
-   'an imported past cannot fabricate a timestamped life story');
+  const person=restored.livingFates.people[f.id];
+  assert.equal(person.arrivalKnown,f.id<=3,
+   'older migrant arrival dates are unknown, but founders share the known opening');
+  assert.equal(person.arrivalAt,f.id<=3?8*60+20:restored.minutes,
+   'an imported past cannot fabricate a migrant arrival timestamp');
  }
  assert.equal(validateLivingFates(restored),true);
  assert.deepEqual(importPioneerWorld(JSON.stringify(restored)),restored);
