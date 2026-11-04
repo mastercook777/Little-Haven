@@ -1,7 +1,7 @@
 {
   "name": "little-haven-prototype",
   "private": true,
-  "version": "0.4.0-alpha.2",
+  "version": "0.4.1-alpha.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

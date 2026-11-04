@@ -87,3 +87,55 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
 
 .pioneer-growth{padding:9px 0 2px;color:#6f8772;font-size:11px;line-height:1.6;text-align:center;font-weight:700}
 @media(max-width:760px){.pioneer-growth{padding:4px 0 0;font-size:9px}.founder-tasks{max-height:110px;overflow-y:auto}}
+
+/* 0.4.1 — object inspection. Designed to be a secondary focus rather than
+   an always-on dashboard that hides the valley. */
+.food-trend{font-size:10px;color:#6e7864;line-height:1.6;padding-top:6px}
+.food-trend.shortage{color:#a3674c;font-weight:700}
+.pioneer-inspector{position:absolute;z-index:7;right:calc(min(328px,29vw) + 44px);
+ top:125px;width:294px;max-height:min(72vh,610px);overflow-y:auto;
+ background:rgba(253,250,238,.97);border:1px solid var(--line);
+ border-radius:20px;padding:17px 19px 18px;box-shadow:0 20px 48px #435b493f;
+ backdrop-filter:blur(20px)}
+.pioneer-inspector[hidden]{display:none}
+.inspect-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.inspect-heading span{font-size:10px;letter-spacing:.8px;color:#789081;word-break:break-all}
+.inspect-heading button{width:36px;height:36px;border-radius:11px;font-size:22px;
+ line-height:1;background:#eee9d7;color:#586a5c;border:1px solid var(--line)}
+.pioneer-inspector h3{margin:5px 0 7px;font:700 20px "Noto Serif SC",serif;color:#425847}
+.pioneer-inspector p{font-size:12px;line-height:1.6;color:#768371;margin:0 0 12px}
+.inspect-facts{display:grid;grid-template-columns:1fr;gap:0;border-top:1px solid var(--line)}
+.inspect-fact{display:flex;justify-content:space-between;gap:12px;padding:8px 0;
+ font-size:11px;border-bottom:1px solid #657b6530}
+.inspect-fact span{color:#819083;flex-shrink:0}
+.inspect-fact b{color:#465d4a;text-align:right;font-weight:600;overflow-wrap:anywhere}
+.inspect-actions{padding-top:12px;display:grid;gap:8px}
+.inspect-actions .inspect-operate{width:100%;text-align:center;padding:10px 7px;
+ background:#6b806d;border-color:#6b806d;color:#fff;font-size:12px;font-weight:700}
+.inspect-actions .inspect-operate.paused{background:#a47959;border-color:#a47959}
+.inspect-mode-label{font-size:10px;font-weight:700;color:#768572;margin-top:3px}
+.inspect-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.inspect-modes button{padding:9px 5px;font-size:11px}
+.inspect-modes button.active{background:#718775;color:#fff;border-color:#718775}
+.inspect-history{margin-top:11px;border-top:1px solid var(--line);padding-top:10px}
+.inspect-history-title{font-size:11px;font-weight:700;color:#748575;margin-bottom:6px}
+.inspect-history-line{font-size:10px;color:#808c80;line-height:1.65;padding:3px 0}
+@media(max-width:1050px){.pioneer-inspector{right:316px;width:265px;top:105px}}
+@media(max-width:760px){
+ .food-trend{font-size:9px;line-height:1.35;padding:4px 0}
+ .pioneer-inspector{left:11px;right:11px;top:auto;bottom:140px;
+  width:auto;max-height:min(48vh,390px);padding:12px 15px;border-radius:16px;
+  box-shadow:0 12px 28px #435b4960}
+ .pioneer-inspector h3{font-size:17px;margin:2px 0 5px}
+ .pioneer-inspector p{font-size:11px;margin:0 0 8px}
+ .inspect-fact{padding:6px 0;font-size:10px}
+ .inspect-heading button{width:40px;height:40px}
+ .inspect-history{margin-top:8px}
+}
+
+.pioneer-building-list{margin:10px 0 0;color:#718474;border-top:1px solid var(--line);padding-top:9px}
+.pioneer-building-list summary{font-size:11px;color:#607c65;list-style:revert}
+#pioneerBuildingChoices{display:flex;flex-wrap:wrap;gap:5px;max-height:103px;overflow:auto;padding:8px 0 0}
+#pioneerBuildingChoices button{padding:6px 8px;font-size:10px;text-align:left}
+#pioneerBuildingChoices span{font-size:10px;color:#809080}
+@media(max-width:760px){.pioneer-building-list{margin-top:5px;padding-top:5px}.pioneer-building-list summary{font-size:9px}#pioneerBuildingChoices{max-height:75px}#pioneerBuildingChoices button{font-size:9px;padding:6px}}

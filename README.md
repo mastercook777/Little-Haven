@@ -6,6 +6,8 @@
 
 ## v0.4 开荒纪元 · Phase A + B 公测（独立模式）
 
+**v0.4.1 工程增量（PR #11）**：建模纠错、真实建筑点击/详情/设施运营、人口与农田联动和粮食收支提示。此前上线版为 Phase B；本增量须通过 PR CI、人工截图检查及 Pages 部署后才可视为正式更新。
+
 **后续开发文档**：[第 4 年实玩反馈与 v0.4.x 打磨计划](docs/V04X_PIONEER_POLISH_PLAN.md) · [v0.5 村落成长树草案](docs/V05_SETTLEMENT_GROWTH_TREE.md)（均为规划，未实施）。
 
 - 正式页面上线后可通过首页按钮或 [开荒纪元](https://mastercook777.github.io/Little-Haven/pioneer.html) 进入。旧谷观察模式仍在主页，v3 存档不会被覆盖。

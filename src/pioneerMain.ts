@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {buildPioneerVillage} from './graphics/pioneerVillage.ts';
+import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage.ts';
+import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
+import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
+import {setPioneerFacilityOperating,setPioneerFacilityPreference,
+ type PioneerFacilityPreference} from './simulation/pioneerFacilities.ts';
 import {SEASON_NAMES} from './simulation/calendar.ts';
 import {WEATHER_NAMES} from './simulation/weather.ts';
 import {advancePioneerWorld,advancePioneerToSeason,createPioneerWorld,
@@ -55,6 +59,9 @@ try{world=loadPioneerWorld(localStorage,Date.now(),slot);}catch{
 }
 let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
+let selection:PioneerSelection|null=null;
+const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
+let clickStart:{x:number;y:number;at:number}|null=null,lastHover=0;
 const labels:Record<PioneerWork,string>={
  rest:'照看营地', 'collect-wood':'林缘拾柴','forage':'入林采食',
  'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
@@ -68,6 +75,61 @@ function toast(message:string){
  const key=++lastToast;
  window.setTimeout(()=>{if(lastToast===key)el.classList.remove('show');},3100);
 }
+function inspectRender(){
+ const panel=$('pioneerInspector');
+ const info=selection?inspectPioneerSelection(world,selection):null;
+ if(!info){panel.hidden=true;if(selection){selection=null;valley.setSelected(null);}return;}
+ panel.hidden=false;
+ $('inspectKicker').textContent=info.kicker;
+ $('inspectTitle').textContent=info.title;
+ $('inspectDescription').textContent=info.description;
+ $('inspectFacts').innerHTML=info.facts.map(x=>
+  '<div class="inspect-fact"><span>'+safe(x.label)+'</span><b>'+
+  safe(x.value)+'</b></div>').join('');
+ $('inspectHistory').innerHTML=info.history.length?
+  '<div class="inspect-history-title">这处地方的经历</div>'+
+  info.history.map(x=>'<div class="inspect-history-line">'+safe(x)+'</div>').join(''):'';
+ const controls=info.operation?
+  '<button type="button" data-inspect-toggle="'+safe(info.operation.id)+
+  '" class="inspect-operate'+(info.operation.active?'':' paused')+'">'+
+  (info.operation.active?'暂停此处生产':'恢复此处生产')+'</button>'+
+  '<div class="inspect-mode-label">这里的工作倾向</div><div class="inspect-modes">'+
+  info.operation.variants.map(v=>'<button type="button" data-inspect-pref="'+safe(v.value)+
+   '" class="'+(info.operation?.preference===v.value?'active':'')+'">'+safe(v.label)+'</button>').join('')+
+  '</div>':'';
+ // This inspector refreshes every 340ms. Rebuilding the controls at that
+ // cadence detaches buttons during pointerdown / pointerup, making real
+ // user clicks and Playwright clicks fail intermittently.
+ const actions=$('inspectActions');
+ if(actions.innerHTML!==controls)actions.innerHTML=controls;
+}
+function chooseInspection(next:PioneerSelection|null){
+ selection=next;valley.setSelected(selection);inspectRender();
+}
+function hitAt(clientX:number,clientY:number):PioneerSelection|null{
+ const bounds=canvas.getBoundingClientRect();
+ mouse.set(((clientX-bounds.left)/bounds.width)*2-1,
+  -((clientY-bounds.top)/bounds.height)*2+1);
+ raycaster.setFromCamera(mouse,camera);
+ for(const hit of raycaster.intersectObject(valley.root,true)){
+  if(!hit.object.visible)continue;
+  const found=pioneerHitSelection(world,hit.object);
+  if(found)return found;
+ }
+ return null;
+}
+function foodBalanceLabel(){
+ const stats=world.foodStats;
+ if(!stats)return '乡邻正在核算粮食收支';
+ const net=stats.previousCollected-stats.previousConsumed;
+ const prefix=net>=0?'+':'';
+ const stock=world.resources.food;
+ const warning=stock<world.founders.length*1.2?
+  ' · 口粮紧张，村民会优先采食':stock<world.founders.length*2.7?
+  ' · 储粮偏少':' · 储备尚可';
+ return '上一日净口粮 '+prefix+amount(net)+
+  '（收 '+amount(stats.previousCollected)+' / 用 '+amount(stats.previousConsumed)+')'+warning;
+}
 function renderUI(){
  const cal=getPioneerCalendar(world),weather=getPioneerWeather(world);
  const w=world.resources;
@@ -77,9 +139,17 @@ function renderUI(){
  $('pioneerSeason').textContent='第 '+cal.year+' 年 · '+SEASON_NAMES[cal.season];
  $('pioneerWood').textContent=amount(w.wood);$('pioneerFood').textContent=amount(w.food);
  $('pioneerWater').textContent=amount(w.water);
+ const trend=$('pioneerFoodTrend');trend.textContent=foodBalanceLabel();
+ trend.classList.toggle('shortage',w.food<world.founders.length*1.2);
  $('pioneerStatus').textContent=pioneerSummary(world);
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
+ const buildingChoices=world.buildings.length?
+  world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
+   safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
+  '<span>从荒地开始，第一间屋尚未落成。</span>';
+ const list=$('pioneerBuildingChoices');
+ if(list.innerHTML!==buildingChoices)list.innerHTML=buildingChoices;
  const intent=world.intent;
  const cause=world.buildings.length&&!intent?
   '有 '+world.buildings.filter(b=>b.kind==='cottage').length+
@@ -101,6 +171,7 @@ function renderUI(){
  $('pioneerPause').textContent=paused?'▶':'Ⅱ';
  $('pioneerSlot1').classList.toggle('active',slot===1);
  $('pioneerSlot2').classList.toggle('active',slot===2);
+ inspectRender();
 }
 function replaceWorld(next:PioneerWorld){
  scene.remove(valley.root);
@@ -116,6 +187,7 @@ function replaceWorld(next:PioneerWorld){
   }
  });
  world=next;valley=buildPioneerVillage(scene,world);
+ selection=null;canvas.style.cursor='grab';
  lastLighting='';renderUI();
 }
 function persist(){try{savePioneerWorld(world,localStorage,Date.now(),slot);}catch{}}
@@ -129,6 +201,40 @@ function switchSlot(next:number){
  replaceWorld(loaded);
  toast('已进入'+(slot===1?'一号谷':'二号谷')+'，开荒存档独立保存。');
 }
+// Distinguish a click/tap from OrbitControls' rotation gesture. All
+// selected entities are looked up through live world-state IDs, never meshes.
+canvas.addEventListener('pointerdown',event=>{
+ clickStart={x:event.clientX,y:event.clientY,at:performance.now()};
+});
+canvas.addEventListener('pointerup',event=>{
+ const start=clickStart;clickStart=null;
+ if(!start||Math.hypot(event.clientX-start.x,event.clientY-start.y)>9||
+  performance.now()-start.at>900)return;
+ chooseInspection(hitAt(event.clientX,event.clientY));
+});
+canvas.addEventListener('pointercancel',()=>{clickStart=null;});
+canvas.addEventListener('pointermove',event=>{
+ if(event.pointerType!=='mouse'||clickStart||performance.now()-lastHover<110)return;
+ lastHover=performance.now();
+ canvas.style.cursor=hitAt(event.clientX,event.clientY)?'pointer':'grab';
+});
+$('pioneerBuildingChoices').addEventListener('click',event=>{
+ const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-pick-building]');
+ const id=button?.dataset.pickBuilding;
+ if(id&&world.buildings.some(b=>b.id===id))chooseInspection({kind:'building',id});
+});
+$('inspectClose').addEventListener('click',()=>chooseInspection(null));
+$('inspectActions').addEventListener('click',event=>{
+ const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button');
+ if(!btn||selection?.kind!=='building')return;
+ const b=world.buildings.find(x=>x.id===selection?.id);if(!b)return;
+ let changed=false;
+ if(btn.hasAttribute('data-inspect-toggle'))
+  changed=setPioneerFacilityOperating(world,b.id,b.operating===false);
+ const pref=btn.dataset.inspectPref as PioneerFacilityPreference|undefined;
+ if(pref)changed=setPioneerFacilityPreference(world,b.id,pref);
+ if(changed){renderUI();persist();toast('建筑的真实运营安排已更新，并记入守望录。');}
+});
 for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-speed]'))){
  btn.addEventListener('click',()=>{speed=Number(btn.dataset.speed)||1;renderUI();});
 }
@@ -180,6 +286,7 @@ addEventListener('keydown',event=>{
   event.preventDefault();$('pioneerPause').click();
  }
  if(event.key==='Escape'){
+  chooseInspection(null);
   const details=document.querySelector<HTMLDetailsElement>('details.save-menu');if(details)details.open=false;
  }
 });
@@ -229,6 +336,14 @@ addEventListener('pagehide',persist);
 renderUI();
 const debugging={
  getState:()=>structuredClone(world),
+ getSelection:()=>selection,
+ projectBuilding:(id:string)=>{
+  const b=world.buildings.find(item=>item.id===id);if(!b)return null;
+  const v=new THREE.Vector3(b.parcel.x,b.kind==='garden'?.35:1.2,b.parcel.z).project(camera);
+  const rect=canvas.getBoundingClientRect();
+  return {x:rect.left+(v.x+1)*.5*rect.width,
+   y:rect.top+(1-v.y)*.5*rect.height};
+ },
  advance:(seconds:number)=>{const result=advancePioneerWorld(world,seconds);
   valley.update(world,world.minutes/3);renderUI();return result;},
  flowSeason:()=>{const result=advancePioneerToSeason(world);

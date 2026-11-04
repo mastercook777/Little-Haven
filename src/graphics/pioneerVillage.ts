@@ -6,8 +6,9 @@ import {VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
 import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
-import {buildMountainRoof} from './villageBuildings.ts';
+import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
+import type {PioneerSelection} from '../ui/pioneerInspection.ts';
 
 const material=(color:string,emissive?:string)=>new THREE.MeshStandardMaterial({
  color,roughness:.92,...(emissive?{emissive,emissiveIntensity:.35}:{})
@@ -63,7 +64,9 @@ function vegetation(root:THREE.Group){
 }
 function resourceLandmarks(root:THREE.Group,s:PioneerWorld){
  for(const site of s.sites){
+  if(site.kind==='field')continue; // The garden model already depicts the crop site.
   const g=group(root,site.x,.18,site.z);g.name='resource-'+site.id;
+  g.userData.siteId=site.id;
   if(site.kind==='forest'){
    for(let i=0;i<5;i++){
     const log=box(g,(i%3-1)*.28,.13+(i>2?.23:0),Math.floor(i/3)*.3,
@@ -85,6 +88,7 @@ function resourceLandmarks(root:THREE.Group,s:PioneerWorld){
 }
 function campVisual(root:THREE.Group,s:PioneerWorld){
  const g=group(root,s.camp.x,.19,s.camp.z);g.name='pioneer-temporary-camp';
+ g.userData.pioneerCamp=true;
  const pad=new THREE.Mesh(new THREE.CircleGeometry(1.05,22),
   new THREE.MeshStandardMaterial({color:'#b8aa82',side:THREE.DoubleSide}));
  pad.rotation.x=-Math.PI/2;pad.position.y=.018;pad.scale.set(1.2,.85,1);g.add(pad);
@@ -128,15 +132,18 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
   pole(g,x,1.15,z,.10,1.93,wood);
  for(const z of [-.84,.84])box(g,0,2.12,z,2.25,.16,.15,lightWood);
  for(const x of [-.99,.99])box(g,x,2.1,0,.13,.15,1.85,lightWood);
- const beam=box(g,0,2.43,0,.16,.15,2.38,lightWood);beam.name='roof-ridge';
- const roofCount=phase==='complete'?2:Math.min(2,Math.floor(Math.max(0,progress-.32)*3));
- for(let i=0;i<roofCount;i++){
-  const sign=i===0?-1:1;
-  const roof=box(g,sign*.61,2.13,0,1.46,.16,2.28,thatch);
-  roof.rotation.z=sign*.43;
-  for(let j=0;j<5;j++){
-   const reed=box(g,sign*(.27+j*.21),2.38-(j*.09),0,.024,.025,2.30,thatchBright);
-   reed.rotation.z=sign*.43;
+ // Both slopes, ridge and thatch seams share a single physically valid roof.
+ // The old per-strip Y offsets were inverted relative to the rotated roof.
+ const roofCount=phase==='complete'?2:
+  Math.min(2,Math.floor(Math.max(0,progress-.25)*3));
+ if(roofCount){
+  const roof=buildPioneerRoof(g,PIONEER_SHELTER_ROOF,thatch,wood,lightWood,thatchBright);
+  if(roofCount<2){
+   const leaf=roof.getObjectByName('roof-right-slope');
+   leaf?.parent?.remove(leaf);
+   // Hide associated right-half seams/rafters until the second slope is made.
+   for(const child of [...roof.children])
+    if(child.position.x>.12&&child.name!=='roof-ridge')child.visible=false;
   }
  }
  if(phase==='complete'){
@@ -212,41 +219,65 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  }
  const cottage=kind==='cottage';
  const w=cottage?2.64:2.38,d=cottage?2.50:2.31,h=cottage?1.68:1.57;
+ const plaster=material('#d4c5a7');
  box(g,0,.12,0,w+.06,.19,d+.03,material('#aba18c'));
  if(phase==='foundation')return g;
  for(const x of [-w/2+.14,w/2-.14])for(const z of [-d/2+.14,d/2-.14])
   pole(g,x,h/2+.21,z,.09,h,wood);
  if(cottage){
-  box(g,0,h*.49+.22,-d*.43,w-.34,h*.77,.12,material('#dfcbb0'));
-  for(const x of [-w*.45,w*.45])box(g,x,h*.52+.21,0,.10,h*.74,d-.22,wood);
+  // +Z is the functional front door. The original model only had a back
+  // wall: add physically supported side/front walls and a usable opening.
+  const wall=plaster,paper=material('#e2d6ad'),door=material('#956c52');
+  box(g,0,h*.48+.24,-d*.48,w-.25,h*.78,.13,wall);
+  for(const x of [-w*.47,w*.47])
+   box(g,x,h*.48+.24,0,.13,h*.78,d-.18,wall);
+  for(const sign of [-1,1]){
+   const panelWidth=(w-.73)*.5;
+   const x=sign*(.37+panelWidth*.5);
+   box(g,x,h*.47+.24,d*.475,panelWidth,h*.75,.13,wall);
+  }
+  // Full timber wall plate takes the load from the roof into the posts.
+  // Avoid the prototype's floating 20cm gap between cottage walls and eaves.
+  for(const z of [-d*.46,d*.46])box(g,0,h+.16,z,w*.91,.14,.14,wood);
+  for(const x of [-w*.45,w*.45])box(g,x,h+.16,0,.14,.14,d*.9,wood);
+  box(g,0,h-.07,d*.475,.86,.29,.14,lightWood); // lintel above door
   if(phase==='complete'){
-   const door=box(g,0,.84,d*.50,.66,1.29,.12,material('#956b52'));
-   door.name='cottage-door';
-   for(const x of [-.95,.95]){
-    box(g,x,1.05,d*.505,.37,.45,.06,material('#dfcfab'));
-    box(g,x,1.06,d*.56,.04,.50,.07,wood);
-    box(g,x,1.06,d*.56,.40,.05,.07,wood);
+   const doorMesh=box(g,0,.77,d*.51,.66,1.04,.075,door);
+   doorMesh.name='cottage-door';
+   orb(g,.22,.78,d*.56,.035,lightWood);
+   for(const x of [-.93,.93]){
+    box(g,x,1.04,d*.545,.38,.46,.045,wood);
+    box(g,x,1.04,d*.57,.32,.38,.035,paper);
+    for(const dx of [-.10,.10])box(g,x+dx,1.04,d*.60,.022,.42,.028,lightWood);
+    box(g,x,1.04,d*.60,.36,.026,.028,lightWood);
    }
-   box(g,0,.25,d/2+.25,1.08,.15,.45,stone);
+   box(g,0,.25,d/2+.18,.98,.14,.26,stone);
   }
  }else{
-  // An open-air woodworking shelter: stacked lumber, workbench, red-brown
-  // awning and sparse frame, unlike a second copy of the dwelling.
-  box(g,0,.77,-.48,1.70,.12,.73,lightWood);
-  for(let n=0;n<5;n++)box(g,-.58+n*.26,.35,0,.18,.18,1.72,
-   n%2?wood:lightWood);
+  // A real open-air woodworking bay: four timber posts, bracing, benches,
+  // lumber racks, and a worktop. No floating residential walls/door.
+  for(const z of [-d*.35,d*.35]){
+   const beam=box(g,0,1.42,z,w*.83,.12,.15,wood);
+   beam.name='wood-yard-crossbeam';
+  }
+  box(g,0,.82,-.45,1.78,.12,.72,lightWood);
+  for(let n=0;n<5;n++)box(g,-.58+n*.28,.34,0,.19,.18,1.65,n%2?wood:lightWood);
   if(phase==='complete'){
-   box(g,.62,.89,.31,.55,.18,.53,material('#a47d5a'));
-   const saw=box(g,.68,1.07,.30,.08,.06,.42,stone);saw.rotation.z=.55;
+   const workbench=box(g,.56,1.05,.28,.67,.12,.50,lightWood);
+   workbench.name='wood-yard-workbench';
+   const saw=box(g,.65,1.14,.28,.05,.06,.35,stone);saw.rotation.z=.45;
+   box(g,-.76,.38,-.75,.38,.64,.30,material('#ac9270'));
   }
  }
  if(phase==='frame'){
   for(const z of [-d*.42,d*.42])box(g,0,h+.21,z,w,.12,.13,wood);
   return g;
  }
- const roof=material(cottage?'#6e7774':'#8f8271');
- buildMountainRoof(g,{width:w-.10,depth:d-.16,eave:h+.29,rise:cottage?.59:.39,
-  style:cottage?'cottage':'workshop',material:roof});
+ const roof=material(cottage?'#677a77':'#9c8668');
+ buildPioneerRoof(g,{
+  halfWidth:(w-.10)/2+.13,halfDepth:(d-.16)/2+.10,
+  eaveY:h+.29,ridgeY:h+.29+(cottage?.52:.43),thickness:.095
+ },roof,wood,lightWood,cottage?undefined:thatchBright,cottage?plaster:undefined);
  if(condition<78){
   // Worn roofs reveal genuine repair history; repaired structures regain
   // a clean silhouette after the simulation transaction finishes.
@@ -283,6 +314,7 @@ function drawFootpaths(parent:THREE.Group,roads:readonly PioneerRoad[]){
 }
 export interface PioneerGraphics{
  root:THREE.Group;update(s:PioneerWorld,seconds:number):void;
+ setSelected(selection:PioneerSelection|null):void;
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;roads:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
@@ -321,7 +353,29 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  rain.frustumCulled=false;root.add(rain);
  let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
  let latestWorld=world;
+ let selected:PioneerSelection|null=null;
+ const glow=new THREE.Mesh(new THREE.RingGeometry(.89,1.0,48),
+  new THREE.MeshBasicMaterial({color:'#f2d89b',side:THREE.DoubleSide,
+   transparent:true,opacity:.90,depthWrite:false}));
+ glow.name='selected-building-ground-marker';glow.rotation.x=-Math.PI/2;
+ glow.renderOrder=9;glow.visible=false;root.add(glow);
+ function updateMarker(s:PioneerWorld){
+  if(!selected){glow.visible=false;return;}
+  const b=selected.kind==='building'?s.buildings.find(x=>x.id===selected?.id):undefined;
+  const site=selected.kind==='site'?s.sites.find(x=>x.id===selected?.id):undefined;
+  const p=b?.parcel??(selected.kind==='intent'&&selected.id===s.intent?.id?s.intent.parcel:null);
+  if(p){
+   glow.visible=true;glow.position.set(p.x,.23,p.z);
+   glow.scale.set(p.width*.80,p.depth*.80,1);
+   glow.rotation.set(-Math.PI/2,0,p.rotation);
+  }else if(site||selected.kind==='camp'){
+   const loc=site??s.camp;
+   glow.visible=true;glow.position.set(loc.x,.25,loc.z);
+   glow.scale.setScalar(site?1.0:1.3);glow.rotation.set(-Math.PI/2,0,0);
+  }else glow.visible=false;
+ }
  function update(s:PioneerWorld,seconds:number){
+  updateMarker(s);
   latestWorld=s;
   const phase=s.intent?.phase??'none';
   const progress=s.intent?.workDone??0;
@@ -406,10 +460,31 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   river.animate(seconds);
  }
  update(world,0);
- return {root,update,signatures:()=>({
+ return {root,update,setSelected:(selection)=>{selected=selection;updateMarker(latestWorld);},
+  signatures:()=>({
   buildings:latestWorld.buildings.length,renderedStructures,
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
   people:people.length,roads:latestWorld.roads.length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
+
+/** Resolve a raycast hit through authored model groups. The actual registry,
+ * not geometry names or mesh order, owns a building's identity. */
+export function pioneerHitSelection(s:PioneerWorld,hit:THREE.Object3D):PioneerSelection|null{
+ let current:THREE.Object3D|null=hit;
+ while(current){
+  if(current.userData.buildingId){
+   const parcelId=String(current.userData.buildingId);
+   const built=s.buildings.find(b=>b.parcel.id===parcelId);
+   if(built)return {kind:'building',id:built.id};
+   if(s.intent?.parcel?.id===parcelId)return {kind:'intent',id:s.intent.id};
+  }
+  if(current.userData.siteId&&
+   s.sites.some(site=>site.id===current?.userData.siteId))
+   return {kind:'site',id:String(current.userData.siteId)};
+  if(current.userData.pioneerCamp)return {kind:'camp',id:'camp'};
+  current=current.parent;
+ }
+ return null;
+}
