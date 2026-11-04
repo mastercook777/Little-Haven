@@ -214,6 +214,9 @@ try{
   if(!opened)throw Error('An obscured building cannot be inspected via mobile facility list: '+
    JSON.stringify({mobileShelter,frontmost}));
  }
+ // The inspector is a touch drawer over the normal HUD. Close it before
+ // selecting another building; a real tap must not pass through its content.
+ await mpage.locator('#inspectClose').tap();
  // The village commons remains inspectable on narrow screens even if its
  // central 3D marker falls behind the HUD and cannot receive pointer input.
  await mpage.locator('.pioneer-building-list').evaluate(el=>el.open=true);
