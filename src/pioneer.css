@@ -139,3 +139,9 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
 #pioneerBuildingChoices button{padding:6px 8px;font-size:10px;text-align:left}
 #pioneerBuildingChoices span{font-size:10px;color:#809080}
 @media(max-width:760px){.pioneer-building-list{margin-top:5px;padding-top:5px}.pioneer-building-list summary{font-size:9px}#pioneerBuildingChoices{max-height:75px}#pioneerBuildingChoices button{font-size:9px;padding:6px}}
+
+/* The living commons is a small piece of scenery with an inspectable
+   history, not a fourth strategic policy button. */
+.commons-status{font-size:10px;line-height:1.5;color:#71836c;padding:5px 0 0;
+ text-align:center}
+@media(max-width:760px){.commons-status{font-size:9px;line-height:1.35;padding:3px 0}}
