@@ -1,4 +1,5 @@
 import type {PioneerWorld,PioneerBuilding,PioneerResourceSite} from './pioneerWorld.ts';
+import {appendPioneerJournal} from './pioneerChronicle.ts';
 
 export type PioneerFacilityPreference='harvest'|'seed'|'timber'|'repair';
 export type PioneerOperationalKind='garden'|'wood-yard';
@@ -6,8 +7,7 @@ const options:Record<PioneerOperationalKind,readonly PioneerFacilityPreference[]
  garden:['harvest','seed'],'wood-yard':['timber','repair']
 };
 function entry(s:PioneerWorld,title:string,text:string,id:string){
- if(s.journal.length>=160)s.journal.shift();
- s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId:id});
+ appendPioneerJournal(s,title,text,causeId);
 }
 export const pioneerFacilityLabel=(kind:PioneerOperationalKind)=>
  kind==='garden'?'菜圃':'木作棚';
