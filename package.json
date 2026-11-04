@@ -9,7 +9,7 @@
     "build:pages": "tsc --noEmit && vite build --mode pages",
     "preview": "vite preview --host 0.0.0.0",
     "check": "tsc --noEmit",
-    "test:sim": "node --experimental-strip-types --test tests/simulation.test.mts tests/pioneer.test.mts tests/living-fates.test.mts",
+    "test:sim": "node --experimental-strip-types --test tests/simulation.test.mts tests/pioneer.test.mts tests/living-fates.test.mts tests/seed-trial.test.mts",
     "test:browser": "node tests/browser-smoke.mjs && node tests/pioneer-browser-smoke.mjs"
   },
   "dependencies": {
