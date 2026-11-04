@@ -98,7 +98,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
    '这是居民铺出石路、修建公告栏和集会座位的公共生活中心。';
   const facts=[
    {label:'当前阶段',value:String(commons.stage)+' / 3 · '+title},
-   {label:'居民',value:s.founders.length+' 位常住乡邻'},
+   {label:'现今人口',value:s.founders.length+' 位常住乡邻'},
    {label:'已耗木料',value:fixed(commons.woodSpent)+' 份'},
    {label:'实际工时',value:fixed(commons.workHours)+' 小时'},
    {label:'已用口粮',value:fixed(commons.mealsServed)+' 份'},
