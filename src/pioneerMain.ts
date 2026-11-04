@@ -27,14 +27,15 @@ renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.16;
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2('#d5e0d6',.010);
 const camera=new THREE.OrthographicCamera(-24,24,16,-16,.1,250);
-const defaultEye=new THREE.Vector3(29,30,39);
-camera.position.copy(defaultEye);camera.lookAt(0,0,0);
+const defaultEye=new THREE.Vector3(27.3,30,39);
+camera.position.copy(defaultEye);camera.lookAt(-1.7,0,0);
 const orbit=new OrbitControls(camera,canvas);
-orbit.target.set(0,0,0);orbit.enablePan=false;orbit.enableDamping=true;
+orbit.target.set(-1.7,0,0);orbit.enablePan=true;orbit.enableDamping=true;
+ orbit.minTargetRadius=0;orbit.maxTargetRadius=12;orbit.cursor.set(-1.7,0,0);
 orbit.dampingFactor=.065;orbit.minPolarAngle=.43;orbit.maxPolarAngle=1.26;
 orbit.minZoom=.72;orbit.maxZoom=2.3;orbit.rotateSpeed=.64;
 orbit.mouseButtons.LEFT=THREE.MOUSE.ROTATE;
-orbit.touches.ONE=THREE.TOUCH.ROTATE;orbit.touches.TWO=THREE.TOUCH.DOLLY_ROTATE;
+orbit.touches.ONE=THREE.TOUCH.ROTATE;orbit.touches.TWO=THREE.TOUCH.DOLLY_PAN;
 const hemi=new THREE.HemisphereLight('#e4eeed','#a3a58b',2.15);scene.add(hemi);
 const sun=new THREE.DirectionalLight('#fff0d7',2.70);
 sun.position.set(-24,35,21);sun.castShadow=true;
@@ -68,7 +69,8 @@ const labels:Record<PioneerWork,string>={
  'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
  'shelter':'回家休息','farm':'耕作收菜','repair':'修屋补梁',
  'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'家中吃饭',
- 'socialize':'村心闲谈','commons-build':'修建公共村心'
+ 'socialize':'村心闲谈','commons-build':'修建公共村心',
+ 'clear-land':'林缘清障开荒'
 };
 const safe=(input:string)=>input.replace(/[&<>"']/g,c=>
  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
@@ -154,8 +156,14 @@ function renderUI(){
   (commonsJob?' ｜ 筹建'+pioneerCommonsNames[commonsJob.targetStage]+
    '：木料 '+amount(commonsJob.woodCommitted)+'/'+amount(commonsJob.woodRequired)+
    '，工时 '+amount(commonsJob.workDone)+'/'+amount(commonsJob.workRequired):' ｜ 点击营火/村心查看生活记录');
+ const frontier=world.frontier;
+ $('pioneerFrontierStatus').textContent='林缘 · 累计伐倒 '+frontier.totalFelled+
+  ' 株 · 已开荒 '+frontier.clearings.filter(c=>c.phase==='cleared').length+
+  ' 处 / '+frontier.clearings.length+' 处已勘地';
  const buildingChoices='<button type="button" data-pick-commons="camp">村心 · '+
   safe(pioneerCommonsNames[world.commons.stage])+'</button>'+
+  world.frontier.clearings.map(c=>'<button type="button" data-pick-clearing="'+safe(c.id)+'">'+
+   (c.phase==='cleared'?'林缘空地':'正在清林')+' · '+safe(c.id)+'</button>').join('')+
   (world.buildings.length?
    world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
     safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
@@ -235,6 +243,10 @@ $('pioneerBuildingChoices').addEventListener('click',event=>{
  if(target.closest('button[data-pick-commons]')){
   chooseInspection({kind:'camp',id:'camp'});return;
  }
+ const clearing=target.closest<HTMLButtonElement>('button[data-pick-clearing]');
+ if(clearing?.dataset.pickClearing){
+  chooseInspection({kind:'clearing',id:clearing.dataset.pickClearing});return;
+ }
  const button=target.closest<HTMLButtonElement>('button[data-pick-building]');
  const id=button?.dataset.pickBuilding;
  if(id&&world.buildings.some(b=>b.id===id))chooseInspection({kind:'building',id});
@@ -268,7 +280,7 @@ $('pioneerSeasonSkip').addEventListener('click',()=>{
 });
 $('pioneerPause').addEventListener('click',()=>{paused=!paused;renderUI();});
 $('pioneerCamera').addEventListener('click',()=>{
- camera.position.copy(defaultEye);orbit.target.set(0,0,0);orbit.update();
+ camera.position.copy(defaultEye);orbit.target.set(-1.7,0,0);orbit.update();
 });
 $('pioneerZoomIn').addEventListener('click',()=>{camera.zoom=Math.min(2.3,camera.zoom*1.15);camera.updateProjectionMatrix();});
 $('pioneerZoomOut').addEventListener('click',()=>{camera.zoom=Math.max(.72,camera.zoom/1.15);camera.updateProjectionMatrix();});
@@ -328,9 +340,16 @@ function lighting(){
 function tick(now:number){
  const dt=Math.max(0,Math.min(.09,(now-last)/1000));last=now;
  if(!paused){
-  const previous=world.buildings.length,previousPopulation=world.founders.length,events=world.journal.length,oldCommonsStage=world.commons.stage;
+  const previous=world.buildings.length,previousPopulation=world.founders.length,
+   events=world.journal.length,oldCommonsStage=world.commons.stage,
+   previousFelled=world.frontier.totalFelled,
+   previousOpened=world.frontier.clearings.filter(c=>c.phase==='cleared').length;
   advancePioneerWorld(world,dt*speed);
-  if(world.commons.stage>oldCommonsStage)toast('村民完成了公共村心升级：'+pioneerCommonsNames[world.commons.stage]);
+  if(world.frontier.clearings.filter(c=>c.phase==='cleared').length>previousOpened)
+   toast('林缘灌木已经清出一处可勘地的开阔地块。');
+  else if(world.frontier.totalFelled>previousFelled)
+   toast('林地里传来倒树声，留下树桩和新的木料。');
+  else if(world.commons.stage>oldCommonsStage)toast('村民完成了公共村心升级：'+pioneerCommonsNames[world.commons.stage]);
   else if(world.buildings.length>previous)toast('村民亲手完成了新设施，山谷里又添了一处生活痕迹。');
   else if(world.founders.length>previousPopulation)toast('山谷添了新邻居，住进了真正空出的屋舍。');
   else if(world.journal.length>events&&world.intent?.phase==='frame')
