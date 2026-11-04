@@ -150,7 +150,9 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
  const stores=stable&&!pioneerHasFacility(s,'granary');
  if(s.livelihood.direction==='river'&&river)return 'fish-hut';
  if(s.livelihood.direction==='fields'&&stores)return 'granary';
- if(s.livelihood.direction==='craft'&&s.livelihood.craft.phase==='building')return null;
+ if(s.livelihood.direction==='craft'&&pioneerHasFacility(s,'wood-yard')&&
+  s.livelihood.craft.phase!=='complete'&&s.resources.food>=s.founders.length*1.5)
+  return null; // Give residents actual spare wood and six shifts before other expansion.
  if(river)return 'fish-hut';
  if(stores)return 'granary';
  return null;
