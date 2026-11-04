@@ -65,6 +65,7 @@ try{world=loadPioneerWorld(localStorage,Date.now(),slot);}catch{
 let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
 let selection:PioneerSelection|null=null;
+let lastLivelihoodMarkup='',lastMilestoneMarkup='';
 let spotlight:PioneerSpotlight=getPioneerSpotlight(world);
 let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number;
  fromZoom:number;toZoom:number}|null=null;
@@ -171,7 +172,9 @@ function renderUI(){
   '" '+(!world.buildings.some(b=>b.kind==='shelter')?'disabled':'')+'>'+
   '<b>'+safe(d.label)+'</b><small>'+safe(d.description)+'</small></button>').join('');
  const council=$('pioneerDirections');
- if(council.innerHTML!==livelihoodControls)council.innerHTML=livelihoodControls;
+ if(lastLivelihoodMarkup!==livelihoodControls){
+  council.innerHTML=livelihoodControls;lastLivelihoodMarkup=livelihoodControls;
+ }
  for(const btn of Array.from(council.querySelectorAll<HTMLButtonElement>('[data-livelihood]')))
   btn.classList.toggle('active',btn.dataset.livelihood===world.livelihood.direction);
  const milestones=pioneerMilestoneBoard(world).map(m=>
@@ -179,7 +182,9 @@ function renderUI(){
   '<span class="mark">'+(m.done?'✓':'○')+'</span><div><b>'+safe(m.label)+'</b>'+
   '<p>'+safe(m.progress)+' · '+safe(m.requirement)+'</p></div></div>').join('');
  const page=$('pioneerMilestones');
- if(page.innerHTML!==milestones)page.innerHTML=milestones;
+ if(lastMilestoneMarkup!==milestones){
+  page.innerHTML=milestones;lastMilestoneMarkup=milestones;
+ }
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
  const commons=world.commons,commonsJob=commons.project;
@@ -342,7 +347,7 @@ const councilOpen=$<HTMLButtonElement>('pioneerCouncilOpen');
 councilOpen.addEventListener('click',()=>{
  councilPanel.open=!councilPanel.open;
  councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
- if(councilPanel.open)councilPanel.scrollIntoView({block:'nearest',behavior:'smooth'});
+ if(councilPanel.open)councilPanel.scrollIntoView({block:'end',behavior:'auto'});
 });
 councilPanel.addEventListener('toggle',()=>{
  councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
