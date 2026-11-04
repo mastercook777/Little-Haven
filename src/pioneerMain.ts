@@ -67,7 +67,7 @@ let clickStart:{x:number;y:number;at:number}|null=null,lastHover=0;
 const labels:Record<PioneerWork,string>={
  rest:'照看营地', 'collect-wood':'林缘拾柴','forage':'入林采食',
  'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
- 'shelter':'回家休息','farm':'耕作收菜','repair':'修屋补梁',
+ 'shelter':'回家休息','farm':'耕作收菜','seed-trial':'试种留种','repair':'修屋补梁',
  'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'家中吃饭',
  'socialize':'村心闲谈','commons-build':'修建公共村心',
  'clear-land':'林缘清障开荒'

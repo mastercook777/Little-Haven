@@ -1,6 +1,8 @@
 import {DAY_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.ts';
 import {createLivingFates,pioneerCultivationMultiplier,settleLivingFatesHour,validateLivingFates,
  type LivingFatesState} from './livingFates/peopleState.ts';
+import {activeSeedTrial,considerSeedTrial,dueSeedTrial,performSeedTrialShift,
+ pioneerFieldLegacyMultiplier} from './livingFates/seedTrial.ts';
 import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,reservedParcels,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
@@ -32,7 +34,7 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land';
+export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land';
 export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
@@ -210,9 +212,14 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   task?.path&&task.path.length?task.path:
   s.roads.find(r=>r.buildingId===targetBuilding?.id)?.points:undefined;
  const builtRoad=s.roads.find(r=>r.buildingId===(targetBuilding??fieldBuilding)?.id);
- const goal:WalkPoint=workClearing?[workClearing.x,workClearing.z]:atCommons?
+ let goal:WalkPoint=workClearing?[workClearing.x,workClearing.z]:atCommons?
   [round(s.camp.x+(f.id%3-1)*.38),round(s.camp.z+(f.id%4-1.5)*.30)]:
-  fieldBuilding?pioneerEntrance(fieldBuilding.parcel):site?[site.x,site.z]:
+  fieldBuilding?[
+   round(pioneerEntrance(fieldBuilding.parcel)[0]+
+    Math.cos(fieldBuilding.parcel.rotation)*(f.id%3-1)*.34),
+   round(pioneerEntrance(fieldBuilding.parcel)[1]+
+    Math.sin(fieldBuilding.parcel.rotation)*(f.id%3-1)*.34)
+  ]:site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
   shelter?pioneerEntrance(shelter.parcel):
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
@@ -226,6 +233,11 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
  else commute=findPioneerWalk(from,goal,obstacles);
+ if(!commute&&fieldBuilding){
+  // Keep the original navigable entrance when a side work slot is blocked.
+  goal=pioneerEntrance(fieldBuilding.parcel);
+  commute=findPioneerWalk(from,goal,obstacles);
+ }
  if(!commute){
   // Never award work or gathered stock to somebody who cannot reach the place.
   f.activity='rest';f.target=point(from[0],from[1]);f.commute=[from,from];f.pathRoadId=undefined;
@@ -237,8 +249,9 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  registerPioneerTrip(s,f.pathRoadId);
 }
 function gather(s:PioneerWorld,f:PioneerFounder,
- kind:PioneerResourceSite['kind'],amount:number,activity:PioneerWork){
- const choices=(kind==='field'?availablePioneerFields(s):
+ kind:PioneerResourceSite['kind'],amount:number,activity:PioneerWork,
+ preferred?:PioneerResourceSite){
+ const choices=(preferred?[preferred]:kind==='field'?availablePioneerFields(s):
   s.sites.filter(site=>site.kind===kind&&site.stock>.001))
   .slice().sort((a,b)=>b.stock-a.stock||a.id.localeCompare(b.id));
  const cap=kind==='forest'?48:36;
@@ -247,10 +260,11 @@ function gather(s:PioneerWorld,f:PioneerFounder,
   if(held>=cap)return false;
   allocate(s,f,activity,site);
   if(f.activity==='rest')continue;
-  const efficiency=kind==='field'?pioneerHarvestMultiplier(s,site)*pioneerCultivationMultiplier(s,f.id):
+  const efficiency=kind==='field'?pioneerHarvestMultiplier(s,site)*pioneerCultivationMultiplier(s,f.id)*
+   pioneerFieldLegacyMultiplier(s,site.id):
    kind==='forest'?pioneerWoodWorkingMultiplier(s):1;
   const gathered=Math.max(0,Math.min(site.stock,amount*efficiency,cap-held));
-  if(!gathered)continue;
+  if(!gathered){allocate(s,f,'rest');continue;}
   registerPioneerTrip(s,f.pathRoadId);
   const oldCollected=site.totalGathered;
   site.stock=round(site.stock-gathered);site.totalGathered=round(site.totalGathered+gathered);
@@ -283,6 +297,8 @@ function work(s:PioneerWorld,f:PioneerFounder){
 /** One authoritative hourly settlement step. Work assignments are exclusive and
  * consume one person's hour; day/month fast-forward uses these same steps. */
 function step(s:PioneerWorld){
+ // Commit the previous season's fate before any new seasonal field renewal.
+ dueSeedTrial(s);
  const weather=getPioneerWeather(s);
  agePioneerBuildings(s);
  if(s.minutes%DAY_MINUTES===0){
@@ -368,12 +384,45 @@ function step(s:PioneerWorld){
  const needWood=!!intent&&intent.phase==='materials'&&s.resources.wood<intent.woodRequired;
  const [liang,lu,he]=s.founders;
  const crisis=s.resources.food<Math.max(1.35,s.founders.length*.48);
+ // When several farmers live here, one daily SAME-FIELD shift lets them
+ // actually tend crops together. Both consume this hour and each deposits only
+ // the harvest gathered from an existing stocked, reachable field. It is not
+ // a passive relationship bonus generated by standing in a crowd.
+ const coFarmWorkers=new Set<number>();
+ if(hour===9&&s.founders.length>=4){
+  const field=availablePioneerFields(s).find(site=>site.stock>=1.8);
+  const eligible=s.founders.filter(f=>f.id===3||/农|园|采集/.test(f.role))
+   .sort((a,b)=>a.id-b.id).slice(0,2);
+  if(field&&eligible.length===2){
+   for(const resident of eligible){
+    if(gather(s,resident,'field',.74,'farm',field))
+     coFarmWorkers.add(resident.id);
+   }
+  }
+ }
+ const seedWorkers=new Set<number>();
+ if(hour===10&&!crisis){
+  considerSeedTrial(s);
+  const trial=activeSeedTrial(s);
+  const site=trial?s.sites.find(site=>site.id==='field-'+trial.gardenId):undefined;
+  if(site){
+   for(const id of trial!.actorIds){
+    const resident=s.founders.find(x=>x.id===id);
+    if(!resident)continue;
+    allocate(s,resident,'seed-trial',site);
+    if(resident.activity==='seed-trial'&&performSeedTrialShift(s,resident,site))
+     seedWorkers.add(id);
+   }
+  }
+ }
  const foodTask=(f:PioneerFounder,amount:number)=>{
   const field=availablePioneerFields(s);
   if(field.length&&gather(s,f,'field',amount, 'farm'))return true;
   return gather(s,f,'forage',amount,'forage');
  };
- if(crisis&&!needWood){
+ if(seedWorkers.has(liang.id)||coFarmWorkers.has(liang.id)){
+  // This resident spent the hour at the trial plot instead of collecting.
+ }else if(crisis&&!needWood){
   if(!foodTask(liang,.86))allocate(s,liang,'rest');
  }else if(needWood||!building&&s.resources.wood<16){
   if(!gather(s,liang,'forest',.94,'collect-wood'))allocate(s,liang,'rest');
@@ -381,7 +430,9 @@ function step(s:PioneerWorld){
  else allocate(s,liang,'tend-fire');
  const foodTarget=Math.max(s.founders.length*2.65,
   s.policy==='food'?18:s.policy==='shelter'?5.5:9.5);
- if(s.resources.food<foodTarget||!building||crisis){
+ if(seedWorkers.has(he.id)||coFarmWorkers.has(he.id)){
+  // Trial work replaces the ordinary farm shift.
+ }else if(s.resources.food<foodTarget||!building||crisis){
   if(!foodTask(he,weather==='rain'?.63:.94))allocate(s,he,'rest');
  }else if(building)work(s,he);
  else allocate(s,he,'shelter');
@@ -394,7 +445,9 @@ function step(s:PioneerWorld){
  const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
   !crisis&&s.resources.food>=s.founders.length*.72&&
   s.resources.water>=Math.max(waterTarget,s.founders.length*.55);
- if(clearingShift&&clearing){
+ if(seedWorkers.has(lu.id)||coFarmWorkers.has(lu.id)){
+  // Seed trial work is exclusive of fetching water or clearing land.
+ }else if(clearingShift&&clearing){
   // Clearing consumes Lu's assigned hour instead of crediting two jobs.
   // The corresponding site must actually remain reachable that day.
   if(pioneerClearingReachable(s,clearing)){
@@ -414,6 +467,7 @@ function step(s:PioneerWorld){
  }else if(building)work(s,lu);
  else allocate(s,lu,'tend-fire');
  for(const f of s.founders.slice(3)){
+  if(seedWorkers.has(f.id)||coFarmWorkers.has(f.id))continue;
   if(s.resources.food<foodTarget||crisis){
    if(!foodTask(f,.86))allocate(s,f,'rest');
   }else if(s.resources.water<s.founders.length*1.2){
@@ -495,6 +549,14 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   // Old slots get only present-day profiles; do not invent historical memories.
   if(s.livingFates===undefined)
    s.livingFates=createLivingFates(s.seed,s.founders,s.minutes,true);
+  // A/B saves predate the first fate arc. Migrate all four new collections
+  // together; partial corrupt data must not be mistaken for an old save.
+  const life=s.livingFates as LivingFatesState;
+  if(life&&life.farmCoWorkHours===undefined&&life.seedTrials===undefined&&
+   life.fieldLegacies===undefined&&life.appliedEffectIds===undefined){
+   life.farmCoWorkHours={};life.seedTrials=[];
+   life.fieldLegacies=[];life.appliedEffectIds=[];
+  }
   if(!validateLivingFates(s))return null;
   if(!Array.isArray(s.roads)||s.roads.length>12||
    !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||

@@ -182,6 +182,106 @@ try{
   .buildings.find(b=>b.id===id),gardenId);
  if(savedConfig?.productionMode!=='seed'||savedConfig.operating!==false)
   throw Error('Garden production settings lost after reload');
+
+ // Fate-C: build a separate truthful fixture by running the REAL model until
+ // two people worked the SAME existing garden. The controlled food reserve is
+ // supplied before trial start; the runtime must still deduct the seeds and
+ // give up normal shifts. Preserve the previous save for subsequent old tests.
+ const seedFate=await page.evaluate(async()=>{
+  const {createPioneerWorld,advancePioneerWorld,PIONEER_SLOT_KEYS}=
+   await import('/src/simulation/pioneerWorld.ts');
+  const {considerSeedTrial}=await import('/src/simulation/livingFates/seedTrial.ts');
+  const {nextSeasonBoundary,DAY_MINUTES}=await import('/src/simulation/calendar.ts');
+  const original=localStorage.getItem(PIONEER_SLOT_KEYS[0]);
+  const s=createPioneerWorld(42,Date.now());
+  let entry=null;
+  for(let day=0;day<48*4&&!entry;day++){
+   advancePioneerWorld(s,DAY_MINUTES/3);
+   if(nextSeasonBoundary(s.minutes)-s.minutes<10*DAY_MINUTES||
+    s.livingFates.seedTrials.some(t=>t.phase==='working'))continue;
+   for(const [key,h] of Object.entries(s.livingFates.farmCoWorkHours)
+    .sort((a,b)=>b[1]-a[1])){
+    const gardenId=key.slice(0,key.lastIndexOf(':'));
+    const field=s.sites.find(x=>x.id==='field-'+gardenId&&x.stock>=.4);
+    const garden=s.buildings.find(b=>b.id===gardenId&&b.kind==='garden');
+    const [a,b]=key.slice(key.lastIndexOf(':')+1).split('-').map(Number);
+    if(h<8||!field||!garden||garden.operating===false||
+     s.livingFates.seedTrials.some(t=>t.gardenId===gardenId)||
+     (s.livingFates.people[a]?.skills.cultivation.xp??0)<12||
+     (s.livingFates.people[b]?.skills.cultivation.xp??0)<6)continue;
+    entry={gardenId,ids:[a,b],hours:h};break;
+   }
+  }
+  if(!entry)return {error:'No qualified real gardening partnership found'};
+  const garden=s.buildings.find(b=>b.id===entry.gardenId);
+  garden.productionMode='seed';s.resources.food=36;
+  s.resources.water=Math.max(s.resources.water,s.founders.length*3);
+  if(!considerSeedTrial(s))return {error:'Real prerequisites did not admit trial',
+   entry,food:s.resources.food,site:s.sites.find(x=>x.id==='field-'+entry.gardenId)?.stock};
+  const first=structuredClone(s.livingFates.seedTrials.at(-1));
+  advancePioneerWorld(s,(nextSeasonBoundary(s.minutes)-s.minutes)/3);
+  const final=s.livingFates.seedTrials.at(-1);
+  if(final.phase!=='resolved')return {error:'Genuine trial did not complete in a season',
+   first,final,food:s.resources.food};
+  s.lastSavedAt=Date.now();
+  const {importPioneerWorld}=await import('/src/simulation/pioneerWorld.ts');
+  const checked=importPioneerWorld(JSON.stringify(s));
+  if(!checked)return {error:'Completed fate cannot survive save validation',gardenId:entry.gardenId,
+   trial:final,seedFates:s.livingFates,buildings:s.buildings.map(x=>x.id)};
+  // Do not write into localStorage under a still-running old world: its
+  // pagehide/autosave would overwrite the fixture just before reload.
+  return {savedWorld:JSON.stringify(s),gardenId:entry.gardenId,first,final,
+   legacy:s.livingFates.fieldLegacies.find(l=>l.gardenId===entry.gardenId),
+   original};
+ });
+ if(seedFate.error||seedFate.first.seedsSpent!==1.2||seedFate.final.phase!=='resolved'||
+  seedFate.legacy?.harvestBonus!==.06)
+  throw Error('Seasonal seed fate not based on real work: '+JSON.stringify(seedFate));
+ // Import through the REAL user-facing file input: replaceWorld updates the
+ // authoritative runtime before its pagehide/autosave writes the save slot.
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#pioneerFile').setInputFiles({
+  name:'pioneer-seed-fate.json',mimeType:'application/json',
+  buffer:Buffer.from(seedFate.savedWorld,'utf8')
+ });
+ await page.waitForFunction(gardenId=>
+  window.__PIONEER_DEBUG__?.getState()?.livingFates?.fieldLegacies
+   ?.some(e=>e.gardenId===gardenId),seedFate.gardenId);
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
+ await page.locator('.pioneer-building-list').evaluate(el=>el.open=true);
+ const listed=await page.evaluate(gardenId=>{
+  const w=window.__PIONEER_DEBUG__.getState();
+  return {name:gardenId,found:w.buildings.some(b=>b.id===gardenId),
+   buildings:w.buildings.map(b=>b.id),people:w.founders.length,
+   saveKeys:Object.keys(w.livingFates)};
+ },seedFate.gardenId);
+ if(!listed.found)throw Error('Completed trial save did not restore field: '+JSON.stringify(listed));
+ await page.locator('button[data-pick-building="'+seedFate.gardenId+'"]').click();
+ const seedFateCard=await page.evaluate(()=>({
+  visible:!document.querySelector('#pioneerInspector').hidden,
+  facts:document.querySelector('#inspectFacts')?.textContent,
+  history:document.querySelector('#inspectHistory')?.textContent,
+  markers:window.__PIONEER_DEBUG__.getVisuals().seedMarkers,
+  persisted:window.__PIONEER_DEBUG__.getState().livingFates.fieldLegacies
+ }));
+ if(!seedFateCard.visible||!seedFateCard.facts?.includes('田间传承')||
+  !seedFateCard.history?.includes('试田有成')||seedFateCard.markers<1)
+  throw Error('Fate outcome lacks real geometry or inspectable history: '+JSON.stringify(seedFateCard));
+ await screenshot(page,'05b-field-seed-trial-living-fate');
+ results.push({seedFate:true,realShifts:seedFate.final.workBy,persistentSeedPlot:true,
+  actualFieldBonus:seedFate.legacy.harvestBonus});
+ // Restore the old developed village used by the remaining felling and
+ // classics/mobile smoke tests; the test fixture must not contaminate them.
+ // Restore through the same real import path; a raw storage write would be
+ // undone by the current world's pagehide save on the following reload.
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#pioneerFile').setInputFiles({
+  name:'pioneer-before-fate.json',mimeType:'application/json',
+  buffer:Buffer.from(seedFate.original,'utf8')
+ });
+ await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState()?.buildings
+  ?.some(b=>b.kind==='garden'&&b.operating===false));
  // Newly opened land and trees must appear as distinct, inspectable 3D
  // scenes, not just an expanding building count.
  const pioneerFelling=await page.evaluate(()=>{

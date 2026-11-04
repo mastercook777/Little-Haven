@@ -1,6 +1,7 @@
 import {getCalendarFromMinutes,SEASON_NAMES} from '../simulation/calendar.ts';
 import {publicPersonHistory,publicPersonRelations} from '../simulation/livingFates/peopleState.ts';
 import {pioneerBuildingLabel} from '../simulation/pioneerGrowth.ts';
+import {gardenSeedTrial} from '../simulation/livingFates/seedTrial.ts';
 import {pioneerCommonsNames} from '../simulation/pioneerCommons.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive,isPioneerOperational} from '../simulation/pioneerFacilities.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerResourceSite} from '../simulation/pioneerWorld.ts';
@@ -41,7 +42,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
    {label:'来谷记录',value:person.arrivalKnown?date(person.arrivalAt):'旧档已有乡邻 · 来时未详'},
    {label:'落脚住处',value:f.homeBuildingId?
     (s.buildings.find(b=>b.id===f.homeBuildingId)?.kind==='cottage'?'山居':'避雨棚'):'尚在营地'},
-   {label:'此刻正在',value:f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
+   {label:'此刻正在',value:f.activity==='seed-trial'?'留种照料试田':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
     f.activity==='build'?'参与建屋':f.activity==='eat'?'村心用餐':f.activity==='socialize'?'邻里闲谈':'村中日常'},
    {label:'已见本领',value:person.publicFacts.knownSkills.join('、')||'仍在相处中'},
    {label:'田间实践',value:person.skills.cultivation.xp+' 小时；经验 '+person.skills.cultivation.level+' 阶'},
@@ -71,6 +72,17 @@ export function inspectPioneerSelection(s:PioneerWorld,
   if(b.kind==='garden'&&site){
    facts.push({label:'田间余量',value:fixed(site.stock)+' / '+fixed(site.capacity)});
    facts.push({label:'累计收获',value:fixed(site.totalGathered)});
+   const trial=gardenSeedTrial(s,b.id);
+   const legacy=s.livingFates.fieldLegacies.find(x=>x.gardenId===b.id);
+   if(trial){
+    const pair=trial.actorIds.map(id=>s.founders.find(f=>f.id===id)?.name??'乡邻');
+    facts.push({label:'留种来历',value:pair.join('与')});
+    facts.push({label:'留种工时',value:trial.workBy.join(' / ')+' 小时（每人至少 5 小时）'});
+    facts.push({label:'种粮成本',value:fixed(trial.seedsSpent)+' 份 · 已实际扣库'});
+    facts.push({label:'试种结局',value:trial.phase==='working'?'照料中 · 待下一季':
+     trial.phase==='resolved'?'成功 · 此田真实采收增益 6%':'中止 · 收成无加成'});
+   }
+   if(legacy)facts.push({label:'田间传承',value:'实际收获 +'+Math.round(legacy.harvestBonus*100)+'% · 长期保留'});
   }
   if(b.kind==='wood-yard'){
    facts.push({label:'当前功能',value:'木材整理与工具保养'});
@@ -87,7 +99,13 @@ export function inspectPioneerSelection(s:PioneerWorld,
    b.kind==='garden'?'季节和生产安排决定收成，不能凭空供粮。':
    '木匠在这里晾晒材料、维护工具和准备建筑木料。';
   return {title:pioneerBuildingLabel(b.kind),kicker:'已建成 · '+b.id,
-   description,facts,history:relevant(s,b.causeId),operation};
+   description,facts,history:[
+     ...s.livingFates.seedTrials.filter(t=>t.gardenId===b.id).slice(-3).reverse().map(t=>
+      date(t.completedAt??t.startedAt)+' · 留种试田'+
+      (t.phase==='working'?'开始':t.phase==='resolved'?'有成':'中止')+
+      '（'+t.actorIds.map(id=>s.founders.find(f=>f.id===id)?.name??'乡邻').join('、')+'）'),
+     ...relevant(s,b.causeId)
+    ],operation};
  }
  if(selection.kind==='intent'){
   const intent=s.intent;if(!intent||intent.id!==selection.id)return null;

@@ -33,7 +33,7 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen �
 - v0.3: one authoritative clock, stable building IDs, causal player opportunities, recoverable offline hazards.
 - v0.3: distinguish day-scale activity from multi-year life milestones; do not regress to the v0.2 four-day life arc.
 - Treat all v0.3 markdown as planned contracts, not as code already in production; develop substantial changes on feature branches.
-- Pioneer Phase A+B and v0.4.1/0.4.2/0.4.3 core slices **have shipped in PR #10–13**. v0.4.4 Living Fates and v0.5 livelihood-tree documents are **design specifications, not shipped systems**. Never mark a feature implemented because prose exists.
+- Pioneer Phase A+B and v0.4.1/0.4.2/0.4.3 core slices **have shipped in PR #10–13**. v0.4.4-A/B personality, seeded identities, real work relationships and permanent memories have shipped in **PR #15**. v0.4.4-C's first seed-field fate is developed separately in **PR #16**, subject to the exact-HEAD CI and browser release gate; C's other arcs, v0.4.4-D and v0.5 are **not shipped**. Never mark a feature implemented because prose exists.
 - Pioneer mode must initialize with **no permanent buildings**, exactly three founders and a temporary campfire; legacy v0.3 must stay independently playable with untouched save slots.
 - Do not hide a prebuilt village and call it construction. A new permanent structure must have a causal resident need, materials, workers, a collision-safe reachable parcel, visible construction and durable IDs.
 - Tavern/dojo/wuxia storylets in pioneer mode are conditioned on real facilities and people; never use old v0.3 hardcoded initial minutes or phantom `inn-001` references for the new mode.
