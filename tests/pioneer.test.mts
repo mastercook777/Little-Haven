@@ -5,6 +5,11 @@ import {createWorld} from '../src/simulation/world.ts';
 import {parcelOverlaps,reservedParcels,validateVillageParcel} from '../src/simulation/villagePlanning.ts';
 import {pioneerWalkable,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
 import {pioneerHousingCapacity} from '../src/simulation/pioneerGrowth.ts';
+import {isPioneerFacilityActive,getPioneerFacilityPreference,setPioneerFacilityOperating,
+ setPioneerFacilityPreference} from '../src/simulation/pioneerFacilities.ts';
+import {inspectPioneerSelection} from '../src/ui/pioneerInspection.ts';
+import {buildPioneerRoof,pioneerRoofHeight,PIONEER_SHELTER_ROOF} from '../src/graphics/pioneerRoof.ts';
+import * as THREE from 'three';
 import {advancePioneerWorld,advancePioneerToSeason,createPioneerWorld,
  getPioneerCalendar,importPioneerWorld,loadPioneerWorld,PIONEER_SLOT_KEYS,
  planPioneerShelter,savePioneerWorld,setPioneerPolicy} from '../src/simulation/pioneerWorld.ts';
@@ -224,4 +229,99 @@ test('Phase B repair changes building wear and can only spend real materials',()
  assert.ok(s.journal.some(e=>e.title==='修屋工单'),'missing repair: '+JSON.stringify({intent:s.intent,resources:s.resources,buildings:s.buildings.map(b=>({kind:b.kind,condition:b.condition})),journal:s.journal.slice(-4)}));
  assert.ok(s.journal.some(e=>e.title==='旧屋焕新'),'actual repairs must be completed');
  assert.ok(first.lastRepairAt!>=first.completedAt);
+});
+
+test('Architectural roof keeps both slopes and every reed on one measured pitch',()=>{
+ const p=PIONEER_SHELTER_ROOF,base=new THREE.Group();
+ const mat=new THREE.MeshStandardMaterial({color:'#ab946f'});
+ const roof=buildPioneerRoof(base,p,mat,mat,mat,mat);
+ assert.equal(roof.children.filter(x=>x.name==='roof-left-slope'||x.name==='roof-right-slope').length,2);
+ assert.ok(pioneerRoofHeight(p,0)>pioneerRoofHeight(p,p.halfWidth));
+ assert.equal(pioneerRoofHeight(p,p.halfWidth),pioneerRoofHeight(p,-p.halfWidth));
+ const seams=roof.children.filter(x=>x.name==='roof-reed-on-slope');
+ assert.equal(seams.length,8);
+ for(const seam of seams){
+  assert.ok(Math.abs(seam.position.y-(pioneerRoofHeight(p,seam.position.x)+.024))<.0001);
+ }
+ for(const leaf of roof.children.filter(x=>x.name.includes('slope'))){
+  const obj=leaf as THREE.Mesh,coords=obj.geometry.getAttribute('position') as THREE.BufferAttribute;
+  for(let i=0;i<coords.count;i++){
+   const x=coords.getX(i),y=coords.getY(i),z=coords.getZ(i);
+   assert.ok(Math.abs(x)<=p.halfWidth+.0001&&Math.abs(z)<=p.halfDepth+.0001);
+   assert.ok(y<=pioneerRoofHeight(p,x)+.0001&&y>=pioneerRoofHeight(p,x)-p.thickness-.0001);
+  }
+ }
+ const bounds=new THREE.Box3().setFromObject(base);
+ assert.ok(bounds.min.x>=-1.22&&bounds.max.x<=1.22);
+ assert.ok(bounds.min.z>=-1.25&&bounds.max.z<=1.25);
+});
+
+test('Built cottages, gardens and work yards expose real saved detail, not cosmetic count',()=>{
+ const s=createPioneerWorld(42,1000);
+ advancePioneerWorld(s,(48*2*DAY_MINUTES-s.minutes)/3);
+ const cottage=s.buildings.find(b=>b.kind==='cottage');
+ const garden=s.buildings.find(b=>b.kind==='garden');
+ assert.ok(cottage&&garden);
+ const detail=inspectPioneerSelection(s,{kind:'building',id:cottage!.id});
+ assert.equal(detail?.title,'山居');
+ assert.ok(detail?.facts.find(x=>x.label==='村民使用'));
+ assert.equal(detail?.facts.find(x=>x.label==='实际木料')?.value,'9 份');
+ assert.ok(detail?.facts.find(x=>x.label==='落成时间'));
+ assert.ok(detail?.history.length);
+ const plot=inspectPioneerSelection(s,{kind:'building',id:garden!.id});
+ assert.equal(plot?.operation?.active,true);
+ assert.equal(plot?.operation?.preference,'harvest');
+ const site=s.sites.find(x=>x.id==='field-'+garden!.id)!;
+ assert.ok(inspectPioneerSelection(s,{kind:'site',id:site.id})?.facts.length);
+ assert.equal(inspectPioneerSelection(s,{kind:'building',id:'not-a-real-building'}),null);
+ const intent=inspectPioneerSelection(s,{kind:'camp',id:'camp'});
+ assert.ok(intent?.facts.some(x=>x.label==='现今人口'));
+});
+
+test('Pause and production preferences change simulated output and survive save import',()=>{
+ const original=createPioneerWorld(42,1000);
+ advancePioneerWorld(original,(48*DAY_MINUTES-original.minutes)/3);
+ const garden=original.buildings.find(b=>b.kind==='garden')!;
+ assert.ok(garden,'garden must emerge from need before operations can be changed');
+ const before=structuredClone(original),active=structuredClone(original);
+ assert.equal(setPioneerFacilityOperating(before,garden.id,false),true);
+ assert.equal(setPioneerFacilityOperating(before,garden.id,false),false);
+ assert.equal(setPioneerFacilityOperating(before,garden.id,true),true);
+ assert.equal(setPioneerFacilityPreference(before,garden.id,'seed'),true);
+ assert.equal(setPioneerFacilityPreference(before,garden.id,'seed'),false);
+ assert.equal(getPioneerFacilityPreference(before.buildings.find(b=>b.id===garden.id)!), 'seed');
+ assert.equal(setPioneerFacilityOperating(active,garden.id,false),true);
+ const stockBefore=active.sites.find(site=>site.id==='field-'+garden.id)!.totalGathered;
+ advancePioneerWorld(active,3*DAY_MINUTES/3);
+ assert.equal(active.sites.find(site=>site.id==='field-'+garden.id)!.totalGathered,stockBefore,
+  'paused farm must not yield resources even when calendar advances');
+ const resumed=structuredClone(active);
+ assert.equal(setPioneerFacilityOperating(resumed,garden.id,true),true);
+ advancePioneerWorld(resumed,3*DAY_MINUTES/3);
+ assert.ok(resumed.sites.find(site=>site.id==='field-'+garden.id)!.totalGathered>stockBefore,
+  'resumed farm should actually supply village food');
+ assert.deepEqual(importPioneerWorld(JSON.stringify(before)),before);
+ const bad=structuredClone(before);bad.buildings.find(b=>b.id===garden.id)!.productionMode='repair';
+ assert.equal(importPioneerWorld(JSON.stringify(bad)),null,'wood-shop mode cannot be used by a farm');
+ const early=structuredClone(original) as unknown as Record<string,unknown>;
+ delete early.foodStats;
+ assert.ok(importPioneerWorld(JSON.stringify(early))?.foodStats,
+  'old Phase B v4 saves without grain statistics must migrate safely');
+ assert.equal(isPioneerFacilityActive(active.buildings.find(b=>b.id===garden.id)!),false);
+});
+
+test('Four-year food security scales actual farm capacity before filling every home',()=>{
+ const s=createPioneerWorld(42,1000);
+ advancePioneerWorld(s,(48*4*DAY_MINUTES-s.minutes)/3);
+ const crops=s.buildings.filter(b=>b.kind==='garden');
+ const population=s.founders.length;
+ assert.ok(crops.length>=Math.ceil(population/4),
+  'must build enough real field parcels for population '+population);
+ assert.ok(s.resources.food>0,'year-four starvation persists: '+JSON.stringify({
+  food:s.resources.food,people:population,gardens:crops.length,stats:s.foodStats,
+  sites:s.sites.map(site=>({kind:site.kind,stock:site.stock,gathered:site.totalGathered})),
+  intent:s.intent?.kind
+ }));
+ assert.ok(s.foodStats&&s.foodStats.consumed>=0&&s.foodStats.collected>=0);
+ assert.ok(s.journal.some(x=>x.title==='又添一位乡邻'));
 });
