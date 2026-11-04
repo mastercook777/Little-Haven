@@ -12,6 +12,9 @@ import {createPioneerCommons,schedulePioneerCommons,reservePioneerCommonsMateria
  type PioneerCommons} from './pioneerCommons.ts';
 import {availablePioneerFields,pioneerFieldRenewMultiplier,pioneerHarvestMultiplier,
  pioneerWoodWorkingMultiplier,validatePioneerFacilityConfiguration} from './pioneerFacilities.ts';
+import {createPioneerFrontier,recordPioneerFelling,schedulePioneerClearing,
+ performPioneerClearing,pioneerClearingReachable,validatePioneerFrontier,
+ type PioneerFrontier} from './pioneerFrontier.ts';
 
 export const PIONEER_VERSION=4;
 export const PIONEER_SLOT_KEYS=['little-haven-pioneer-v04-slot-1','little-haven-pioneer-v04-slot-2'] as const;
@@ -27,7 +30,7 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build';
+export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land';
 export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
@@ -62,7 +65,7 @@ export interface PioneerWorld{
  sites:PioneerResourceSite[];intent:PioneerIntent|null;buildings:PioneerBuilding[];
  journal:PioneerJournal[];nextEventId:number;policy:PioneerPolicy;comfort:number;
  roads:PioneerRoad[];nextResidentId:number;nextSurveyAt:number;lastArrivalAt:number;
- commons:PioneerCommons;
+ commons:PioneerCommons;frontier:PioneerFrontier;
  foodStats?:{day:number;collected:number;consumed:number;previousCollected:number;previousConsumed:number};
 }
 const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
@@ -133,6 +136,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
   resources:{wood:1,food:5,water:5},sites:resourceSites(seed,camp),
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
   roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0,commons:createPioneerCommons(),
+  frontier:createPioneerFrontier(),
   foodStats:{day:0,collected:0,consumed:0,previousCollected:0,previousConsumed:0}
  };
  log(s,'荒谷点火','梁伯、陆娘和阿禾在安全的林缘安下临时营火。眼前尚无永久屋舍。');
@@ -195,13 +199,15 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   s.buildings.find(b=>site.id==='field-'+b.id):undefined;
  const shelter=activity==='shelter'||activity==='eat-home'?home:undefined;
  const atCommons=['eat','cook','socialize','commons-build'].includes(activity);
+ const workClearing=activity==='clear-land'?
+  s.frontier.clearings.find(c=>c.phase==='clearing'):undefined;
  const targetBuilding=activity==='build'||activity==='repair'?
   s.buildings.find(b=>b.id===task?.targetBuildingId):shelter;
  const jobRoute=(activity==='build'||activity==='repair')?
   task?.path&&task.path.length?task.path:
   s.roads.find(r=>r.buildingId===targetBuilding?.id)?.points:undefined;
  const builtRoad=s.roads.find(r=>r.buildingId===(targetBuilding??fieldBuilding)?.id);
- const goal:WalkPoint=atCommons?
+ const goal:WalkPoint=workClearing?[workClearing.x,workClearing.z]:atCommons?
   [round(s.camp.x+(f.id%3-1)*.38),round(s.camp.z+(f.id%4-1.5)*.30)]:
   fieldBuilding?pioneerEntrance(fieldBuilding.parcel):site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
@@ -243,8 +249,12 @@ function gather(s:PioneerWorld,f:PioneerFounder,
   const gathered=Math.max(0,Math.min(site.stock,amount*efficiency,cap-held));
   if(!gathered)continue;
   registerPioneerTrip(s,f.pathRoadId);
+  const oldCollected=site.totalGathered;
   site.stock=round(site.stock-gathered);site.totalGathered=round(site.totalGathered+gathered);
-  if(kind==='forest')s.resources.wood=round(s.resources.wood+gathered);
+  if(kind==='forest'){
+   s.resources.wood=round(s.resources.wood+gathered);
+   recordPioneerFelling(s,site,f,oldCollected);
+  }
   else if(kind==='spring')s.resources.water=round(s.resources.water+gathered);
   else {
    s.resources.food=round(s.resources.food+gathered);
@@ -297,6 +307,7 @@ function step(s:PioneerWorld){
   log(s,'储备告急','乡邻缺少粮水，暂缓非必要劳动，改去水源或有余量的林地采集。');
  requestShelter(s);schedulePioneerProject(s);considerPioneerMigration(s);
  schedulePioneerCommons(s);reservePioneerCommonsMaterials(s);
+ schedulePioneerClearing(s);
  const intent=s.intent;
  if(intent&&intent.phase==='survey'){
   intent.parcel=planPioneerShelter(s);
@@ -372,10 +383,22 @@ function step(s:PioneerWorld){
  }else if(building)work(s,he);
  else allocate(s,he,'shelter');
  const waterTarget=s.policy==='food'?8:s.policy==='shelter'?2.8:4.3;
+ const clearing=s.frontier.clearings.find(c=>c.phase==='clearing');
+ const clearingShift=!!clearing&&hour===14&&!crisis&&
+  s.resources.food>=Math.max(3,s.founders.length*1.1)&&
+  s.resources.water>=Math.max(waterTarget,s.founders.length*.65)&&
+  !needWood;
  const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
   !crisis&&s.resources.food>=s.founders.length*.72&&
   s.resources.water>=Math.max(waterTarget,s.founders.length*.55);
- if(commonsShift){
+ if(clearingShift&&clearing){
+  // Clearing consumes Lu's assigned hour instead of crediting two jobs.
+  // The corresponding site must actually remain reachable that day.
+  if(pioneerClearingReachable(s,clearing)){
+   allocate(s,lu,'clear-land');
+   if(lu.activity==='clear-land')performPioneerClearing(s,clearing,weather==='rain'?.65:1);
+  }else allocate(s,lu,'rest');
+ }else if(commonsShift){
   // Reserve this actual hour BEFORE Lu would fetch resources or build a
   // cottage. No person can receive two work credits in the same hour.
   allocate(s,lu,'commons-build');
@@ -460,6 +483,10 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   // gradually upgraded through actual material/work, never auto-converted.
   s.commons??=createPioneerCommons();
   if(!validatePioneerCommons(s.commons))return null;
+  // Legacy v0.4.1/v0.4.2 saves have none of these forestry fields.
+  // Never retroactively grant clearing hours, timber or fallen trees.
+  s.frontier??=createPioneerFrontier();
+  if(!validatePioneerFrontier(s.frontier,s))return null;
   s.roads??=[];s.nextResidentId??=Math.max(...s.founders.map(f=>f.id))+1;
   s.nextSurveyAt??=0;s.lastArrivalAt??=0;
   if(!Array.isArray(s.roads)||s.roads.length>12||
