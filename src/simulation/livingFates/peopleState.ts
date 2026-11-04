@@ -1,4 +1,5 @@
 import type {PioneerFounder,PioneerWork,PioneerWorld} from '../pioneerWorld.ts';
+import {pioneerEntrance} from '../pioneerPaths.ts';
 import {notePioneerFarmCoWork,validateSeedFates,
  type FieldLegacy,type SeedTrial} from './seedTrial.ts';
 
@@ -106,8 +107,15 @@ export function pioneerCultivationMultiplier(s:PioneerWorld,id:number){
  const level=s.livingFates.people[id]?.skills.cultivation.level??0;
  return 1+Math.min(.12,level*.02);
 }
-const sharedPlace=(f:PioneerFounder)=>f.activity+':'+
- f.target.map(n=>n.toFixed(2)).join(':');
+const sharedPlace=(s:PioneerWorld,f:PioneerFounder)=>{
+ if(f.activity==='farm'||f.activity==='seed-trial'){
+  const garden=s.buildings.find(b=>b.kind==='garden'&&
+   Math.hypot(f.target[0]-pioneerEntrance(b.parcel)[0],
+    f.target[1]-pioneerEntrance(b.parcel)[1])<.65);
+  if(garden)return f.activity+':'+garden.id;
+ }
+ return f.activity+':'+f.target.map(n=>n.toFixed(2)).join(':');
+};
 function practice(person:PersonLife,skill:PersonSkill,minute:number){
  const entry=person.skills[skill];
  entry.xp=Math.min(100000,entry.xp+1);
@@ -134,7 +142,7 @@ export function settleLivingFatesHour(s:PioneerWorld){
   for(let j=i+1;j<s.founders.length;j++){
    const right=s.founders[j];
    const working=left.activity===right.activity&&relevantWork.has(left.activity)&&
-    sharedPlace(left)===sharedPlace(right);
+    sharedPlace(s,left)===sharedPlace(s,right);
    const eating=left.activity==='eat'&&right.activity==='eat'&&
     s.resources.food>=0; // servePioneerMeal already committed this meal.
    if(!working&&!eating)continue;
@@ -153,7 +161,7 @@ export function settleLivingFatesHour(s:PioneerWorld){
     if(!lives.majorMemories[memoryId]){
      lives.majorMemories[memoryId]={id:memoryId,minute:s.minutes,
       actorIds:[a,b],kind:'shared-work',work:left.activity,
-      placeId:sharedPlace(left),sourceEventIds:[]};
+      placeId:sharedPlace(s,left),sourceEventIds:[]};
      edge.memoryIds.push(memoryId);
      for(const id of [a,b])lives.people[id].majorMemoryIds.push(memoryId);
     }
