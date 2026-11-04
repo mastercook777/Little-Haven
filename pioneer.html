@@ -36,6 +36,10 @@
     </div>
     <div class="food-trend" id="pioneerFoodTrend">近一日粮食收支将在日常劳动中显示</div>
     <div class="pioneer-growth" id="pioneerGrowth">三位常住乡邻 · 还没有人工乡路</div>
+    <button id="pioneerCouncilOpen" class="pioneer-council-open" type="button" aria-controls="pioneerLivelihoodPanel" aria-expanded="false">
+      <span>村落议事 <small>新生计与成长</small></span>
+      <strong id="pioneerCouncilPreview">顺着人心</strong>
+    </button>
     <div class="commons-status" id="pioneerCommonsStatus">村心：临时营火</div>
     <div class="frontier-status" id="pioneerFrontierStatus">林缘 · 等待第一批伐木</div>
     <details class="pioneer-building-list">
@@ -50,7 +54,7 @@
       <button type="button" data-policy="food">先备口粮</button>
       <button type="button" data-policy="balanced">顺其自然</button>
     </div>
-    <details class="pioneer-livelihood">
+    <details class="pioneer-livelihood" id="pioneerLivelihoodPanel">
       <summary><span>村落议事 · 下一种生活</span><strong id="pioneerLivelihoodLabel">顺着人心</strong></summary>
       <p class="livelihood-explain">保留原有生存建议；这次讨论的是下一阶段把人和劳动投入哪里。即使不参与，村民也会自行发展。</p>
       <div class="livelihood-directions" id="pioneerDirections"></div>
