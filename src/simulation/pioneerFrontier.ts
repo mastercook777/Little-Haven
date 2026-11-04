@@ -67,15 +67,16 @@ export function recordPioneerFelling(s:PioneerWorld,site:PioneerResourceSite,
 function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
  const blockers=[...landscape(),...s.buildings.map(b=>b.parcel)];
  const origin:WalkPoint=[s.camp.x,s.camp.z];
- const angles=[3.05,2.53,3.67,2.07,4.13,1.78,4.56,2.78,3.38];
- const radius=[10.2,11.6,12.5,9.6,13.2,10.5,12.1,13.5,10.8];
  const candidates:{x:number;z:number;score:number}[]=[];
- for(let a=0;a<angles.length;a++){
-  const theta=angles[(a+index*3)%angles.length];
-  const distance=radius[a];
-  for(let j=0;j<6;j++){
-   const x=round(s.camp.x+Math.cos(theta)*distance+(hash(s.seed+index*29+j*11)-.5)*2.0);
-   const z=round(s.camp.z+Math.sin(theta)*distance+(hash(s.seed+index*47+j*73)-.5)*2.0);
+ // Search the whole safe buffer ring rather than nine speculative
+ // directions. Otherwise a seeded hamlet with trees on those headings
+ // could never open any land despite walkable clearings elsewhere.
+ for(let a=0;a<36;a++){
+  const theta=(a+hash(s.seed+index*149)*.24)/36*Math.PI*2;
+  for(let j=0;j<5;j++){
+   const distance=8.5+j*1.0;
+   const x=round(s.camp.x+Math.cos(theta)*distance);
+   const z=round(s.camp.z+Math.sin(theta)*distance);
    const patch:VillageParcel={id:'frontier-survey',kind:'protected',x,z,
     width:2.4,depth:2.4,rotation:0,clearance:.18,
     accessX:x,accessZ:z,builtAt:s.minutes};
@@ -85,7 +86,10 @@ function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
    if(!pioneerWalkable([x,z],blockers))continue;
    const route=findPioneerWalk(origin,[x,z],blockers);
    if(!route)continue;
-   candidates.push({x,z,score:route.length*.07+hash(s.seed+index*57+j*197)*.7});
+   candidates.push({x,z,score:route.length*.055+
+    Math.max(0,x-s.camp.x)*.18+
+    Math.abs(distance-10.4)*.12+
+    hash(s.seed+index*57+j*197+a*677)*.33});
   }
  }
  candidates.sort((a,b)=>a.score-b.score);
