@@ -97,6 +97,11 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
  if(!gardens&&(s.policy==='food'||s.resources.food<16||s.buildings.length>=2))return 'garden';
  // An actual household consumes food every day, including winter. The old
  // growth loop built one garden for nine people and silently starved.
+ // The next free bedroom creates *future* demand: prebuild a field before
+ // inviting the 5th/9th mouth. Otherwise migration requires extra fields,
+ // while the construction planner waits forever for those migrants.
+ const capacity=pioneerHousingCapacity(s);
+ if(gardens>0&&gardens<Math.ceil(capacity/4))return 'garden';
  if(gardens>0&&gardens<Math.ceil(s.founders.length/4)&&
   s.resources.food<Math.max(18,s.founders.length*3.5))return 'garden';
  if(!pioneerHasFacility(s,'cottage')&&
