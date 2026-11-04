@@ -106,6 +106,15 @@ export function inspectPioneerSelection(s:PioneerWorld,
    if(b.loftAddedAt!==undefined)facts.push({label:'木阁改造',value:
     date(b.loftAddedAt)+' · 4 份木料 / 8 工时 · 屋界未扩张'});
   }
+  if(b.kind==='tea-stop'){
+   const c=s.commerce,v=c.activeVisitor;
+   facts.push({label:'路上来往',value:c.totalArrivals+' 人实际经过；未计入常住人口'});
+   facts.push({label:'真实交换',value:c.totalExchanges+' 次；交换的净木料 '+
+    fixed(c.netWood)+' / 口粮 '+fixed(c.netFood)});
+   facts.push({label:'热茶招待',value:c.totalHosted+' 次；水耗 '+fixed(-c.netWater)});
+   facts.push({label:'此刻旅人',value:v?v.name+' · '+v.origin+' · '+v.occupation:'此时无客'});
+   facts.push({label:'下一次来往',value:c.nextVisitorAt===null?'尚未安排':date(c.nextVisitorAt)});
+  }
   if(b.kind==='granary'){
    facts.push({label:'全村储粮容量',value:fixed(pioneerFoodCapacity(s))+' 份'});
    facts.push({label:'眼下实有粮食',value:fixed(s.resources.food)+' 份 · 非免费填仓'});
@@ -122,6 +131,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
    b.kind==='garden'?'季节和生产安排决定收成，不能凭空供粮。':
    b.kind==='fish-hut'?'河岸先要合法落地、村民出工，冬季鱼群恢复慢。每一篓才会变成村中的粮食。':
    b.kind==='granary'?'架高的储粮阁扩大储量但不生产粮食，所有仓中口粮仍来自真实劳动。':
+   b.kind==='tea-stop'?'客人需要沿真实道路抵达；能换粮木、付粮水招待，也可选择安静不交易。访客不会冒充常住人口。':
    '木匠在这里晾晒材料、维护工具和准备建筑木料。';
   return {title:pioneerBuildingLabel(b.kind),kicker:'已建成 · '+b.id,
    description,facts,history:[
@@ -129,6 +139,9 @@ export function inspectPioneerSelection(s:PioneerWorld,
       date(t.completedAt??t.startedAt)+' · 留种试田'+
       (t.phase==='working'?'开始':t.phase==='resolved'?'有成':'中止')+
       '（'+t.actorIds.map(id=>s.founders.find(f=>f.id===id)?.name??'乡邻').join('、')+'）'),
+     ...s.commerce.visits.slice(-3).reverse().map(v=>
+      date(v.arrivedAt)+' · '+v.name+'自'+v.origin+'来访'+
+       (v.outcome==='exchange'?'，真实交换了货物':v.outcome==='hosted'?'，村民为他付出粮水':'，未作交换')),
      ...relevant(s,b.causeId)
     ],operation};
  }
