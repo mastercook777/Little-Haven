@@ -8,6 +8,7 @@ import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFound
 import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
 import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
+import type {PioneerSelection} from '../ui/pioneerInspection.ts';
 
 const material=(color:string,emissive?:string)=>new THREE.MeshStandardMaterial({
  color,roughness:.92,...(emissive?{emissive,emissiveIntensity:.35}:{})
@@ -63,7 +64,9 @@ function vegetation(root:THREE.Group){
 }
 function resourceLandmarks(root:THREE.Group,s:PioneerWorld){
  for(const site of s.sites){
+  if(site.kind==='field')continue; // The garden model already depicts the crop site.
   const g=group(root,site.x,.18,site.z);g.name='resource-'+site.id;
+  g.userData.siteId=site.id;
   if(site.kind==='forest'){
    for(let i=0;i<5;i++){
     const log=box(g,(i%3-1)*.28,.13+(i>2?.23:0),Math.floor(i/3)*.3,
@@ -85,6 +88,7 @@ function resourceLandmarks(root:THREE.Group,s:PioneerWorld){
 }
 function campVisual(root:THREE.Group,s:PioneerWorld){
  const g=group(root,s.camp.x,.19,s.camp.z);g.name='pioneer-temporary-camp';
+ g.userData.pioneerCamp=true;
  const pad=new THREE.Mesh(new THREE.CircleGeometry(1.05,22),
   new THREE.MeshStandardMaterial({color:'#b8aa82',side:THREE.DoubleSide}));
  pad.rotation.x=-Math.PI/2;pad.position.y=.018;pad.scale.set(1.2,.85,1);g.add(pad);
@@ -305,6 +309,7 @@ function drawFootpaths(parent:THREE.Group,roads:readonly PioneerRoad[]){
 }
 export interface PioneerGraphics{
  root:THREE.Group;update(s:PioneerWorld,seconds:number):void;
+ setSelected(selection:PioneerSelection|null):void;
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;roads:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
@@ -343,7 +348,29 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  rain.frustumCulled=false;root.add(rain);
  let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
  let latestWorld=world;
+ let selected:PioneerSelection|null=null;
+ const glow=new THREE.Mesh(new THREE.RingGeometry(.89,1.0,48),
+  new THREE.MeshBasicMaterial({color:'#f2d89b',side:THREE.DoubleSide,
+   transparent:true,opacity:.90,depthWrite:false}));
+ glow.name='selected-building-ground-marker';glow.rotation.x=-Math.PI/2;
+ glow.renderOrder=9;glow.visible=false;root.add(glow);
+ function updateMarker(s:PioneerWorld){
+  if(!selected){glow.visible=false;return;}
+  const b=selected.kind==='building'?s.buildings.find(x=>x.id===selected?.id):undefined;
+  const site=selected.kind==='site'?s.sites.find(x=>x.id===selected?.id):undefined;
+  const p=b?.parcel??(selected.kind==='intent'&&selected.id===s.intent?.id?s.intent.parcel:null);
+  if(p){
+   glow.visible=true;glow.position.set(p.x,.23,p.z);
+   glow.scale.set(p.width*.80,p.depth*.80,1);
+   glow.rotation.set(-Math.PI/2,0,p.rotation);
+  }else if(site||selected.kind==='camp'){
+   const loc=site??s.camp;
+   glow.visible=true;glow.position.set(loc.x,.25,loc.z);
+   glow.scale.setScalar(site?1.0:1.3);glow.rotation.set(-Math.PI/2,0,0);
+  }else glow.visible=false;
+ }
  function update(s:PioneerWorld,seconds:number){
+  updateMarker(s);
   latestWorld=s;
   const phase=s.intent?.phase??'none';
   const progress=s.intent?.workDone??0;
@@ -428,10 +455,31 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   river.animate(seconds);
  }
  update(world,0);
- return {root,update,signatures:()=>({
+ return {root,update,setSelected:(selection)=>{selected=selection;updateMarker(latestWorld);},
+  signatures:()=>({
   buildings:latestWorld.buildings.length,renderedStructures,
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
   people:people.length,roads:latestWorld.roads.length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
+
+/** Resolve a raycast hit through authored model groups. The actual registry,
+ * not geometry names or mesh order, owns a building's identity. */
+export function pioneerHitSelection(s:PioneerWorld,hit:THREE.Object3D):PioneerSelection|null{
+ let current:THREE.Object3D|null=hit;
+ while(current){
+  if(current.userData.buildingId){
+   const parcelId=String(current.userData.buildingId);
+   const built=s.buildings.find(b=>b.parcel.id===parcelId);
+   if(built)return {kind:'building',id:built.id};
+   if(s.intent?.parcel?.id===parcelId)return {kind:'intent',id:s.intent.id};
+  }
+  if(current.userData.siteId&&
+   s.sites.some(site=>site.id===current?.userData.siteId))
+   return {kind:'site',id:String(current.userData.siteId)};
+  if(current.userData.pioneerCamp)return {kind:'camp',id:'camp'};
+  current=current.parent;
+ }
+ return null;
+}
