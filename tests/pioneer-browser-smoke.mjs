@@ -265,6 +265,20 @@ try{
  },gardenId);
  if(settings?.productionMode!=='seed'||settings.operating!==false)
   throw Error('Real facility controls did not update simulation/save: '+JSON.stringify(settings));
+ const validAtReload=await page.evaluate(async()=>{
+  const s=window.__PIONEER_DEBUG__.getState();
+  const {importPioneerWorld}=await import('/src/simulation/pioneerWorld.ts');
+  const {validateLivingFates}=await import('/src/simulation/livingFates/peopleState.ts');
+  const {validPioneerLivelihood}=await import('/src/simulation/pioneerLivelihood.ts');
+  const {validatePioneerFrontier}=await import('/src/simulation/pioneerFrontier.ts');
+  return {importOK:!!importPioneerWorld(JSON.stringify(s)),life:validateLivingFates(s),
+   business:validPioneerLivelihood(s),forest:validatePioneerFrontier(s.frontier,s),
+   population:s.founders.length,huts:s.buildings.map(b=>b.kind),
+   sites:s.sites.map(x=>({kind:x.kind,id:x.id})),journal:s.journal.length,
+   fish:s.livelihood,active:s.livingFates.relationships.length};
+ });
+ if(!validAtReload.importOK)throw Error('Full lived-in v4 settlement cannot roundtrip: '+
+  JSON.stringify(validAtReload));
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
  const savedConfig=await page.evaluate(id=>window.__PIONEER_DEBUG__.getState()
