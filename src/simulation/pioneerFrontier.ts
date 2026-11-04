@@ -84,19 +84,21 @@ function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
    if(s.sites.some(site=>site.kind!=='field'&&dist({x,z},site)<3.0))continue;
    if(s.frontier.clearings.some(c=>dist({x,z},c)<4.1))continue;
    if(!pioneerWalkable([x,z],blockers))continue;
-   const route=findPioneerWalk(origin,[x,z],blockers);
-   if(!route)continue;
-   candidates.push({x,z,score:route.length*.055+
+   candidates.push({x,z,score:distance*.055+
     Math.max(0,x-s.camp.x)*.18+
     Math.abs(distance-10.4)*.12+
     hash(s.seed+index*57+j*197+a*677)*.33});
   }
  }
  candidates.sort((a,b)=>a.score-b.score);
- if(!candidates.length)return null;
- const chosen=candidates[0];
- return {id:'clearing-'+(index+1),x:chosen.x,z:chosen.z,radius:2.20,
-  phase:'clearing',workDone:0,workRequired:8,startedAt:s.minutes,clearedAt:null};
+ for(const chosen of candidates){
+  // Search geometry cheaply first, then solve A* on demand. Computing
+  // 180 complete navigation graphs per 3-day survey stalls low-end phones.
+  if(!findPioneerWalk(origin,[chosen.x,chosen.z],blockers))continue;
+  return {id:'clearing-'+(index+1),x:chosen.x,z:chosen.z,radius:2.20,
+   phase:'clearing',workDone:0,workRequired:8,startedAt:s.minutes,clearedAt:null};
+ }
+ return null;
 }
 export function schedulePioneerClearing(s:PioneerWorld){
  const f=s.frontier;
