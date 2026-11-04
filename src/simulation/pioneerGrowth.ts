@@ -70,7 +70,8 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   {x:opened.x,z:opened.z}:
   kind==='fish-hut'?{x:3.6,z:-2.1}:
   kind==='granary'?{x:s.camp.x+3.3,z:s.camp.z+1.6}:
-  kind==='tea-stop'?{x:s.camp.x+4.6,z:s.camp.z-2.4}:
+  kind==='tea-stop'?(opened?{x:opened.x,z:opened.z}:
+   {x:s.camp.x-3.8,z:s.camp.z+2.1}):
   kind==='garden'?(s.policy==='food'?
   {x:s.camp.x-2.1,z:s.camp.z+5.0}:s.policy==='shelter'?
   {x:s.camp.x-5.4,z:s.camp.z+2.0}:
@@ -120,7 +121,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // Mature villages have exhausted their central lanes. Inspect safe
  // cleared-ring candidates instead of rejecting growth after the first
  // 210 high-scoring *central* parcels have no walkable access.
- const candidates=kind==='cottage'&&s.founders.length>=9?420:210;
+ const candidates=(kind==='cottage'&&s.founders.length>=9)||kind==='tea-stop'?420:210;
  for(const candidate of choices.slice(0,candidates)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
