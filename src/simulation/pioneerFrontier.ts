@@ -1,4 +1,5 @@
 import type {PioneerWorld,PioneerFounder,PioneerResourceSite} from './pioneerWorld.ts';
+import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {findPioneerWalk,pioneerWalkable,type WalkPoint} from './pioneerPaths.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {reservedParcels,type VillageParcel} from './villagePlanning.ts';
@@ -27,8 +28,7 @@ const hash=(n:number)=>{
 const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
 const dist=(a:{x:number;z:number},b:{x:number;z:number})=>Math.hypot(a.x-b.x,a.z-b.z);
 const record=(s:PioneerWorld,title:string,text:string,causeId:string)=>{
- if(s.journal.length>=160)s.journal.shift();
- s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId});
+ appendPioneerJournal(s,title,text,causeId);
 };
 export function createPioneerFrontier():PioneerFrontier{
  return {clearings:[],totalFelled:0,lastFelling:null,lastSurveyAt:0,clearingHours:0};
