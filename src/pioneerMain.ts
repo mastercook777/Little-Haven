@@ -3,6 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage.ts';
 import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
 import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
+import {pioneerCommonsNames} from './simulation/pioneerCommons.ts';
 import {setPioneerFacilityOperating,setPioneerFacilityPreference,
  type PioneerFacilityPreference} from './simulation/pioneerFacilities.ts';
 import {SEASON_NAMES} from './simulation/calendar.ts';
@@ -65,7 +66,9 @@ let clickStart:{x:number;y:number;at:number}|null=null,lastHover=0;
 const labels:Record<PioneerWork,string>={
  rest:'照看营地', 'collect-wood':'林缘拾柴','forage':'入林采食',
  'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
- 'shelter':'回家休息','farm':'耕作收菜','repair':'修屋补梁'
+ 'shelter':'回家休息','farm':'耕作收菜','repair':'修屋补梁',
+ 'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'家中吃饭',
+ 'socialize':'村心闲谈','commons-build':'修建公共村心'
 };
 const safe=(input:string)=>input.replace(/[&<>"']/g,c=>
  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
@@ -112,7 +115,9 @@ function hitAt(clientX:number,clientY:number):PioneerSelection|null{
   -((clientY-bounds.top)/bounds.height)*2+1);
  raycaster.setFromCamera(mouse,camera);
  for(const hit of raycaster.intersectObject(valley.root,true)){
-  if(!hit.object.visible)continue;
+  let visible=true,ancestor:THREE.Object3D|null=hit.object;
+  while(ancestor){if(!ancestor.visible){visible=false;break;}ancestor=ancestor.parent;}
+  if(!visible)continue;
   const found=pioneerHitSelection(world,hit.object);
   if(found)return found;
  }
@@ -144,10 +149,17 @@ function renderUI(){
  $('pioneerStatus').textContent=pioneerSummary(world);
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
- const buildingChoices=world.buildings.length?
-  world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
-   safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
-  '<span>从荒地开始，第一间屋尚未落成。</span>';
+ const commons=world.commons,commonsJob=commons.project;
+ $('pioneerCommonsStatus').textContent='村心 · '+pioneerCommonsNames[commons.stage]+
+  (commonsJob?' ｜ 筹建'+pioneerCommonsNames[commonsJob.targetStage]+
+   '：木料 '+amount(commonsJob.woodCommitted)+'/'+amount(commonsJob.woodRequired)+
+   '，工时 '+amount(commonsJob.workDone)+'/'+amount(commonsJob.workRequired):' ｜ 点击营火/村心查看生活记录');
+ const buildingChoices='<button type="button" data-pick-commons="camp">村心 · '+
+  safe(pioneerCommonsNames[world.commons.stage])+'</button>'+
+  (world.buildings.length?
+   world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
+    safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
+   '<span>第一间屋尚未落成。</span>');
  const list=$('pioneerBuildingChoices');
  if(list.innerHTML!==buildingChoices)list.innerHTML=buildingChoices;
  const intent=world.intent;
@@ -219,7 +231,11 @@ canvas.addEventListener('pointermove',event=>{
  canvas.style.cursor=hitAt(event.clientX,event.clientY)?'pointer':'grab';
 });
 $('pioneerBuildingChoices').addEventListener('click',event=>{
- const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-pick-building]');
+ const target=event.target as HTMLElement;
+ if(target.closest('button[data-pick-commons]')){
+  chooseInspection({kind:'camp',id:'camp'});return;
+ }
+ const button=target.closest<HTMLButtonElement>('button[data-pick-building]');
  const id=button?.dataset.pickBuilding;
  if(id&&world.buildings.some(b=>b.id===id))chooseInspection({kind:'building',id});
 });
@@ -312,9 +328,10 @@ function lighting(){
 function tick(now:number){
  const dt=Math.max(0,Math.min(.09,(now-last)/1000));last=now;
  if(!paused){
-  const previous=world.buildings.length,previousPopulation=world.founders.length,events=world.journal.length;
+  const previous=world.buildings.length,previousPopulation=world.founders.length,events=world.journal.length,oldCommonsStage=world.commons.stage;
   advancePioneerWorld(world,dt*speed);
-  if(world.buildings.length>previous)toast('村民亲手完成了新设施，山谷里又添了一处生活痕迹。');
+  if(world.commons.stage>oldCommonsStage)toast('村民完成了公共村心升级：'+pioneerCommonsNames[world.commons.stage]);
+  else if(world.buildings.length>previous)toast('村民亲手完成了新设施，山谷里又添了一处生活痕迹。');
   else if(world.founders.length>previousPopulation)toast('山谷添了新邻居，住进了真正空出的屋舍。');
   else if(world.journal.length>events&&world.intent?.phase==='frame')
    toast('木梁已经搭起，工地出现了新的变化。');

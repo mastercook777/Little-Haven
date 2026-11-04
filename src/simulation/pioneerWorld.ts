@@ -7,6 +7,9 @@ import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {agePioneerBuildings,completePioneerProject,considerPioneerMigration,
  pioneerHasFacility,pioneerHousingCapacity,pioneerBuildingLabel,
  registerPioneerTrip,schedulePioneerProject} from './pioneerGrowth.ts';
+import {createPioneerCommons,schedulePioneerCommons,reservePioneerCommonsMaterials,
+ performPioneerCommonsWork,servePioneerMeal,validatePioneerCommons,
+ type PioneerCommons} from './pioneerCommons.ts';
 import {availablePioneerFields,pioneerFieldRenewMultiplier,pioneerHarvestMultiplier,
  pioneerWoodWorkingMultiplier,validatePioneerFacilityConfiguration} from './pioneerFacilities.ts';
 
@@ -24,7 +27,7 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'repair';
+export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build';
 export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
@@ -59,6 +62,7 @@ export interface PioneerWorld{
  sites:PioneerResourceSite[];intent:PioneerIntent|null;buildings:PioneerBuilding[];
  journal:PioneerJournal[];nextEventId:number;policy:PioneerPolicy;comfort:number;
  roads:PioneerRoad[];nextResidentId:number;nextSurveyAt:number;lastArrivalAt:number;
+ commons:PioneerCommons;
  foodStats?:{day:number;collected:number;consumed:number;previousCollected:number;previousConsumed:number};
 }
 const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
@@ -128,7 +132,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
   ],
   resources:{wood:1,food:5,water:5},sites:resourceSites(seed,camp),
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
-  roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0,
+  roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0,commons:createPioneerCommons(),
   foodStats:{day:0,collected:0,consumed:0,previousCollected:0,previousConsumed:0}
  };
  log(s,'荒谷点火','梁伯、陆娘和阿禾在安全的林缘安下临时营火。眼前尚无永久屋舍。');
@@ -189,14 +193,17 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  const home=s.buildings.find(b=>b.id===f.homeBuildingId);
  const fieldBuilding=site?.kind==='field'?
   s.buildings.find(b=>site.id==='field-'+b.id):undefined;
- const shelter=activity==='shelter'?home:undefined;
+ const shelter=activity==='shelter'||activity==='eat-home'?home:undefined;
+ const atCommons=['eat','cook','socialize','commons-build'].includes(activity);
  const targetBuilding=activity==='build'||activity==='repair'?
   s.buildings.find(b=>b.id===task?.targetBuildingId):shelter;
  const jobRoute=(activity==='build'||activity==='repair')?
   task?.path&&task.path.length?task.path:
   s.roads.find(r=>r.buildingId===targetBuilding?.id)?.points:undefined;
  const builtRoad=s.roads.find(r=>r.buildingId===(targetBuilding??fieldBuilding)?.id);
- const goal:WalkPoint=fieldBuilding?pioneerEntrance(fieldBuilding.parcel):site?[site.x,site.z]:
+ const goal:WalkPoint=atCommons?
+  [round(s.camp.x+(f.id%3-1)*.38),round(s.camp.z+(f.id%4-1.5)*.30)]:
+  fieldBuilding?pioneerEntrance(fieldBuilding.parcel):site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
   shelter?pioneerEntrance(shelter.parcel):
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
@@ -280,13 +287,16 @@ function step(s:PioneerWorld){
   s.foodStats.previousConsumed=s.foodStats.consumed;
   s.foodStats.collected=0;s.foodStats.consumed=0;s.foodStats.day=day;
  }
- const foodNeeded=s.founders.length/24;
- s.foodStats.consumed=round(s.foodStats.consumed+foodNeeded);
- s.resources.food=round(Math.max(0,s.resources.food-foodNeeded));
+ // The food previously disappeared in 24 invisible hourly instalments.
+ // Now consumption happens at three observable meals (7h / 12h / 18h).
+ // See servePioneerMeal below for the single inventory transaction.
+ // Ration demand remains 1 food per resident per day.
+ const hour=Math.floor(s.minutes%DAY_MINUTES/60);
  s.resources.water=round(Math.max(0,s.resources.water-s.founders.length/24));
  if(s.minutes%DAY_MINUTES===0&&(s.resources.food<1||s.resources.water<1))
   log(s,'储备告急','乡邻缺少粮水，暂缓非必要劳动，改去水源或有余量的林地采集。');
  requestShelter(s);schedulePioneerProject(s);considerPioneerMigration(s);
+ schedulePioneerCommons(s);reservePioneerCommonsMaterials(s);
  const intent=s.intent;
  if(intent&&intent.phase==='survey'){
   intent.parcel=planPioneerShelter(s);
@@ -297,10 +307,47 @@ function step(s:PioneerWorld){
    log(s,'找到安全屋址','梁伯重新勘地，找到了不挡河岸、林地与山路的合法屋址。',intent.id);
   }
  }
- const hour=Math.floor(s.minutes%DAY_MINUTES/60);
+ // Night and meals are real scheduled activities, not repeated idle labels.
+ // One resident can only occupy one destination in each hourly step.
  if(hour<7||hour>=20){
   for(const f of s.founders)allocate(s,f,f.homeBuildingId?'shelter':'rest');
   s.comfort=s.buildings.length?weather==='rain'?74:82:weather==='rain'?18:32;
+  return;
+ }
+ if(hour===7||hour===12||hour===18){
+  const served=servePioneerMeal(s);
+  if(served>=s.founders.length/6){
+   const seats=[3,4,6,8][s.commons.stage];
+   for(let i=0;i<s.founders.length;i++){
+    const f=s.founders[i];
+    const activity:PioneerWork=s.commons.stage>=1&&i===1?'cook':
+     i<seats?'eat':'eat-home';
+    allocate(s,f,activity);
+    if(activity==='cook'&&f.activity==='cook')
+     s.commons.cookingHours=round(s.commons.cookingHours+1);
+   }
+   return;
+  }
+  // With almost empty cupboards there is no fake feast. A normal daylight
+  // emergency gathering shift runs below instead.
+ }
+ if(hour===19&&s.commons.stage>=1&&
+  s.resources.food>=s.founders.length*.45&&
+  s.resources.water>=s.founders.length*.30){
+  const seats=[0,3,5,7][s.commons.stage];
+  const attending=s.founders.slice(0,seats);
+  for(const f of attending){
+   allocate(s,f,'socialize');
+   if(f.activity==='socialize')s.commons.socialHours++;
+  }
+  for(const f of s.founders.slice(seats))
+   allocate(s,f,f.homeBuildingId?'shelter':'rest');
+  if(day%9===2&&attending.length>=2){
+   log(s,'火塘边的闲话',
+    attending.slice(0,3).map(f=>f.name).join('与')+
+    '在'+['营火','火塘','灶棚','村心'][s.commons.stage]+'歇脚，聊起田里收成和屋舍修葺。',
+    'pioneer-commons');
+  }
   return;
  }
  const building=!!intent&&intent.phase!=='survey'&&intent.phase!=='materials';
@@ -325,7 +372,16 @@ function step(s:PioneerWorld){
  }else if(building)work(s,he);
  else allocate(s,he,'shelter');
  const waterTarget=s.policy==='food'?8:s.policy==='shelter'?2.8:4.3;
- if(s.resources.water<waterTarget||!building&&s.resources.water<6){
+ const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
+  !crisis&&s.resources.food>=s.founders.length*.72&&
+  s.resources.water>=Math.max(waterTarget,s.founders.length*.55);
+ if(commonsShift){
+  // Reserve this actual hour BEFORE Lu would fetch resources or build a
+  // cottage. No person can receive two work credits in the same hour.
+  allocate(s,lu,'commons-build');
+  if(lu.activity==='commons-build')
+   performPioneerCommonsWork(s,weather==='rain'?.7:1);
+ }else if(s.resources.water<waterTarget||!building&&s.resources.water<6){
   if(!gather(s,lu,'spring',1.36,'fetch-water'))allocate(s,lu,'rest');
  }else if(crisis){
   if(!foodTask(lu,.72))allocate(s,lu,'rest');
@@ -400,6 +456,10 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   }
   s.foodStats??={day:Math.floor(s.minutes/DAY_MINUTES),collected:0,consumed:0,
    previousCollected:0,previousConsumed:0};
+  // Import old v0.4.1 slots as a stage-0 commons: their original camp is
+  // gradually upgraded through actual material/work, never auto-converted.
+  s.commons??=createPioneerCommons();
+  if(!validatePioneerCommons(s.commons))return null;
   s.roads??=[];s.nextResidentId??=Math.max(...s.founders.map(f=>f.id))+1;
   s.nextSurveyAt??=0;s.lastArrivalAt??=0;
   if(!Array.isArray(s.roads)||s.roads.length>12||

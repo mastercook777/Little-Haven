@@ -113,10 +113,27 @@ try{
    roadGrades:state.roads.map(r=>r.grade),visuals:d.getVisuals(),
    renderer:d.getRendererInfo()};
  });
+ if(grown.visuals.commonsStage!==3||grown.visuals.commonsBeds!==0)
+  throw Error('Old first-night bedrolls survived a real mature settlement: '+JSON.stringify(grown));
  if(grown.people<6||grown.roadCount<3||!grown.buildings.includes('garden')||
   !grown.buildings.includes('cottage')||!grown.buildings.includes('wood-yard')||
   grown.visuals.renderedStructures<4||grown.visuals.people!==grown.people)
   throw Error('Phase B did not produce a visible populated village: '+JSON.stringify(grown));
+ const commonsInfo=await page.evaluate(()=>{
+  const w=window.__PIONEER_DEBUG__.getState();
+  return {stage:w.commons.stage,work:w.commons.workHours,
+   wood:w.commons.woodSpent,meals:w.commons.mealsServed,
+   cooking:w.commons.cookingHours,social:w.commons.socialHours,
+   description:document.querySelector('#pioneerCommonsStatus')?.textContent};
+ });
+ if(commonsInfo.stage!==3||commonsInfo.wood!==8.5||
+  commonsInfo.meals<=0||commonsInfo.cooking<=0||commonsInfo.social<=0||
+  !commonsInfo.description?.includes('村心空地'))
+  throw Error('Commons stage was not caused by recorded work, food and social activities: '+
+   JSON.stringify(commonsInfo));
+ // Click the real central plaza from its existing 3D camp locator, if not
+ // occluded by the HUD; otherwise validate its actual registry through a
+ // model-projected debug ray intersection.
  const grownDigest=await screenshot(page,'05-third-year-living-village');
  if(grownDigest===startDigest)throw Error('Third-year village looks identical to the initial empty valley');
  const gardenId=await page.evaluate(()=>window.__PIONEER_DEBUG__.getState()
@@ -145,7 +162,7 @@ try{
   .buildings.find(b=>b.id===id),gardenId);
  if(savedConfig?.productionMode!=='seed'||savedConfig.operating!==false)
   throw Error('Garden production settings lost after reload');
- results.push({phaseB:grown,gardenInspected:true,gardenControlsPersist:true});
+ results.push({phaseB:grown,gardenInspected:true,gardenControlsPersist:true,commons:commonsInfo});
  await page.goto(base,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__HAVEN_DEBUG__?.getState);
  const classic=await page.evaluate(()=>window.__HAVEN_DEBUG__.getState());
@@ -197,8 +214,23 @@ try{
   if(!opened)throw Error('An obscured building cannot be inspected via mobile facility list: '+
    JSON.stringify({mobileShelter,frontmost}));
  }
+ // The inspector is a touch drawer over the normal HUD. Close it before
+ // selecting another building; a real tap must not pass through its content.
+ await mpage.locator('#inspectClose').tap();
+ // The village commons remains inspectable on narrow screens even if its
+ // central 3D marker falls behind the HUD and cannot receive pointer input.
+ await mpage.locator('.pioneer-building-list').evaluate(el=>el.open=true);
+ await mpage.locator('#pioneerBuildingChoices button[data-pick-commons]').tap();
+ const commonsCard=await mpage.evaluate(()=>({
+  open:!document.querySelector('#pioneerInspector').hidden,
+  title:document.querySelector('#inspectTitle')?.textContent,
+  contents:document.querySelector('#inspectFacts')?.textContent
+ }));
+ if(!commonsCard.open||!['临时营火','安家火塘','公共灶台','村心空地'].includes(commonsCard.title)||
+  !commonsCard.contents?.includes('已耗木料'))
+  throw Error('Mobile commons detail does not expose its real growth history: '+JSON.stringify(commonsCard));
  results.push({mobile:sizing,touchInspection:true,touchMethod:canvasVisible?'3d-canvas':'accessible-facility-list',
-  frontmost});
+  commonsCard:true,frontmost});
  await mobile.close();
  if(errors.length)throw Error('Pioneer browser errors: '+errors.join('\n').slice(0,1500));
  await writeFile(output+'/report.json',JSON.stringify({pass:true,results,errors},null,2));

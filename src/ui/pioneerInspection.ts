@@ -1,5 +1,6 @@
 import {getCalendarFromMinutes,SEASON_NAMES} from '../simulation/calendar.ts';
 import {pioneerBuildingLabel} from '../simulation/pioneerGrowth.ts';
+import {pioneerCommonsNames} from '../simulation/pioneerCommons.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive,isPioneerOperational} from '../simulation/pioneerFacilities.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerResourceSite} from '../simulation/pioneerWorld.ts';
 
@@ -88,14 +89,36 @@ export function inspectPioneerSelection(s:PioneerWorld,
    ],history:[]};
  }
  if(selection.kind==='camp'){
-  return {title:'第一处营火',kicker:'谷心 · 临时营地',
-   description:'三位开荒者最初在这里点火安家。村心升级、公共灶和集会场景已排入后续打磨，不会只按时间替换模型。',
-   facts:[
-    {label:'最初居民',value:'梁伯、陆娘、阿禾'},
-    {label:'现今人口',value:s.founders.length+' 位'},
-    {label:'永久建筑',value:s.buildings.length+' 处'},
-    {label:'生活状况',value:fixed(s.comfort)+' / 100'}
-   ],history:s.journal.filter(e=>e.title==='荒谷点火').map(e=>date(e.minute)+' · '+e.title)};
+  const commons=s.commons,project=commons.project;
+  const title=pioneerCommonsNames[commons.stage];
+  const description=commons.stage===0?
+   '最初的三张草席和营火仍是临时营地。等第一间真正的住屋落成，村民才会备木、动工重修村心。':
+   commons.stage===1?'露宿草席已搬走，居民在安家火塘边坐下歇脚。':
+   commons.stage===2?'有菜田和新邻居之后，村民用木料搭起共同做饭的灶台。':
+   '这是居民铺出石路、修建公告栏和集会座位的公共生活中心。';
+  const facts=[
+   {label:'当前阶段',value:String(commons.stage)+' / 3 · '+title},
+   {label:'现今人口',value:s.founders.length+' 位常住乡邻'},
+   {label:'已耗木料',value:fixed(commons.woodSpent)+' 份'},
+   {label:'实际工时',value:fixed(commons.workHours)+' 小时'},
+   {label:'已用口粮',value:fixed(commons.mealsServed)+' 份'},
+   {label:'烹饪工时',value:fixed(commons.cookingHours)+' 小时'},
+   {label:'交谈人时',value:fixed(commons.socialHours)+' 小时'}
+  ];
+  if(project)facts.push(
+   {label:'下一阶段',value:pioneerCommonsNames[project.targetStage]},
+   {label:'备料进度',value:fixed(project.woodCommitted)+' / '+fixed(project.woodRequired)},
+   {label:'施工进度',value:fixed(project.workDone)+' / '+fixed(project.workRequired)}
+  );
+  else if(commons.stage<3)facts.push({label:'接下来',value:commons.stage===0?
+   '首间避雨棚入住':'菜圃和新邻居 / 更多住户、工坊'});
+  // Commons milestones must remain inspectable even after hundreds of
+  // routine conversations have pushed older journal lines out of the ring.
+  const completed=commons.stageCompletedAt.flatMap((minute,i)=>
+   minute===null?[]:[date(minute)+' · '+pioneerCommonsNames[i+1]+'落成']).reverse();
+  const recent=relevant(s,commons.id).filter(line=>!line.includes('落成')).slice(0,2);
+  return {title,kicker:'原始营火所在地 · '+commons.id,description,facts,
+   history:[...completed,...recent]};
  }
  return null;
 }

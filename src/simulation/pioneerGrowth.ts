@@ -1,7 +1,7 @@
 import {DAY_MINUTES} from './calendar.ts';
 import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
-import {pioneerBuildingPath,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {pioneerBuildingPath,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
@@ -83,9 +83,17 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // After the core ring fills, look farther along already-walkable land.
  // Rejecting only the first 65 scored plots trapped every 5-person village
  // behind existing dirt paths despite safe distant parcels still existing.
+ // A cottage must never cut the ONLY route to a real resource. Stage 0
+ // validates the site's camp->source route once. Now every proposed
+ // parcel must maintain the same forest, spring and forage access when
+ // added to the navigation obstacles, not just its own front-door path.
+ const critical=s.sites.filter(site=>site.kind==='forest'||site.kind==='spring'||site.kind==='forage');
  for(const candidate of choices.slice(0,210)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
+  const blockers=[...taken,candidate.parcel];
+  if(!critical.every(site=>findPioneerWalk(
+   [s.camp.x,s.camp.z],[site.x,site.z],blockers)))continue;
   return {parcel:candidate.parcel,path};
  }
  return null;

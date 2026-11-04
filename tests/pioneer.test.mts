@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import {DAY_MINUTES,nextSeasonBoundary} from '../src/simulation/calendar.ts';
 import {createWorld} from '../src/simulation/world.ts';
 import {parcelOverlaps,reservedParcels,validateVillageParcel} from '../src/simulation/villagePlanning.ts';
-import {pioneerWalkable,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
+import {pioneerWalkable,roadSegmentsSafe,findPioneerWalk,pioneerEntrance} from '../src/simulation/pioneerPaths.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {pioneerHousingCapacity} from '../src/simulation/pioneerGrowth.ts';
+import {createPioneerCommons,pioneerCommonsNames,validatePioneerCommons} from '../src/simulation/pioneerCommons.ts';
 import {isPioneerFacilityActive,getPioneerFacilityPreference,setPioneerFacilityOperating,
  setPioneerFacilityPreference} from '../src/simulation/pioneerFacilities.ts';
 import {inspectPioneerSelection} from '../src/ui/pioneerInspection.ts';
@@ -165,7 +166,17 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
   people:s.founders.length,buildings:s.buildings.map(b=>b.kind),
   food:s.resources.food,wood:s.resources.wood,sites:s.sites.filter(x=>x.kind==='field').map(x=>x.stock),
   intent:s.intent?.kind,paused:s.intent?.pauseReason,surveyAt:s.nextSurveyAt,
-  recent:s.journal.slice(-8).map(x=>x.title)
+  recent:s.journal.slice(-8).map(x=>x.title),
+  forest:s.sites.filter(x=>x.kind==='forest').map(site=>({
+   stock:site.stock,gathered:site.totalGathered,renew:site.renewPerDay,
+   campRoute:!!findPioneerWalk([s.camp.x,s.camp.z],[site.x,site.z],
+    [...reservedParcels(null).filter(x=>x.id.startsWith('pine-')||x.id.startsWith('bamboo-')),
+     ...s.buildings.map(x=>x.parcel)]),
+   liangRoute:!!findPioneerWalk(pioneerEntrance(s.buildings.find(x=>x.id===s.founders[0].homeBuildingId)!.parcel),
+    [site.x,site.z],
+    [...reservedParcels(null).filter(x=>x.id.startsWith('pine-')||x.id.startsWith('bamboo-')),
+     ...s.buildings.filter(x=>x.id!==s.founders[0].homeBuildingId).map(x=>x.parcel)])
+  }))
  }));
  assert.ok(s.founders.every(f=>f.homeBuildingId&&s.buildings.some(b=>b.id===f.homeBuildingId)));
  assert.ok(pioneerHousingCapacity(s)>=s.founders.length);
@@ -185,6 +196,13 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
  for(const b of s.buildings){
   assert.ok(validatePioneerParcel(b.parcel,occupied,s.roads.filter(r=>r.buildingId!==b.id)).ok,'unsafe '+b.id);
   occupied.push(b.parcel);
+ }
+ // The one wood source cannot become landlocked behind an otherwise
+ // legal cottage. No in-game logging can repair permanently blocked labor.
+ const blockers=[...natural,...s.buildings.map(b=>b.parcel)];
+ for(const site of s.sites.filter(x=>x.kind==='forest'||x.kind==='spring'||x.kind==='forage')){
+  assert.ok(findPioneerWalk([s.camp.x,s.camp.z],[site.x,site.z],blockers),
+   'growth cut village access to critical '+site.kind+' resource');
  }
  for(const road of s.roads){
   const others=[...natural,...s.buildings.filter(b=>b.id!==road.buildingId).map(b=>b.parcel)];
@@ -337,4 +355,101 @@ test('Four-year food security scales actual farm capacity before filling every h
  }));
  assert.ok(s.foodStats&&s.foodStats.consumed>=0&&s.foodStats.collected>=0);
  assert.ok(s.journal.some(x=>x.title==='又添一位乡邻'));
+});
+
+test('Commons is temporary at zero buildings, upgrades by actual materials and resident labor',()=>{
+ const s=createPioneerWorld(42,1000);
+ assert.deepEqual(s.commons,createPioneerCommons());
+ assert.equal(s.commons.stage,0);
+ assert.equal(s.commons.mealsServed,0);
+ assert.equal(s.commons.woodSpent,0);
+ advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ assert.equal(s.commons.stage,3,'year-three residents must actually build a village square');
+ assert.ok(s.commons.woodSpent===8.5,'wood must be paid across three stages: '+s.commons.woodSpent);
+ assert.ok(s.commons.workHours>=19,'work is not a free year-based unlock');
+ assert.ok(s.commons.stageCompletedAt.every(t=>t!==null));
+ assert.ok(s.commons.stageCompletedAt[0]!<s.commons.stageCompletedAt[1]!);
+ assert.ok(s.commons.stageCompletedAt[1]!<s.commons.stageCompletedAt[2]!);
+ assert.ok(s.journal.some(e=>e.title==='安家火塘落成'));
+ assert.ok(s.journal.some(e=>e.title==='公共灶台落成'));
+ assert.ok(s.journal.some(e=>e.title==='村心空地落成'));
+ assert.ok(s.commons.mealsServed>0&&s.commons.cookingHours>0&&s.commons.socialHours>0);
+ assert.equal(pioneerCommonsNames[s.commons.stage],'村心空地');
+ const gathered=s.sites.find(x=>x.kind==='forest')!.totalGathered;
+ const spent=s.buildings.reduce((v,b)=>v+b.materialsSpent.wood,0)+s.commons.woodSpent+
+  s.journal.filter(e=>e.title==='工材送达'&&e.text.includes('修')).length*0;
+ // repair commissions also consume wood and aren't in the new buildings; journal
+ // should record each such transaction independently.
+ assert.ok(1+gathered+1e-3>=spent+s.resources.wood,
+  'commons timber cannot be created without real gathered stock');
+ const report=inspectPioneerSelection(s,{kind:'camp',id:'camp'});
+ assert.equal(report?.title,'村心空地');
+ assert.ok(report?.facts.some(x=>x.label==='已耗木料'&&x.value==='8.5 份'));
+ assert.ok(report?.history.some(x=>x.includes('村心空地落成')));
+});
+
+test('Commons cannot upgrade when real wood is unavailable, and import rejects forged stages',()=>{
+ const s=createPioneerWorld(42,1000);
+ for(let i=0;i<150&&s.buildings.length===0;i++)advancePioneerWorld(s,60);
+ assert.ok(s.buildings.length>0);
+ s.resources.wood=0;
+ const wood=s.sites.find(site=>site.kind==='forest')!;
+ wood.stock=0;wood.renewPerDay=0;
+ advancePioneerWorld(s,7*DAY_MINUTES/3);
+ assert.equal(s.commons.stage,0,'no actual timber means the old camp stays');
+ assert.equal(s.commons.woodSpent,0);
+ assert.equal(s.commons.project?.phase,'materials');
+ const old=structuredClone(s) as unknown as Record<string,unknown>;
+ delete old.commons;
+ const imported=importPioneerWorld(JSON.stringify(old));
+ assert.ok(imported,'old v4.1 slot must load without the commons field');
+ assert.equal(imported!.commons.stage,0);
+ assert.equal(imported!.commons.woodSpent,0);
+ assert.ok(validatePioneerCommons(imported!.commons));
+ const forged=structuredClone(s);
+ forged.commons.stage=3;
+ forged.commons.woodSpent=-12;
+ assert.equal(importPioneerWorld(JSON.stringify(forged)),null);
+});
+
+test('Meals and village gatherings occupy real hourly assignments without double consumption',()=>{
+ const s=createPioneerWorld(42,1000);
+ advancePioneerWorld(s,(48*DAY_MINUTES-s.minutes)/3);
+ assert.ok(s.commons.stage>=1);
+ function toHour(hour:number){
+  const today=Math.floor(s.minutes/DAY_MINUTES)*DAY_MINUTES;
+  const at=today+hour*60;
+  const time=at>s.minutes?at:at+DAY_MINUTES;
+  advancePioneerWorld(s,(time-s.minutes)/3);
+ }
+ toHour(12);
+ assert.ok(s.founders.some(f=>f.activity==='cook'));
+ assert.ok(s.founders.some(f=>f.activity==='eat'||f.activity==='eat-home'));
+ const meals=s.commons.mealsServed;
+ const consumed=s.foodStats!.consumed;
+ toHour(18);
+ assert.ok(s.commons.mealsServed>meals);
+ assert.ok(s.foodStats!.consumed>=consumed);
+ const afterDinner=s.commons.mealsServed;
+ toHour(19);
+ assert.ok(s.founders.some(f=>f.activity==='socialize'));
+ assert.ok(s.commons.socialHours>=2);
+ assert.equal(s.commons.mealsServed,afterDinner,'socializing does not feed the village');
+ toHour(23);
+ assert.ok(s.founders.every(f=>f.activity==='shelter'||f.activity==='rest'));
+});
+
+test('Old v4 save with stage zero does not get a free plaza on reload',()=>{
+ const a=createPioneerWorld(42,1000);
+ advancePioneerWorld(a,(48*DAY_MINUTES-a.minutes)/3);
+ const raw=structuredClone(a) as unknown as Record<string,unknown>;
+ delete raw.commons;
+ const restored=importPioneerWorld(JSON.stringify(raw));
+ assert.ok(restored);
+ assert.equal(restored!.commons.stage,0);
+ const baselineWood=restored!.resources.wood;
+ advancePioneerWorld(restored!,7*DAY_MINUTES/3);
+ assert.ok(restored!.commons.stage>=1,'an existing settled town should rebuild the commons');
+ assert.ok(restored!.resources.wood<baselineWood+7*1.15,
+  'commons must cost actual materials and not appear from a save migration');
 });
