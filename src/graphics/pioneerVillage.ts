@@ -625,6 +625,8 @@ function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b
 export function pioneerHitSelection(s:PioneerWorld,hit:THREE.Object3D):PioneerSelection|null{
  let current:THREE.Object3D|null=hit;
  while(current){
+  if(current.userData.founderId&&s.founders.some(f=>f.id===current?.userData.founderId))
+   return {kind:'person',id:String(current.userData.founderId)};
   if(current.userData.buildingId){
    const parcelId=String(current.userData.buildingId);
    const built=s.buildings.find(b=>b.parcel.id===parcelId);
