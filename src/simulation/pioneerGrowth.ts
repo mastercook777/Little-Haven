@@ -1,8 +1,9 @@
 import {DAY_MINUTES} from './calendar.ts';
+import {VALLEY_RIVER} from './valleyGeography.ts';
 import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
 import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
-import {pioneerBuildingPath,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
@@ -22,7 +23,11 @@ const spec:Record<Exclude<PioneerBuildKind,'shelter'>,{wood:number;hours:number;
  cottage:{wood:9,hours:15,width:3.10,depth:2.95,
   why:'谷中有了口粮和遮蔽，乡邻希望留出下一户人家的住处。',label:'山居'},
  'wood-yard':{wood:6,hours:11,width:2.85,depth:2.80,
-  why:'拾柴往返费时，大家希望有一个晒木、修工具和储柴的作业处。',label:'木作棚'}
+  why:'拾柴往返费时，大家希望有一个晒木、修工具和储柴的作业处。',label:'木作棚'},
+ 'fish-hut':{wood:7,hours:12,width:2.85,depth:2.65,
+  why:'田里的收成有季节，乡邻想借河水多添一门生计。先探安全岸边，再真实捕鱼。',label:'河岸渔棚'},
+ granary:{wood:8,hours:12,width:2.65,depth:2.45,
+  why:'田里有余粮，露天存粮不方便。乡邻想建一处能多储十八份口粮的架高粮仓。',label:'架高粮仓'}
 };
 const woodFor=(kind:PioneerBuildKind)=>kind==='shelter'?7:spec[kind].wood;
 const hoursFor=(kind:PioneerBuildKind)=>kind==='shelter'?9:spec[kind].hours;
@@ -47,7 +52,18 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   clearance:.24,accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
  const occupied=[...taken,camp];
  const field=s.sites.find(site=>site.kind==='field');
- const center=kind==='garden'?(s.policy==='food'?
+ const riverDist=(x:number,z:number)=>{
+  let best=Infinity;
+  for(let k=1;k<VALLEY_RIVER.length;k++){
+   const a=VALLEY_RIVER[k-1],b=VALLEY_RIVER[k],dx=b[0]-a[0],dz=b[1]-a[1];
+   const t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));
+   best=Math.min(best,Math.hypot(x-a[0]-t*dx,z-a[1]-t*dz));
+  }
+  return best;
+ };
+ const center=kind==='fish-hut'?{x:3.6,z:-2.1}:
+  kind==='granary'?{x:s.camp.x+3.3,z:s.camp.z+1.6}:
+  kind==='garden'?(s.policy==='food'?
   {x:s.camp.x-2.1,z:s.camp.z+5.0}:s.policy==='shelter'?
   {x:s.camp.x-5.4,z:s.camp.z+2.0}:
   {x:s.camp.x+2.7,z:s.camp.z+3.0}):
@@ -63,6 +79,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  for(let i=-17;i<=17;i++)for(let j=-14;j<=14;j++){
   const x=round(s.camp.x+i*.72+offsetX),z=round(s.camp.z+j*.72+offsetZ);
   if(distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>13.3)continue;
+  if(kind==='fish-hut'&&(riverDist(x,z)<2.9||riverDist(x,z)>5.7))continue;
   for(const rotation of [0,Math.PI/2]){
    const road=nearestRoad(x,z);
    const parcel:VillageParcel={id:projectId,
@@ -76,6 +93,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
     s.policy==='food'?Math.hypot(x-(s.camp.x-4),z-(s.camp.z+4))*.12:0;
    const score=proximity*.57+distance({x,z},s.camp)*.11+
+    (kind==='fish-hut'?Math.abs(riverDist(x,z)-3.35)*1.8:0)+
     road.distance*.12+policy+hash(s.seed+i*719+j*991+salt*533+rotation*80)*.81;
    choices.push({parcel,score});
   }
@@ -123,8 +141,18 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
   return 'wood-yard';
  const cottages=s.buildings.filter(b=>b.kind==='cottage').length;
  const housing=pioneerHousingCapacity(s);
- if(cottages<3&&housing<=s.founders.length&&
+ if(cottages<5&&housing<=s.founders.length&&
   pioneerHasFacility(s,'garden')&&s.resources.food>=3)return 'cottage';
+ // Real professions, not more identical cottages, keep a mature hamlet
+ // changing. Suggested direction changes priority, never permanently locks.
+ const stable=s.commons.stage>=2&&s.founders.length>=5&&gardens>=2;
+ const river=stable&&!pioneerHasFacility(s,'fish-hut');
+ const stores=stable&&!pioneerHasFacility(s,'granary');
+ if(s.livelihood.direction==='river'&&river)return 'fish-hut';
+ if(s.livelihood.direction==='fields'&&stores)return 'granary';
+ if(s.livelihood.direction==='craft'&&s.livelihood.craft.phase==='building')return null;
+ if(river)return 'fish-hut';
+ if(stores)return 'granary';
  return null;
 }
 export function schedulePioneerProject(s:PioneerWorld){
@@ -192,12 +220,19 @@ export function completePioneerProject(s:PioneerWorld){
    renewPerDay:5.1,totalGathered:0};
   s.sites.push(site);
  }
+ if(kind==='fish-hut'){
+  const dock=pioneerEntrance(b.parcel);
+  s.sites.push({id:'fish-'+b.id,kind:'fish',x:dock[0],z:dock[1],
+   stock:5.5,capacity:13,renewPerDay:3.5,totalGathered:0});
+ }
  if(kind==='wood-yard')s.resources.wood=round(Math.min(48,s.resources.wood));
  if(kind==='shelter'){
   for(const resident of s.founders.slice(0,3))resident.homeBuildingId=b.id;
  }
  record(s,pioneerBuildingLabel(kind)+'落成',
-  (kind==='garden'?'阿禾开出田畦，粮食今后要靠四季耕作、采收而来。':
+  (kind==='fish-hut'?'乡邻造出靠近真正河岸且可走到的渔棚，渔点有季节库存，仍需居民每日出工。':
+   kind==='granary'?'乡邻架高屋底和储谷桶，粮库可以多存十八份口粮，但并不凭空产粮。':
+   kind==='garden'?'阿禾开出田畦，粮食今后要靠四季耕作、采收而来。':
    kind==='cottage'?'一户新的住处终于空出来，是否有人落脚仍取决于粮食与生计。':
    kind==='wood-yard'?'梁伯的柴木有了晾晒、保管和修工具的所在。':
    '三位开荒者终于有了避雨之处。')+' 工材与路线均已登记。',b.causeId);
@@ -206,10 +241,11 @@ export function completePioneerProject(s:PioneerWorld){
 const newcomers=[
  ['小满','园丁','#ba9a65'],['阿岚','木匠','#748e87'],
  ['叶生','采集者','#9d8c6c'],['青雀','山野农人','#8f9874'],
- ['孟石','石匠','#847f72'],['阿荞','菜农','#ba8277']
+ ['孟石','石匠','#847f72'],['阿荞','菜农','#ba8277'],
+ ['胡舟','渔夫','#668f97'],['阿蓉','织网人','#b99478'],['庆山','修路匠','#97856b']
 ] as const;
 export function considerPioneerMigration(s:PioneerWorld){
- if(s.founders.length>=9||s.minutes<s.lastArrivalAt+7*DAY_MINUTES)return false;
+ if(s.founders.length>=12||s.minutes<s.lastArrivalAt+7*DAY_MINUTES)return false;
  const idx=s.founders.length-3;const data=newcomers[idx%newcomers.length];
  // A stable visitor exists before acceptance, even while a house or food is
  // missing. Returning later never changes this person's seed, history or ID.
