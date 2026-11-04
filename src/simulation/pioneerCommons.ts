@@ -1,4 +1,5 @@
 import type {PioneerWorld} from './pioneerWorld.ts';
+import {appendPioneerJournal} from './pioneerChronicle.ts';
 
 export type PioneerCommonsStage=0|1|2|3;
 export interface PioneerCommonsProject{
@@ -25,8 +26,7 @@ const spec={
 } as const;
 const round=(n:number)=>Math.round(n*1000)/1000;
 const record=(s:PioneerWorld,title:string,text:string)=>{
- if(s.journal.length>=160)s.journal.shift();
- s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId:'pioneer-commons'});
+ appendPioneerJournal(s,title,text,'pioneer-commons');
 };
 export const pioneerCommonsNames=['临时营火','安家火塘','公共灶台','村心空地'] as const;
 export function createPioneerCommons():PioneerCommons{
