@@ -413,6 +413,8 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   return g;
  }
  if(kind==='tea-stop'){
+  // Shrunk open eaves remain entirely inside the reserved legal 2.55×2.38m footprint.
+  g.scale.setScalar(.84);
   box(g,0,.09,0,2.75,.14,2.38,material('#a89d83'));
   if(phase==='foundation')return g;
   for(const x of [-1.10,1.10])for(const z of [-.96,.96])
