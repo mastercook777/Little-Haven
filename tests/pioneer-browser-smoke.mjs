@@ -176,12 +176,29 @@ try{
   const d=window.__PIONEER_DEBUG__,b=d.getState().buildings[0];
   return b?d.projectBuilding(b.id):null;
  });
- if(mobileShelter){
+ if(!mobileShelter)throw Error('Mobile world did not build an inspectable shelter');
+ const frontmost=await mpage.evaluate(({x,y})=>{
+  const element=document.elementFromPoint(x,y);
+  return element?.id||element?.className||element?.nodeName||'none';
+ },mobileShelter);
+ const canvasVisible=frontmost==='pioneerWorld';
+ if(canvasVisible){
   await mpage.touchscreen.tap(mobileShelter.x,mobileShelter.y);
   const opened=await mpage.evaluate(()=>!document.querySelector('#pioneerInspector').hidden);
-  if(!opened)throw Error('Touch cannot inspect a built 3D shelter');
+  if(!opened)throw Error('Touch on unobscured 3D shelter did not open its inspector: '+
+   JSON.stringify({mobileShelter,frontmost}));
+ }else{
+  // A building behind the deliberately present mobile HUD cannot receive a
+  // canvas touch. In that case the visible, touch-accessible facility list
+  // must serve as a real saved-registry entrypoint.
+  await mpage.locator('.pioneer-building-list summary').tap();
+  await mpage.locator('#pioneerBuildingChoices button').first().tap();
+  const opened=await mpage.evaluate(()=>!document.querySelector('#pioneerInspector').hidden);
+  if(!opened)throw Error('An obscured building cannot be inspected via mobile facility list: '+
+   JSON.stringify({mobileShelter,frontmost}));
  }
- results.push({mobile:sizing,touchInspection:!!mobileShelter});
+ results.push({mobile:sizing,touchInspection:true,touchMethod:canvasVisible?'3d-canvas':'accessible-facility-list',
+  frontmost});
  await mobile.close();
  if(errors.length)throw Error('Pioneer browser errors: '+errors.join('\n').slice(0,1500));
  await writeFile(output+'/report.json',JSON.stringify({pass:true,results,errors},null,2));
