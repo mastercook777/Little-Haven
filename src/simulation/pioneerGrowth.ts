@@ -33,7 +33,7 @@ const woodFor=(kind:PioneerBuildKind)=>kind==='shelter'?7:spec[kind].wood;
 const hoursFor=(kind:PioneerBuildKind)=>kind==='shelter'?9:spec[kind].hours;
 export const pioneerBuildingLabel=(kind:PioneerBuildKind)=>kind==='shelter'?'避雨棚':spec[kind].label;
 export function pioneerHousingCapacity(s:PioneerWorld){
- return s.buildings.reduce((sum,b)=>sum+(b.kind==='shelter'?3:b.kind==='cottage'?2:0),0);
+ return s.buildings.reduce((sum,b)=>sum+(b.kind==='shelter'?3:b.kind==='cottage'?(b.loftAddedAt!==undefined?3:2):0),0);
 }
 export function pioneerHasFacility(s:PioneerWorld,kind:PioneerBuildKind){
  return s.buildings.some(b=>b.kind===kind);
@@ -185,6 +185,25 @@ export function schedulePioneerProject(s:PioneerWorld){
  }
  const proposal=surveyPioneerPlot(s,kind);
  if(!proposal){
+  // A full old village centre has no legal fourth-cottage plot. In this
+  // case existing families can invest real lumber and labour in loft
+  // conversions *within an already inspected cottage footprint*. This is
+  // preferable to generating overlapping cottages or phantom migrants.
+  if(kind==='cottage'&&s.founders.length>=9){
+   const home=s.buildings.find(b=>b.kind==='cottage'&&
+    b.loftAddedAt===undefined&&(b.condition??100)>=60);
+   if(home){
+    const id='pioneer-loft-'+s.nextEventId;
+    s.intent={id,kind:'loft',targetBuildingId:home.id,
+     reason:'平地已满，新邻居仍需要能遮雨的住处。乡邻决定在原有山居内加一道稳固木阁。',
+     createdAt:s.minutes,requestedBy:s.founders.filter(f=>f.homeBuildingId===home.id).map(f=>f.id),
+     parcel:home.parcel,path:s.roads.find(r=>r.buildingId===home.id)?.points??[],
+     phase:'materials',woodRequired:4,woodCommitted:0,workDone:0,
+     workRequired:8,pauseReason:'改阁楼仍需四份木料和八小时真实施工'};
+    record(s,'商议山居加阁','新屋址不够，村民决定在已有安全屋界内增加一处睡铺；仍需木料和施工。',id);
+    return true;
+   }
+  }
   s.nextSurveyAt=s.minutes+3*DAY_MINUTES;
   // An unavailable riverside parcel remains actionable, but repeated
   // three-day survey failures must not erase decades of village memories.
@@ -207,6 +226,16 @@ export function schedulePioneerProject(s:PioneerWorld){
 }
 export function completePioneerProject(s:PioneerWorld){
  const intent=s.intent;if(!intent)return false;
+ if(intent.kind==='loft'){
+  const home=s.buildings.find(b=>b.id===intent.targetBuildingId&&b.kind==='cottage');
+  if(!home||home.loftAddedAt!==undefined){s.intent=null;return false;}
+  home.loftAddedAt=s.minutes;
+  home.loftWoodSpent=intent.woodCommitted;
+  home.loftWorkHours=intent.workDone;
+  const cause=intent.id;s.intent=null;
+  record(s,'山居木阁落成','村民在'+home.id+'原有安全屋界内耗四份木料与八工时，加出一处能住人的木阁；并没有凭空另盖屋。',cause);
+  return true;
+ }
  if(intent.kind==='repair'){
   const old=s.buildings.find(b=>b.id===intent.targetBuildingId);
   if(!old){s.intent=null;return false;}
@@ -268,7 +297,7 @@ export function considerPioneerMigration(s:PioneerWorld){
  s.livingFates.pendingCandidate??=makePioneerCandidate(
   s.seed,s.nextResidentId,data,s.minutes);
  const candidate=s.livingFates.pendingCandidate;
- const cottage=s.buildings.find(b=>b.kind==='cottage'&&b.occupants.length<2);
+ const cottage=s.buildings.find(b=>b.kind==='cottage'&&b.occupants.length<(b.loftAddedAt!==undefined?3:2));
  if(!cottage||!pioneerHasFacility(s,'garden')||
   s.resources.food<Math.max(6,(s.founders.length+1)*1.5)||
   s.resources.water<Math.max(2,s.founders.length*.6)||
