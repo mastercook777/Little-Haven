@@ -212,9 +212,14 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   task?.path&&task.path.length?task.path:
   s.roads.find(r=>r.buildingId===targetBuilding?.id)?.points:undefined;
  const builtRoad=s.roads.find(r=>r.buildingId===(targetBuilding??fieldBuilding)?.id);
- const goal:WalkPoint=workClearing?[workClearing.x,workClearing.z]:atCommons?
+ let goal:WalkPoint=workClearing?[workClearing.x,workClearing.z]:atCommons?
   [round(s.camp.x+(f.id%3-1)*.38),round(s.camp.z+(f.id%4-1.5)*.30)]:
-  fieldBuilding?pioneerEntrance(fieldBuilding.parcel):site?[site.x,site.z]:
+  fieldBuilding?[
+   round(pioneerEntrance(fieldBuilding.parcel)[0]+
+    Math.cos(fieldBuilding.parcel.rotation)*(f.id%3-1)*.34),
+   round(pioneerEntrance(fieldBuilding.parcel)[1]+
+    Math.sin(fieldBuilding.parcel.rotation)*(f.id%3-1)*.34)
+  ]:site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
   shelter?pioneerEntrance(shelter.parcel):
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
@@ -228,6 +233,11 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
  else commute=findPioneerWalk(from,goal,obstacles);
+ if(!commute&&fieldBuilding){
+  // Keep the original navigable entrance when a side work slot is blocked.
+  goal=pioneerEntrance(fieldBuilding.parcel);
+  commute=findPioneerWalk(from,goal,obstacles);
+ }
  if(!commute){
   // Never award work or gathered stock to somebody who cannot reach the place.
   f.activity='rest';f.target=point(from[0],from[1]);f.commute=[from,from];f.pathRoadId=undefined;
