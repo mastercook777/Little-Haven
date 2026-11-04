@@ -30,7 +30,7 @@ const spec:Record<Exclude<PioneerBuildKind,'shelter'>,{wood:number;hours:number;
   why:'田里的收成有季节，乡邻想借河水多添一门生计。先探安全岸边，再真实捕鱼。',label:'河岸渔棚'},
  granary:{wood:8,hours:12,width:2.65,depth:2.45,
   why:'田里有余粮，露天存粮不方便。乡邻想建一处能多储十八份口粮的架高粮仓。',label:'架高粮仓'},
- 'tea-stop':{wood:9,hours:12,width:3.10,depth:2.78,
+ 'tea-stop':{wood:9,hours:12,width:2.55,depth:2.38,
   why:'村里有余粮、成形乡路和来往的需求，乡邻愿意用真木料与工时建一处临路茶棚。',label:'山路茶棚'}
 };
 const woodFor=(kind:PioneerBuildKind)=>kind==='shelter'?7:spec[kind].wood;
