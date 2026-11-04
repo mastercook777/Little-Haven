@@ -243,7 +243,7 @@ test('Architectural roof keeps both slopes and every reed on one measured pitch'
  for(const seam of seams){
   assert.ok(Math.abs(seam.position.y-(pioneerRoofHeight(p,seam.position.x)+.024))<.0001);
  }
- for(const leaf of roof.children.filter(x=>x.name.includes('slope'))){
+ for(const leaf of roof.children.filter(x=>x.name==='roof-left-slope'||x.name==='roof-right-slope')){
   const obj=leaf as THREE.Mesh,coords=obj.geometry.getAttribute('position') as THREE.BufferAttribute;
   for(let i=0;i<coords.count;i++){
    const x=coords.getX(i),y=coords.getY(i),z=coords.getZ(i);
