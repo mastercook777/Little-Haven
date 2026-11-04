@@ -227,6 +227,9 @@ export function schedulePioneerProject(s:PioneerWorld){
 export function completePioneerProject(s:PioneerWorld){
  const intent=s.intent;if(!intent)return false;
  if(intent.kind==='loft'){
+  if(intent.woodRequired!==4||intent.woodCommitted!==4||
+   intent.workRequired!==8||intent.workDone<8||!['foundation','frame'].includes(intent.phase))
+   return false;
   const home=s.buildings.find(b=>b.id===intent.targetBuildingId&&b.kind==='cottage');
   if(!home||home.loftAddedAt!==undefined){s.intent=null;return false;}
   home.loftAddedAt=s.minutes;
