@@ -219,6 +219,7 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  }
  const cottage=kind==='cottage';
  const w=cottage?2.64:2.38,d=cottage?2.50:2.31,h=cottage?1.68:1.57;
+ const plaster=material('#d4c5a7');
  box(g,0,.12,0,w+.06,.19,d+.03,material('#aba18c'));
  if(phase==='foundation')return g;
  for(const x of [-w/2+.14,w/2-.14])for(const z of [-d/2+.14,d/2-.14])
@@ -226,7 +227,7 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  if(cottage){
   // +Z is the functional front door. The original model only had a back
   // wall: add physically supported side/front walls and a usable opening.
-  const wall=material('#d4c5a7'),paper=material('#e2d6ad'),door=material('#956c52');
+  const wall=plaster,paper=material('#e2d6ad'),door=material('#956c52');
   box(g,0,h*.48+.24,-d*.48,w-.25,h*.78,.13,wall);
   for(const x of [-w*.47,w*.47])
    box(g,x,h*.48+.24,0,.13,h*.78,d-.18,wall);
@@ -235,6 +236,10 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
    const x=sign*(.37+panelWidth*.5);
    box(g,x,h*.47+.24,d*.475,panelWidth,h*.75,.13,wall);
   }
+  // Full timber wall plate takes the load from the roof into the posts.
+  // Avoid the prototype's floating 20cm gap between cottage walls and eaves.
+  for(const z of [-d*.46,d*.46])box(g,0,h+.16,z,w*.91,.14,.14,wood);
+  for(const x of [-w*.45,w*.45])box(g,x,h+.16,0,.14,.14,d*.9,wood);
   box(g,0,h-.07,d*.475,.86,.29,.14,lightWood); // lintel above door
   if(phase==='complete'){
    const doorMesh=box(g,0,.77,d*.51,.66,1.04,.075,door);
@@ -272,7 +277,7 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  buildPioneerRoof(g,{
   halfWidth:(w-.10)/2+.13,halfDepth:(d-.16)/2+.10,
   eaveY:h+.29,ridgeY:h+.29+(cottage?.52:.43),thickness:.095
- },roof,wood,lightWood,cottage?undefined:thatchBright);
+ },roof,wood,lightWood,cottage?undefined:thatchBright,cottage?plaster:undefined);
  if(condition<78){
   // Worn roofs reveal genuine repair history; repaired structures regain
   // a clean silhouette after the simulation transaction finishes.
