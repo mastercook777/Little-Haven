@@ -199,7 +199,7 @@ export function validateLivingFates(s:PioneerWorld):boolean{
  const value=s.livingFates;
  if(!value||value.schemaVersion!==1||!value.people||
   Array.isArray(value.people)||!Array.isArray(value.relationships)||
-  value.relationships.length>36||!value.majorMemories||
+  value.relationships.length>66||!value.majorMemories||
   Array.isArray(value.majorMemories)||Object.keys(value.majorMemories).length>150)return false;
  const ids=new Set(s.founders.map(f=>f.id));
  if(Object.keys(value.people).length!==ids.size)return false;
