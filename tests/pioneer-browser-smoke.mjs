@@ -214,8 +214,20 @@ try{
   if(!opened)throw Error('An obscured building cannot be inspected via mobile facility list: '+
    JSON.stringify({mobileShelter,frontmost}));
  }
+ // The village commons remains inspectable on narrow screens even if its
+ // central 3D marker falls behind the HUD and cannot receive pointer input.
+ await mpage.locator('.pioneer-building-list').evaluate(el=>el.open=true);
+ await mpage.locator('#pioneerBuildingChoices button[data-pick-commons]').tap();
+ const commonsCard=await mpage.evaluate(()=>({
+  open:!document.querySelector('#pioneerInspector').hidden,
+  title:document.querySelector('#inspectTitle')?.textContent,
+  contents:document.querySelector('#inspectFacts')?.textContent
+ }));
+ if(!commonsCard.open||!['临时营火','安家火塘','公共灶台','村心空地'].includes(commonsCard.title)||
+  !commonsCard.contents?.includes('已耗木料'))
+  throw Error('Mobile commons detail does not expose its real growth history: '+JSON.stringify(commonsCard));
  results.push({mobile:sizing,touchInspection:true,touchMethod:canvasVisible?'3d-canvas':'accessible-facility-list',
-  frontmost});
+  commonsCard:true,frontmost});
  await mobile.close();
  if(errors.length)throw Error('Pioneer browser errors: '+errors.join('\n').slice(0,1500));
  await writeFile(output+'/report.json',JSON.stringify({pass:true,results,errors},null,2));
