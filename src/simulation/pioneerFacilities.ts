@@ -11,7 +11,7 @@ function entry(s:PioneerWorld,title:string,text:string,id:string){
 }
 export const pioneerFacilityLabel=(kind:PioneerOperationalKind)=>
  kind==='garden'?'菜圃':'木作棚';
-export function isPioneerOperational(b:PioneerBuilding){
+export function isPioneerOperational(b:PioneerBuilding):b is PioneerBuilding&{kind:PioneerOperationalKind}{
  return b.kind==='garden'||b.kind==='wood-yard';
 }
 export function isPioneerFacilityActive(b:PioneerBuilding){
