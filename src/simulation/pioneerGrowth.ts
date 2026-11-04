@@ -1,6 +1,6 @@
 import {DAY_MINUTES} from './calendar.ts';
-import {nearestRoad,parcelLineDistance,reservedParcels,validateVillageParcel,
- type VillageParcel} from './villagePlanning.ts';
+import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
+import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {pioneerBuildingPath,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
@@ -67,9 +67,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
     width:data.width,depth:data.depth,rotation,clearance:.30,
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
-   if(!validateVillageParcel(parcel,occupied,4.25).ok)continue;
-   if(s.roads.some(existing=>parcelLineDistance(parcel,existing.points)<.18))
-    continue;
+   if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
    const proximity=distance({x,z},center);
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
