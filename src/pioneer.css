@@ -132,3 +132,10 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
  .inspect-heading button{width:40px;height:40px}
  .inspect-history{margin-top:8px}
 }
+
+.pioneer-building-list{margin:10px 0 0;color:#718474;border-top:1px solid var(--line);padding-top:9px}
+.pioneer-building-list summary{font-size:11px;color:#607c65;list-style:revert}
+#pioneerBuildingChoices{display:flex;flex-wrap:wrap;gap:5px;max-height:103px;overflow:auto;padding:8px 0 0}
+#pioneerBuildingChoices button{padding:6px 8px;font-size:10px;text-align:left}
+#pioneerBuildingChoices span{font-size:10px;color:#809080}
+@media(max-width:760px){.pioneer-building-list{margin-top:5px;padding-top:5px}.pioneer-building-list summary{font-size:9px}#pioneerBuildingChoices{max-height:75px}#pioneerBuildingChoices button{font-size:9px;padding:6px}}
