@@ -43,6 +43,8 @@ try{
    gl:!!(canvas.getContext('webgl2')||canvas.getContext('webgl')),
    width:canvas.clientWidth,height:canvas.clientHeight};
  });
+ if(initial.scene.forestTrees<2||initial.scene.clearings!==0||initial.scene.clearedPlots!==0)
+  throw Error('New forest lacks genuine initial vegetation or starts pre-cleared: '+JSON.stringify(initial.scene));
  if(initial.mode!=='pioneer'||initial.founders!==3||initial.buildings!==0||
   initial.scene.renderedStructures!==0||!initial.gl)throw Error('Not a genuine empty WebGL start: '+JSON.stringify(initial));
  const startDigest=await screenshot(page,'01-three-founders-and-camp');
@@ -113,6 +115,10 @@ try{
    roadGrades:state.roads.map(r=>r.grade),visuals:d.getVisuals(),
    renderer:d.getRendererInfo()};
  });
+ if(grown.visuals.clearings<1||grown.visuals.clearedPlots<1||
+  grown.visuals.forestStumps<1)
+  throw Error('3-year world did not visually clear real land or retain felling traces: '+
+   JSON.stringify(grown.visuals));
  if(grown.visuals.commonsStage!==3||grown.visuals.commonsBeds!==0)
   throw Error('Old first-night bedrolls survived a real mature settlement: '+JSON.stringify(grown));
  if(grown.people<6||grown.roadCount<3||!grown.buildings.includes('garden')||
@@ -162,7 +168,49 @@ try{
   .buildings.find(b=>b.id===id),gardenId);
  if(savedConfig?.productionMode!=='seed'||savedConfig.operating!==false)
   throw Error('Garden production settings lost after reload');
- results.push({phaseB:grown,gardenInspected:true,gardenControlsPersist:true,commons:commonsInfo});
+ // Newly opened land and trees must appear as distinct, inspectable 3D
+ // scenes, not just an expanding building count.
+ const pioneerFelling=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,w=d.getState();
+  return {count:w.frontier.totalFelled,
+   cleared:w.frontier.clearings.filter(c=>c.phase==='cleared').length,
+   woodGathered:w.sites.find(site=>site.kind==='forest')?.totalGathered,
+   view:d.getVisuals()};
+ });
+ if(pioneerFelling.count<3||pioneerFelling.cleared<1||
+  pioneerFelling.woodGathered<pioneerFelling.count*2.6)
+  throw Error('Felling/clearing not backed by collected timber: '+JSON.stringify(pioneerFelling));
+ await page.locator('#pioneerBuildingChoices').evaluate(el=>el.closest('details').open=true);
+ await page.locator('button[data-pick-clearing]').first().click();
+ const clearingCard=await page.evaluate(()=>({
+  selection:window.__PIONEER_DEBUG__.getSelection(),
+  title:document.querySelector('#inspectTitle')?.textContent,
+  details:document.querySelector('#inspectFacts')?.textContent
+ }));
+ if(clearingCard.selection?.kind!=='clearing'||
+  !clearingCard.details?.includes('实际开垦工时'))
+  throw Error('Actual opened plot cannot be inspected: '+JSON.stringify(clearingCard));
+ await page.locator('#inspectClose').click();
+ results.push({phaseB:grown,gardenInspected:true,gardenControlsPersist:true,
+  commons:commonsInfo,frontier:pioneerFelling,clearingCard:true});
+ // A quick fresh-world playback checks an actual felling animation window.
+ // The real simulation is advanced in hour-sized chunks and the GPU model
+ // is refreshed by the same public debug helper used for other snapshots.
+ const fallingRun=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__;d.reset(42);
+  for(let i=0;i<110;i++){
+   d.advance(20);
+   if(d.getVisuals().fallingTree){
+    const world=d.getState(),render=d.getVisuals();
+    return {realFell:world.frontier.totalFelled,render,minute:world.minutes};
+   }
+  }
+  return null;
+ });
+ if(!fallingRun||fallingRun.realFell<1)
+  throw Error('No visible falling-tree window during actual cutting: '+JSON.stringify(fallingRun));
+ await screenshot(page,'06-harvest-driven-tree-fall');
+ results.push({fallingTree:true,render:fallingRun.render});
  await page.goto(base,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__HAVEN_DEBUG__?.getState);
  const classic=await page.evaluate(()=>window.__HAVEN_DEBUG__.getState());

@@ -5,6 +5,7 @@ import {pioneerBuildingPath,findPioneerWalk,type WalkPoint,type PioneerRoad} fro
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
+import {pioneerParcelOpened} from './pioneerFrontier.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
 const hash=(n:number)=>{
@@ -68,6 +69,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
     width:data.width,depth:data.depth,rotation,clearance:.30,
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
    if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
+   if(!pioneerParcelOpened(s,parcel))continue;
    const proximity=distance({x,z},center);
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:

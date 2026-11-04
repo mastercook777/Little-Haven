@@ -145,3 +145,7 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
 .commons-status{font-size:10px;line-height:1.5;color:#71836c;padding:5px 0 0;
  text-align:center}
 @media(max-width:760px){.commons-status{font-size:9px;line-height:1.35;padding:3px 0}}
+
+.frontier-status{font-size:10px;line-height:1.6;color:#668370;padding-top:5px;
+ font-variant-numeric:tabular-nums}
+@media(max-width:760px){.frontier-status{font-size:9px;line-height:1.4;padding-top:3px}}

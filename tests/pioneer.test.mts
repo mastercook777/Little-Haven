@@ -7,6 +7,10 @@ import {pioneerWalkable,roadSegmentsSafe,findPioneerWalk,pioneerEntrance} from '
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {pioneerHousingCapacity} from '../src/simulation/pioneerGrowth.ts';
 import {createPioneerCommons,pioneerCommonsNames,validatePioneerCommons} from '../src/simulation/pioneerCommons.ts';
+import {pioneerParcelOpened,validatePioneerFrontier,createPioneerFrontier,
+ performPioneerClearing} from '../src/simulation/pioneerFrontier.ts';
+import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
+import {PIONEER_VALLEY,pioneerIslandFraction} from '../src/simulation/pioneerGeography.ts';
 import {isPioneerFacilityActive,getPioneerFacilityPreference,setPioneerFacilityOperating,
  setPioneerFacilityPreference} from '../src/simulation/pioneerFacilities.ts';
 import {inspectPioneerSelection} from '../src/ui/pioneerInspection.ts';
@@ -194,7 +198,8 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
   accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
  occupied.push(camp);
  for(const b of s.buildings){
-  assert.ok(validatePioneerParcel(b.parcel,occupied,s.roads.filter(r=>r.buildingId!==b.id)).ok,'unsafe '+b.id);
+  const review=validatePioneerParcel(b.parcel,occupied,s.roads.filter(r=>r.buildingId!==b.id));
+  assert.ok(review.ok,'unsafe '+b.id+' '+review.reason+' x='+b.parcel.x+' z='+b.parcel.z);
   occupied.push(b.parcel);
  }
  // The one wood source cannot become landlocked behind an otherwise
@@ -452,4 +457,83 @@ test('Old v4 save with stage zero does not get a free plaza on reload',()=>{
  assert.ok(restored!.commons.stage>=1,'an existing settled town should rebuild the commons');
  assert.ok(restored!.resources.wood<baselineWood+7*1.15,
   'commons must cost actual materials and not appear from a save migration');
+});
+
+test('v0.4.3: aggregated forest stock pays for persisted tree-fall events, never rendering',()=>{
+ const s=createPioneerWorld(42,1000);
+ assert.equal(s.frontier.totalFelled,0);
+ assert.equal(s.frontier.lastFelling,null);
+ const forest=s.sites.find(x=>x.kind==='forest')!;
+ for(let t=0;t<110&&s.frontier.totalFelled<3;t++)
+  advancePioneerWorld(s,20);
+ assert.ok(s.frontier.totalFelled>=3,'forester must visibly fell trees from real labor');
+ assert.ok(forest.totalGathered>=2.8*3,
+  'tree-fall cannot precede the cumulative actual harvest');
+ assert.ok(s.frontier.lastFelling?.minute!<=s.minutes);
+ const count=s.frontier.totalFelled,wood=s.resources.wood,stock=forest.stock;
+ const latest=s.frontier.lastFelling!;
+ const view=buildPioneerForestArt(new THREE.Group(),s);
+ view.update(s,s.minutes/3+3);
+ const sig=view.signatures();
+ assert.ok(sig.standing>0&&sig.stumps>=0);
+ assert.equal(sig.falling,true,'last real felling must animate in game time');
+ assert.equal(s.frontier.totalFelled,count,'rendering must not trigger forest harvest');
+ assert.equal(s.resources.wood,wood);assert.equal(forest.stock,stock);
+ advancePioneerWorld(s,(151)/3);
+ view.update(s,s.minutes/3);
+ assert.equal(view.signatures().falling,false,'years-old felling must never replay');
+ assert.equal(s.frontier.lastFelling?.serial,latest.serial);
+ const roundtrip=importPioneerWorld(JSON.stringify(s));
+ assert.ok(roundtrip);assert.equal(roundtrip?.frontier.totalFelled,s.frontier.totalFelled);
+ assert.deepEqual(roundtrip?.frontier.lastFelling,s.frontier.lastFelling);
+});
+
+test('v0.4.3: frontier is actually larger than classic valley and old village unchanged',()=>{
+ assert.ok(PIONEER_VALLEY.radiusX>16.8);
+ assert.ok(PIONEER_VALLEY.centerX<0);
+ assert.ok(pioneerIslandFraction(-17.5,0,1.05,1.05)<1);
+ assert.equal(pioneerWalkable([-17.5,0],[]),true);
+ // Older v0.3 geography contract does not expand with pioneer land.
+ assert.ok(reservedParcels(null).length>0);
+});
+
+test('v0.4.3: surveyed buffer only opens after reachable resident clearing hours',()=>{
+ const s=createPioneerWorld(42,1000);
+ advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ assert.ok(s.frontier.clearings.length>=1,
+  'growing settlement must ask residents to clear marginal land');
+ const opened=s.frontier.clearings.filter(c=>c.phase==='cleared');
+ assert.ok(opened.length>=1,
+  'village must turn at least one researched patch into usable ground');
+ assert.ok(s.frontier.clearingHours>=8*opened.length);
+ for(const c of opened){
+  assert.equal(c.workDone,c.workRequired);
+  assert.ok(c.clearedAt!==null&&c.clearedAt>=c.startedAt);
+  const plot={id:'probe',kind:'dwelling' as const,x:c.x,z:c.z,
+   width:2,depth:2,rotation:0,clearance:.3,accessX:c.x,accessZ:c.z,builtAt:s.minutes};
+  assert.equal(pioneerParcelOpened(s,plot),true);
+ }
+ const old=structuredClone(s);
+ const statsBefore=old.frontier.clearingHours;
+ const c=old.frontier.clearings.find(p=>p.phase==='cleared')!;
+ assert.equal(performPioneerClearing(old,c,1),false);
+ assert.equal(old.frontier.clearingHours,statsBefore,'a completed patch cannot issue fake labor credit');
+ assert.equal(validatePioneerFrontier(s.frontier,s),true);
+ assert.ok(s.journal.some(e=>e.title==='林地开出空场'));
+});
+
+test('v0.4.3: legacy v4 saves migrate without free clearing or retroactive falls',()=>{
+ const s=createPioneerWorld(42,1000);
+ advancePioneerWorld(s,(48*DAY_MINUTES-s.minutes)/3);
+ const old=structuredClone(s) as unknown as Record<string,unknown>;
+ delete old.frontier;
+ const restored=importPioneerWorld(JSON.stringify(old));
+ assert.ok(restored);
+ assert.deepEqual(restored!.frontier,createPioneerFrontier());
+ assert.equal(restored!.buildings.length,s.buildings.length);
+ assert.equal(restored!.resources.wood,s.resources.wood);
+ const bad=structuredClone(s);
+ bad.frontier.clearings=[{id:'forged',x:-18,z:0,radius:2,
+  phase:'cleared',workDone:0,workRequired:8,startedAt:1000,clearedAt:2000}];
+ assert.equal(importPioneerWorld(JSON.stringify(bad)),null);
 });
