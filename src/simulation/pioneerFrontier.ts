@@ -102,7 +102,7 @@ function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
 }
 export function schedulePioneerClearing(s:PioneerWorld){
  const f=s.frontier;
- if(f.clearings.some(c=>c.phase==='clearing')||f.clearings.length>=4||
+ if(f.clearings.some(c=>c.phase==='clearing')||f.clearings.length>=8||
   s.buildings.length<3||s.founders.length<4||
   s.minutes<f.lastSurveyAt)return false;
  // Clear the next corridor when houses begin to occupy the first ring.
@@ -114,6 +114,44 @@ export function schedulePioneerClearing(s:PioneerWorld){
  if(!next)return false;
  f.clearings.push(next);
  record(s,'林缘勘荒','乡邻沿现有安全小径探路，选择了不挡河道、住房和水源的缓冲林地。',next.id);
+ return true;
+}
+/** A later real livelihood may need land after the first housing ring fills.
+ * Do not waive island, tree, river or road checks. Find an actually walkable
+ * legal plot, then schedule the SAME eight resident clearing shifts as the
+ * initial frontier. If an old unworked plot has become unreachable through
+ * later construction, resurvey it (the old zero hours cannot move with it). */
+export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
+ if(pioneerParcelOpened(s,p))return false;
+ const f=s.frontier;
+ const occupied=[...landscape(),...s.buildings.map(b=>b.parcel)];
+ if(!validatePioneerParcel(p,occupied,s.roads).ok||
+  !findPioneerWalk([s.camp.x,s.camp.z],[p.x,p.z],occupied))return false;
+ const active=f.clearings.find(c=>c.phase==='clearing');
+ if(active){
+  if(dist(active,p)<=1.5)return true;
+  // A house built after the original survey can strand the plot. No
+  // phantom workers should receive credit for standing behind blocked lanes.
+  if(pioneerClearingReachable(s,active)||s.minutes-active.startedAt<3*DAY_MINUTES)
+   return false;
+  // Preserve actual historical total work; reset current plot work. A
+  // displaced clearing is not a completed clearing, nor a free new parcel.
+  const lost=active.workDone;
+  active.x=p.x;active.z=p.z;active.workDone=0;active.startedAt=s.minutes;
+  active.clearedAt=null;active.radius=2.2;
+  f.lastSurveyAt=s.minutes+3*DAY_MINUTES;
+  record(s,'林缘改勘','原清障地因新屋与乡路而无法安全抵达。村民另选合规可达的工地；'+
+   (lost>0?'原来投入的 '+round(lost)+' 小时不能移作新地功劳。':
+    '旧址尚未开工，没有虚构开垦成果。'),active.id);
+  return true;
+ }
+ if(f.clearings.length>=8)return false;
+ const next:PioneerClearing={id:'clearing-'+(f.clearings.length+1),
+  x:p.x,z:p.z,radius:2.2,phase:'clearing',workDone:0,workRequired:8,
+  startedAt:s.minutes,clearedAt:null};
+ f.clearings.push(next);
+ f.lastSurveyAt=s.minutes+3*DAY_MINUTES;
+ record(s,'为茶棚新开林缘地','乡邻勘出合规又可达的山路空隙。须实际清灌移石八小时，方可在此考虑茶棚。',next.id);
  return true;
 }
 export function pioneerClearingReachable(s:PioneerWorld,p:PioneerClearing):boolean{
@@ -141,7 +179,7 @@ export function pioneerParcelOpened(s:PioneerWorld,p:VillageParcel){
   dist(c,p)<=c.radius+1.1);
 }
 export function validatePioneerFrontier(f:PioneerFrontier,s:PioneerWorld){
- if(!f||!Array.isArray(f.clearings)||f.clearings.length>4||
+ if(!f||!Array.isArray(f.clearings)||f.clearings.length>8||
   ![f.totalFelled,f.lastSurveyAt,f.clearingHours].every(x=>Number.isFinite(x)&&x>=0)||
   !Number.isInteger(f.totalFelled)||f.totalFelled>100000)return false;
  const ids=new Set<string>();
