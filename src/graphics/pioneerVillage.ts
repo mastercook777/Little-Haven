@@ -6,7 +6,7 @@ import {VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
 import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
-import {buildMountainRoof} from './villageBuildings.ts';
+import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 
 const material=(color:string,emissive?:string)=>new THREE.MeshStandardMaterial({
@@ -128,15 +128,18 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
   pole(g,x,1.15,z,.10,1.93,wood);
  for(const z of [-.84,.84])box(g,0,2.12,z,2.25,.16,.15,lightWood);
  for(const x of [-.99,.99])box(g,x,2.1,0,.13,.15,1.85,lightWood);
- const beam=box(g,0,2.43,0,.16,.15,2.38,lightWood);beam.name='roof-ridge';
- const roofCount=phase==='complete'?2:Math.min(2,Math.floor(Math.max(0,progress-.32)*3));
- for(let i=0;i<roofCount;i++){
-  const sign=i===0?-1:1;
-  const roof=box(g,sign*.61,2.13,0,1.46,.16,2.28,thatch);
-  roof.rotation.z=sign*.43;
-  for(let j=0;j<5;j++){
-   const reed=box(g,sign*(.27+j*.21),2.38-(j*.09),0,.024,.025,2.30,thatchBright);
-   reed.rotation.z=sign*.43;
+ // Both slopes, ridge and thatch seams share a single physically valid roof.
+ // The old per-strip Y offsets were inverted relative to the rotated roof.
+ const roofCount=phase==='complete'?2:
+  Math.min(2,Math.floor(Math.max(0,progress-.25)*3));
+ if(roofCount){
+  const roof=buildPioneerRoof(g,PIONEER_SHELTER_ROOF,thatch,wood,lightWood,thatchBright);
+  if(roofCount<2){
+   const leaf=roof.getObjectByName('roof-right-slope');
+   leaf?.parent?.remove(leaf);
+   // Hide associated right-half seams/rafters until the second slope is made.
+   for(const child of [...roof.children])
+    if(child.position.x>.12&&child.name!=='roof-ridge')child.visible=false;
   }
  }
  if(phase==='complete'){
@@ -217,36 +220,55 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  for(const x of [-w/2+.14,w/2-.14])for(const z of [-d/2+.14,d/2-.14])
   pole(g,x,h/2+.21,z,.09,h,wood);
  if(cottage){
-  box(g,0,h*.49+.22,-d*.43,w-.34,h*.77,.12,material('#dfcbb0'));
-  for(const x of [-w*.45,w*.45])box(g,x,h*.52+.21,0,.10,h*.74,d-.22,wood);
+  // +Z is the functional front door. The original model only had a back
+  // wall: add physically supported side/front walls and a usable opening.
+  const wall=material('#d4c5a7'),paper=material('#e2d6ad'),door=material('#956c52');
+  box(g,0,h*.48+.24,-d*.48,w-.25,h*.78,.13,wall);
+  for(const x of [-w*.47,w*.47])
+   box(g,x,h*.48+.24,0,.13,h*.78,d-.18,wall);
+  for(const sign of [-1,1]){
+   const panelWidth=(w-.73)*.5;
+   const x=sign*(.37+panelWidth*.5);
+   box(g,x,h*.47+.24,d*.475,panelWidth,h*.75,.13,wall);
+  }
+  box(g,0,h-.07,d*.475,.86,.29,.14,lightWood); // lintel above door
   if(phase==='complete'){
-   const door=box(g,0,.84,d*.50,.66,1.29,.12,material('#956b52'));
-   door.name='cottage-door';
-   for(const x of [-.95,.95]){
-    box(g,x,1.05,d*.505,.37,.45,.06,material('#dfcfab'));
-    box(g,x,1.06,d*.56,.04,.50,.07,wood);
-    box(g,x,1.06,d*.56,.40,.05,.07,wood);
+   const doorMesh=box(g,0,.77,d*.51,.66,1.04,.075,door);
+   doorMesh.name='cottage-door';
+   orb(g,.22,.78,d*.56,.035,lightWood);
+   for(const x of [-.93,.93]){
+    box(g,x,1.04,d*.545,.38,.46,.045,wood);
+    box(g,x,1.04,d*.57,.32,.38,.035,paper);
+    for(const dx of [-.10,.10])box(g,x+dx,1.04,d*.60,.022,.42,.028,lightWood);
+    box(g,x,1.04,d*.60,.36,.026,.028,lightWood);
    }
-   box(g,0,.25,d/2+.25,1.08,.15,.45,stone);
+   box(g,0,.25,d/2+.18,.98,.14,.26,stone);
   }
  }else{
-  // An open-air woodworking shelter: stacked lumber, workbench, red-brown
-  // awning and sparse frame, unlike a second copy of the dwelling.
-  box(g,0,.77,-.48,1.70,.12,.73,lightWood);
-  for(let n=0;n<5;n++)box(g,-.58+n*.26,.35,0,.18,.18,1.72,
-   n%2?wood:lightWood);
+  // A real open-air woodworking bay: four timber posts, bracing, benches,
+  // lumber racks, and a worktop. No floating residential walls/door.
+  for(const z of [-d*.35,d*.35]){
+   const beam=box(g,0,1.42,z,w*.83,.12,.15,wood);
+   beam.name='wood-yard-crossbeam';
+  }
+  box(g,0,.82,-.45,1.78,.12,.72,lightWood);
+  for(let n=0;n<5;n++)box(g,-.58+n*.28,.34,0,.19,.18,1.65,n%2?wood:lightWood);
   if(phase==='complete'){
-   box(g,.62,.89,.31,.55,.18,.53,material('#a47d5a'));
-   const saw=box(g,.68,1.07,.30,.08,.06,.42,stone);saw.rotation.z=.55;
+   const workbench=box(g,.56,1.05,.28,.67,.12,.50,lightWood);
+   workbench.name='wood-yard-workbench';
+   const saw=box(g,.65,1.14,.28,.05,.06,.35,stone);saw.rotation.z=.45;
+   box(g,-.76,.38,-.75,.38,.64,.30,material('#ac9270'));
   }
  }
  if(phase==='frame'){
   for(const z of [-d*.42,d*.42])box(g,0,h+.21,z,w,.12,.13,wood);
   return g;
  }
- const roof=material(cottage?'#6e7774':'#8f8271');
- buildMountainRoof(g,{width:w-.10,depth:d-.16,eave:h+.29,rise:cottage?.59:.39,
-  style:cottage?'cottage':'workshop',material:roof});
+ const roof=material(cottage?'#677a77':'#9c8668');
+ buildPioneerRoof(g,{
+  halfWidth:(w-.10)/2+.13,halfDepth:(d-.16)/2+.10,
+  eaveY:h+.29,ridgeY:h+.29+(cottage?.52:.43),thickness:.095
+ },roof,wood,lightWood,cottage?undefined:thatchBright);
  if(condition<78){
   // Worn roofs reveal genuine repair history; repaired structures regain
   // a clean silhouette after the simulation transaction finishes.
