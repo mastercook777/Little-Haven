@@ -126,7 +126,9 @@ try{
  if(finishDigest===startDigest)throw Error('Pioneer island did not visibly change');
  // The new low-frequency council must have real options beyond the
  // original 3 survival policies, and each vote persists independently.
- await page.locator('.pioneer-livelihood summary').click();
+ await page.locator('#pioneerCouncilOpen').click();
+ if(!await page.locator('#pioneerLivelihoodPanel').evaluate(node=>node.open))
+  throw Error('Quick village council cannot open development options');
  const available=await page.locator('#pioneerDirections button[data-livelihood]').count();
  if(available!==4)throw Error('Village council still offers only the old 3 advice buttons');
  await page.locator('#pioneerDirections button[data-livelihood="river"]').click();
@@ -474,10 +476,11 @@ try{
   const panel=document.querySelector('.pioneer-panel').getBoundingClientRect();
   return {gl:!!(canvas.getContext('webgl2')||canvas.getContext('webgl')),
    toolbarWidth:toolbar.width,panelRight:panel.right,viewport:innerWidth,
-   spotlightButtonHeight:document.querySelector('#pioneerSpotlightFocus').getBoundingClientRect().height};
+   spotlightButtonHeight:document.querySelector('#pioneerSpotlightFocus').getBoundingClientRect().height,
+   councilButtonHeight:document.querySelector('#pioneerCouncilOpen').getBoundingClientRect().height};
  });
  if(!sizing.gl||sizing.toolbarWidth>sizing.viewport+1||sizing.panelRight>sizing.viewport+1||
-  sizing.spotlightButtonHeight<43)
+  sizing.spotlightButtonHeight<43||sizing.councilButtonHeight<43)
   throw Error('Pioneer mobile overflow or blank WebGL: '+JSON.stringify(sizing));
  await mpage.locator('#pioneerSpotlightFocus').tap();
  const mobileMoment=await mpage.evaluate(()=>({
@@ -489,7 +492,7 @@ try{
  await mpage.locator('#inspectClose').tap();
  await mpage.locator('#pioneerCamera').tap();
  await mpage.evaluate(()=>window.__PIONEER_DEBUG__.advance(1200));
- await mpage.locator('.pioneer-livelihood summary').tap();
+ await mpage.locator('#pioneerCouncilOpen').tap();
  const touchChoices=await mpage.locator('#pioneerDirections button').count();
  if(touchChoices!==4)throw Error('Mobile council decisions not reachable');
  await mpage.locator('#pioneerDirections button[data-livelihood="fields"]').tap();
