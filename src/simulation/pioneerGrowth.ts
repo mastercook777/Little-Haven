@@ -46,8 +46,15 @@ function record(s:PioneerWorld,title:string,text:string,causeId:string|null=null
  appendPioneerJournal(s,title,text,causeId);
 }
 /** Enforce the existing real eave/SAT checks, plus every new walking trail. */
-export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>):
+export interface PioneerSurveyMetrics{
+ candidateParcels:number;legalGeometry:number;openedLand:number;
+ routeReached:number;resourceRoutesKept:number;
+}
+export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>,
+ metrics?:PioneerSurveyMetrics):
  {parcel:VillageParcel;path:WalkPoint[]}|null{
+ if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
+  routeReached:0,resourceRoutesKept:0});
  const data=spec[kind];
  const taken=[...natural(),...s.buildings.map(b=>b.parcel)];
  const camp={id:'temporary-camp',kind:'protected' as const,
@@ -95,8 +102,11 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
     width:data.width,depth:data.depth,rotation,clearance:.30,
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
+   if(metrics)metrics.candidateParcels++;
    if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
+   if(metrics)metrics.legalGeometry++;
    if(!pioneerParcelOpened(s,parcel))continue;
+   if(metrics)metrics.openedLand++;
    const proximity=distance({x,z},center);
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
@@ -125,9 +135,11 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  for(const candidate of choices.slice(0,candidates)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
+  if(metrics)metrics.routeReached++;
   const blockers=[...taken,candidate.parcel];
   if(!critical.every(site=>findPioneerWalk(
    [s.camp.x,s.camp.z],[site.x,site.z],blockers)))continue;
+  if(metrics)metrics.resourceRoutesKept++;
   return {parcel:candidate.parcel,path};
  }
  return null;
