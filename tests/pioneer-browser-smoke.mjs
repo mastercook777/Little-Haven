@@ -437,7 +437,42 @@ try{
   throw Error('No mature paid/visible village growth after four real years: '+
    JSON.stringify(mature));
  await screenshot(page,'05d-four-year-life-and-paid-lofts');
- results.push({matureVillage:mature});
+ if(!mature.built.includes('tea-stop'))
+  throw Error('Four-year village still never built its real roadside tea stop: '+
+   JSON.stringify(mature));
+ const visitation=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,s=d.getState();
+  return {visits:s.commerce.totalArrivals,exchanges:s.commerce.totalExchanges,
+   hosted:s.commerce.totalHosted,food:s.commerce.netFood,
+   wood:s.commerce.netWood,stored:s.commerce.visits.length,
+   direction:s.livelihood.direction,people:s.founders.length,
+   tea:s.buildings.find(b=>b.kind==='tea-stop')?.id};
+ });
+ if(visitation.visits<1||visitation.exchanges<1||
+  !visitation.tea||visitation.people!==mature.people)
+  throw Error('Roadside tea building has no real trade and separate visitor history: '+
+   JSON.stringify(visitation));
+ const liveTraveler=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__;
+  for(let i=0;i<24*22;i++){
+   const s=d.getState();
+   if(s.commerce.activeVisitor){
+    const v=d.getVisuals();
+    return {guest:s.commerce.activeVisitor,seen:v.roadsideVisitor,
+     modelName:v.activeVisitorName,population:s.founders.length,
+     visitorCount:s.commerce.totalArrivals};
+   }
+   d.advance(60/3);
+  }
+  return null;
+ });
+ if(!liveTraveler?.seen||liveTraveler.modelName!==liveTraveler.guest.name||
+  liveTraveler.population!==mature.people||liveTraveler.guest.route.length<2)
+  throw Error('The actual road visitor has no saved presence or visible 3D model: '+
+   JSON.stringify(liveTraveler));
+ await screenshot(page,'05e-actual-visitor-at-roadside-tea-stop');
+ results.push({matureVillage:mature,teaVisitation:visitation,
+  visibleTraveler:liveTraveler.guest.name});
  // A quick fresh-world playback checks an actual felling animation window.
  // The real simulation is advanced in hour-sized chunks and the GPU model
  // is refreshed by the same public debug helper used for other snapshots.
