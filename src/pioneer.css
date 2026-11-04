@@ -180,3 +180,42 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
 }
 @media(max-width:400px){.pioneer-intro{max-width:159px;left:13px}}
 @media(prefers-reduced-motion:reduce){.pioneer-spotlight-focus{transition:none}}
+
+
+/* v0.5: a compact, opt-in village council. The world keeps the floor;
+   unopened council does not cover the miniature scene. */
+.pioneer-panel{max-height:calc(100vh - 234px);overflow-y:auto;scrollbar-width:thin}
+.pioneer-livelihood{border-top:1px solid var(--line);margin-top:11px;padding-top:10px}
+.pioneer-livelihood summary{display:flex;justify-content:space-between;align-items:center;
+ gap:8px;font-size:11px;font-weight:800;color:#52715e;list-style:none;
+ min-height:40px;padding:6px 4px;cursor:pointer}
+.pioneer-livelihood summary:before{content:'▸';font-size:14px}
+.pioneer-livelihood[open] summary:before{content:'▾'}
+.pioneer-livelihood summary strong{font-size:10px;font-weight:600;color:#8b977e}
+.livelihood-explain{font-size:10px;line-height:1.6;color:#738777;margin:7px 1px 10px}
+.livelihood-directions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.livelihood-directions button{padding:9px 6px;min-height:44px;
+ display:flex;flex-direction:column;justify-content:center;gap:3px;text-align:left}
+.livelihood-directions button b{font-size:11px}
+.livelihood-directions button small{font-size:9px;line-height:1.4;color:#708777}
+.livelihood-directions button.active{background:#647f6a;border-color:#647f6a;color:white}
+.livelihood-directions button.active small{color:#edf2e4}
+.livelihood-directions button:disabled{opacity:.54;cursor:not-allowed}
+.livelihood-book-title{font-size:11px;font-weight:800;margin:12px 0 7px;color:#567463}
+.livelihood-milestones{display:grid;gap:6px}
+.livelihood-milestone{display:grid;grid-template-columns:17px minmax(0,1fr);
+ column-gap:6px;border-left:2px solid #b1baa1;padding:5px 5px 5px 8px}
+.livelihood-milestone.done{border-color:#799574}
+.livelihood-milestone .mark{font-size:13px;color:#94a38d}
+.livelihood-milestone.done .mark{color:#4f9064}
+.livelihood-milestone b{font-size:10px;color:#536c56}
+.livelihood-milestone p{font-size:9px;line-height:1.5;margin:2px 0;color:#798777}
+@media(max-width:760px){
+ .pioneer-panel{max-height:calc(100vh - 240px)}
+ .pioneer-livelihood{margin-top:6px;padding-top:5px}
+ .pioneer-livelihood summary{font-size:10px;min-height:44px}
+ .pioneer-livelihood summary strong{font-size:9px}
+ .livelihood-directions button{min-height:44px}
+ .livelihood-directions button b{font-size:10px}
+ .livelihood-directions button small{font-size:8px}
+}
