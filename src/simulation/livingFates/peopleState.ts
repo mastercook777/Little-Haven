@@ -10,7 +10,7 @@ export interface PersonLife{
  privateFacts:{tags:string[];secretSkills:PersonSkill[]};
  knownTruth:Record<string,'clue'|'suspected'|'confirmed'|'public'>;
  skills:Record<PersonSkill,{level:number;xp:number;lastPracticeAt:number}>;
- majorMemoryIds:string[];arrivalAt:number;state:'resident'|'away'|'departed'|'deceased';
+ majorMemoryIds:string[];arrivalAt:number;arrivalKnown:boolean;state:'resident'|'away'|'departed'|'deceased';
 }
 export interface RelationshipEdge{
  id:string;a:number;b:number;trust:number;closeness:number;
@@ -73,12 +73,16 @@ export function generatePersonLife(seed:number,f:Pick<PioneerFounder,'id'|'role'
   .map(id=>[id,{level:0,xp:0,lastPracticeAt:0}])) as PersonLife['skills'];
  return {residentId:f.id,generatorVersion:1,origin,
   publicFacts:publicFacts(f.role,isFounder),privateFacts,knownTruth:{},
-  skills,majorMemoryIds:[],arrivalAt,state:'resident'};
+  skills,majorMemoryIds:[],arrivalAt,arrivalKnown:true,state:'resident'};
 }
-export function createLivingFates(seed:number,founders:PioneerFounder[],minute:number):LivingFatesState{
+export function createLivingFates(seed:number,founders:PioneerFounder[],minute:number,
+ migratingOldSave=false):LivingFatesState{
  const people:Record<string,PersonLife>={};
- for(const f of founders)
-  people[f.id]=generatePersonLife(seed,f,minute,f.id<=3);
+ for(const f of founders){
+  const person=generatePersonLife(seed,f,f.id<=3?8*60+20:minute,f.id<=3);
+  if(migratingOldSave&&f.id>3)person.arrivalKnown=false;
+  people[f.id]=person;
+ }
  return {schemaVersion:1,people,relationships:[],majorMemories:{},pendingCandidate:null};
 }
 /** An identified traveler exists in the save before housing/food admission is checked.
@@ -90,7 +94,7 @@ export function makePioneerCandidate(seed:number,id:number,
 }
 export function welcomePioneerCandidate(s:PioneerWorld,candidate:PioneerCandidate){
  const person=candidate.person;
- s.livingFates.people[candidate.id]={...person,arrivalAt:s.minutes,state:'resident'};
+ s.livingFates.people[candidate.id]={...person,arrivalAt:s.minutes,arrivalKnown:true,state:'resident'};
  s.livingFates.pendingCandidate=null;
 }
 export function pioneerCultivationMultiplier(s:PioneerWorld,id:number){
@@ -186,6 +190,7 @@ export function validateLivingFates(s:PioneerWorld):boolean{
   Array.isArray(p.privateFacts?.tags)&&Array.isArray(p.privateFacts?.secretSkills)&&
   p.knownTruth&&typeof p.knownTruth==='object'&&
   ['resident','away','departed','deceased'].includes(p.state)&&
+  typeof p.arrivalKnown==='boolean'&&
   Number.isFinite(p.arrivalAt)&&p.arrivalAt>=0&&p.arrivalAt<=s.minutes&&
   Array.isArray(p.majorMemoryIds)&&p.majorMemoryIds.length<=50&&
   (['wayfinding','cultivation','healing','protection'] as PersonSkill[]).every(skill=>{
