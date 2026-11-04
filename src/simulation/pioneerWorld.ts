@@ -17,6 +17,8 @@ import {createPioneerCommons,schedulePioneerCommons,reservePioneerCommonsMateria
  type PioneerCommons} from './pioneerCommons.ts';
 import {availablePioneerFields,pioneerFieldRenewMultiplier,pioneerHarvestMultiplier,
  pioneerWoodWorkingMultiplier,validatePioneerFacilityConfiguration} from './pioneerFacilities.ts';
+import {advancePioneerCommerce,createPioneerCommerce,validPioneerCommerce,
+ type PioneerCommerce} from './pioneerCommerce.ts';
 import {createPioneerLivelihood,considerPioneerCraft,performPioneerCraftShift,
  pioneerFoodCapacity,pioneerCraftMultiplier,markPioneerFishing,validPioneerLivelihood,
  type PioneerLivelihood} from './pioneerLivelihood.ts';
@@ -39,7 +41,7 @@ const hash=(n:number)=>{
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
 export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land'|'fish'|'craft';
-export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard'|'fish-hut'|'granary';
+export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard'|'fish-hut'|'granary'|'tea-stop';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
  id:number;name:string;role:string;color:string;
@@ -75,7 +77,7 @@ export interface PioneerWorld{
  journal:PioneerJournal[];nextEventId:number;policy:PioneerPolicy;comfort:number;
  roads:PioneerRoad[];nextResidentId:number;nextSurveyAt:number;lastArrivalAt:number;
  commons:PioneerCommons;frontier:PioneerFrontier;livingFates:LivingFatesState;
- livelihood:PioneerLivelihood;
+ livelihood:PioneerLivelihood;commerce:PioneerCommerce;
  foodStats?:{day:number;collected:number;consumed:number;previousCollected:number;previousConsumed:number};
 }
 const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
@@ -147,7 +149,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
   roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0,commons:createPioneerCommons(),
   frontier:createPioneerFrontier(),livingFates:createLivingFates(seed,founders,8*60+20),
-   livelihood:createPioneerLivelihood(),
+   livelihood:createPioneerLivelihood(),commerce:createPioneerCommerce(),
   foodStats:{day:0,collected:0,consumed:0,previousCollected:0,previousConsumed:0}
  };
  log(s,'荒谷点火','梁伯、陆娘和阿禾在安全的林缘安下临时营火。眼前尚无永久屋舍。');
@@ -332,6 +334,7 @@ function step(s:PioneerWorld){
  // See servePioneerMeal below for the single inventory transaction.
  // Ration demand remains 1 food per resident per day.
  const hour=Math.floor(s.minutes%DAY_MINUTES/60);
+ advancePioneerCommerce(s);
  s.resources.water=round(Math.max(0,s.resources.water-s.founders.length/24));
  if(s.minutes%DAY_MINUTES===0&&(s.resources.food<1||s.resources.water<1))
   log(s,'储备告急','乡邻缺少粮水，暂缓非必要劳动，改去水源或有余量的林地采集。');
@@ -594,13 +597,15 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   if(!validateLivingFates(s))return null;
    s.livelihood??=createPioneerLivelihood();
    if(!validPioneerLivelihood(s))return null;
+   s.commerce??=createPioneerCommerce();
+   if(!validPioneerCommerce(s))return null;
   if(!Array.isArray(s.roads)||s.roads.length>20||
    !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||
    !Number.isFinite(s.nextSurveyAt)||!Number.isFinite(s.lastArrivalAt))return null;
   const ids=new Set<string>();
   const occupied=[...landscape(),campParcel(s)];
   for(const b of s.buildings){
-   if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
+   if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary','tea-stop'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
     (b.loftAddedAt!==undefined&&(b.kind!=='cottage'||!Number.isFinite(b.loftAddedAt)||
       b.loftAddedAt<b.completedAt||b.loftAddedAt>s.minutes||
       b.loftWoodSpent!==4||typeof b.loftCauseId!=='string'||
