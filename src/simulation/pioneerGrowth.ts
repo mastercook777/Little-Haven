@@ -61,7 +61,11 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   }
   return best;
  };
- const center=kind==='fish-hut'?{x:3.6,z:-2.1}:
+ const opened=s.frontier.clearings.find(c=>c.phase==='cleared'&&
+  distance(c,s.camp)>7.2);
+ const center=kind==='cottage'&&s.founders.length>=9&&opened?
+  {x:opened.x,z:opened.z}:
+  kind==='fish-hut'?{x:3.6,z:-2.1}:
   kind==='granary'?{x:s.camp.x+3.3,z:s.camp.z+1.6}:
   kind==='garden'?(s.policy==='food'?
   {x:s.camp.x-2.1,z:s.camp.z+5.0}:s.policy==='shelter'?
@@ -109,7 +113,11 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // parcel must maintain the same forest, spring and forage access when
  // added to the navigation obstacles, not just its own front-door path.
  const critical=s.sites.filter(site=>site.kind==='forest'||site.kind==='spring'||site.kind==='forage'||site.kind==='fish');
- for(const candidate of choices.slice(0,210)){
+ // Mature villages have exhausted their central lanes. Inspect safe
+ // cleared-ring candidates instead of rejecting growth after the first
+ // 210 high-scoring *central* parcels have no walkable access.
+ const candidates=kind==='cottage'&&s.founders.length>=9?420:210;
+ for(const candidate of choices.slice(0,candidates)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
   const blockers=[...taken,candidate.parcel];
