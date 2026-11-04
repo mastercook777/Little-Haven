@@ -519,7 +519,8 @@ export interface PioneerGraphics{
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
-   seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean};
+   seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
+   fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -559,6 +560,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  rain.frustumCulled=false;root.add(rain);
  let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
  const gardenCrops=new Map<string,THREE.Mesh[]>();
+ const fishProps=new Map<string,THREE.Mesh[]>(),grainProps=new Map<string,THREE.Mesh[]>();
  let latestWorld=world;
  let selected:PioneerSelection|null=null;
  const glow=new THREE.Mesh(new THREE.RingGeometry(.89,1.0,48),
@@ -596,12 +598,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const progress=s.intent?.workDone??0;
   const progressIndex=Math.floor(progress*2);
   const signature=s.buildings.map(b=>b.id+':'+((b.condition??100)<78?'w':'c')+
+    (b.kind==='wood-yard'?':'+s.livelihood.craft.phase:'')+
     (b.kind==='garden'?':'+(s.livingFates.seedTrials.filter(t=>t.gardenId===b.id).at(-1)?.phase??''):'' )).join(',')+
    '/'+(s.intent?.id??'')+'/'+phase+'/'+(s.intent?.parcel?.x??'')+'/'+
    (s.intent?.parcel?.z??'');
   let rebuilt=false;
   if(signature!==lastBuildSig||progressIndex!==lastProgressIndex){
-   rebuilt=true;gardenCrops.clear();
+   rebuilt=true;gardenCrops.clear();fishProps.clear();grainProps.clear();
    while(constructionLayer.children.length){
     const old=constructionLayer.children[0];constructionLayer.remove(old);
    }
@@ -609,7 +612,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     const trial=built.kind==='garden'?
      s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
     const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
-     trial?.phase);
+     trial?.phase,s.livelihood.craft.phase==='complete');
     if(built.kind==='garden'){
      const crops:THREE.Mesh[]=[];
      plot.traverse(child=>{
@@ -617,6 +620,15 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
      });
      crops.sort((a,b)=>Number(a.userData.cropIndex)-Number(b.userData.cropIndex));
      gardenCrops.set(built.id,crops);
+    }
+    if(built.kind==='fish-hut'||built.kind==='granary'){
+     const items:THREE.Mesh[]=[];
+     plot.traverse(child=>{
+      if(child instanceof THREE.Mesh&&child.name===(built.kind==='fish-hut'?
+       'visible-caught-fish':'stored-real-grain-jar'))items.push(child);
+     });
+     if(built.kind==='fish-hut')fishProps.set(built.id,items);
+     else grainProps.set(built.id,items);
     }
    }
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
@@ -656,6 +668,14 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
        i%2?'#75a46d':'#91af6b');
     }
    }
+  }
+  for(const [id,props] of fishProps){
+   const caught=s.sites.find(site=>site.id==='fish-'+id)?.totalGathered??0;
+   props.forEach((mesh,i)=>{mesh.visible=caught>=i+1;});
+  }
+  for(const props of grainProps.values()){
+   const stored=s.resources.food;
+   props.forEach((jar,i)=>{jar.visible=stored>=(i+1)*8;});
   }
   if(lastSeason!==season){
    lastSeason=season;river.setSeason(season);
@@ -707,16 +727,21 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    visual.mealBowl.visible=f.activity==='eat'||f.activity==='eat-home';
    const forester=f.activity==='collect-wood'||f.activity==='clear-land';
    visual.axe.visible=forester&&!(moving&&phaseHour>.78);
+   visual.rod.visible=f.activity==='fish'&&!moving;
    visual.cargo.visible=f.activity==='collect-wood'&&moving&&phaseHour>.78;
    visual.axe.rotation.z=forester&&!moving?
     .32*Math.sin(seconds*6+i):0;
-   if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build')&&!moving){
+   if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build'||f.activity==='craft')&&!moving){
     const effort=Math.sin(seconds*5+i)*.20;
     visual.arms[0].rotation.x=-.72+effort;visual.arms[1].rotation.x=-.72-effort;
    }else if(forester&&!moving){
     visual.arms[0].rotation.x=-1.03+.35*Math.sin(seconds*7+i);
     visual.arms[1].rotation.x=-.38;
     visual.head.rotation.x=.15;
+   }else if(f.activity==='fish'&&!moving){
+    visual.arms[0].rotation.x=-.83+.10*Math.sin(seconds*2.4+i);
+    visual.arms[1].rotation.x=-.61;
+    visual.rod.rotation.x=.12*Math.sin(seconds*2+i);
    }else if(f.activity==='cook'&&!moving){
     visual.arms[0].rotation.x=-1.0+.3*Math.sin(seconds*4+i);
     visual.arms[1].rotation.x=-.50+.25*Math.cos(seconds*4+i);
@@ -759,7 +784,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   gardenSprouts:[...gardenCrops.values()].reduce((n,crops)=>
    n+crops.filter(c=>c.visible).length,0),
   campWoodLogs:camp.woodLogs.filter(log=>log.visible).length,
-  focusedResident:glow.visible&&selected?.kind==='person'
+  focusedResident:glow.visible&&selected?.kind==='person',
+  fishCaughtProps:[...fishProps.values()].reduce((n,items)=>
+   n+items.filter(p=>p.visible).length,0),
+  grainJars:[...grainProps.values()].reduce((n,items)=>
+   n+items.filter(p=>p.visible).length,0),
+  sawbenches:constructionLayer.children.filter(g=>g.getObjectByName('actual-crafted-sawbench')).length,
+  fishingActors:latestWorld.founders.filter(f=>f.activity==='fish').length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
