@@ -58,9 +58,9 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  const offsetX=(hash(s.seed+salt*193)-.5)*.47;
  const offsetZ=(hash(s.seed+salt*509)-.5)*.47;
  const projectId='pioneer-'+kind+'-'+s.nextEventId;
- for(let i=-12;i<=12;i++)for(let j=-10;j<=10;j++){
+ for(let i=-17;i<=17;i++)for(let j=-14;j<=14;j++){
   const x=round(s.camp.x+i*.72+offsetX),z=round(s.camp.z+j*.72+offsetZ);
-  if(distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>10.3)continue;
+  if(distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>13.3)continue;
   for(const rotation of [0,Math.PI/2]){
    const road=nearestRoad(x,z);
    const parcel:VillageParcel={id:projectId,
@@ -82,7 +82,10 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  choices.sort((a,b)=>a.score-b.score||a.parcel.x-b.parcel.x||a.parcel.z-b.parcel.z);
  // Route is tested in the same transaction as the proposed building.
  // No successful path: the parcel is rejected; never emit an orphan cottage.
- for(const candidate of choices.slice(0,65)){
+ // After the core ring fills, look farther along already-walkable land.
+ // Rejecting only the first 65 scored plots trapped every 5-person village
+ // behind existing dirt paths despite safe distant parcels still existing.
+ for(const candidate of choices.slice(0,210)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
   return {parcel:candidate.parcel,path};
