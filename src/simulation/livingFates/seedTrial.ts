@@ -1,4 +1,5 @@
 import {DAY_MINUTES,nextSeasonBoundary} from '../calendar.ts';
+import {appendPioneerJournal} from '../pioneerChronicle.ts';
 import {pioneerEntrance} from '../pioneerPaths.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive} from '../pioneerFacilities.ts';
 import type {PioneerWorld,PioneerFounder,PioneerResourceSite} from '../pioneerWorld.ts';
@@ -25,10 +26,7 @@ const maxTrials=36;
 const safeToStart=(s:PioneerWorld)=>s.resources.food>=Math.max(6,s.founders.length*2.4);
 const safeToWork=(s:PioneerWorld)=>s.resources.food>=Math.max(2,s.founders.length*.75);
 const journal=(s:PioneerWorld,title:string,content:string,causeId:string)=>{
- if(s.journal.length>=160)s.journal.shift();
- const id=s.nextEventId++;
- s.journal.push({id,minute:s.minutes,title,text:content,causeId});
- return id;
+ return appendPioneerJournal(s,title,content,causeId);
 };
 export function farmPairKey(gardenId:string,a:number,b:number){
  return gardenId+':'+Math.min(a,b)+'-'+Math.max(a,b);
