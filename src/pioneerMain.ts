@@ -420,6 +420,8 @@ addEventListener('pagehide',persist);
 renderUI();
 const debugging={
  getState:()=>structuredClone(world),
+ getSpotlight:()=>getPioneerSpotlight(world),
+ getCameraTarget:()=>({x:orbit.target.x,z:orbit.target.z}),
  getSelection:()=>selection,
  projectBuilding:(id:string)=>{
   const b=world.buildings.find(item=>item.id===id);if(!b)return null;
