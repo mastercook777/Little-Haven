@@ -64,7 +64,7 @@ export interface PioneerBuilding{
  id:string;kind:PioneerBuildKind;parcel:VillageParcel;completedAt:number;
  causeId:string;occupants:number[];materialsSpent:{wood:number};workHours:number;
  condition?:number;lastRepairAt?:number;
-  loftAddedAt?:number;loftWoodSpent?:number;loftWorkHours?:number;
+  loftAddedAt?:number;loftWoodSpent?:number;loftWorkHours?:number;loftCauseId?:string;
  operating?:boolean;productionMode?:'harvest'|'seed'|'timber'|'repair';
 }
 export interface PioneerWorld{
@@ -603,10 +603,11 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
     (b.loftAddedAt!==undefined&&(b.kind!=='cottage'||!Number.isFinite(b.loftAddedAt)||
       b.loftAddedAt<b.completedAt||b.loftAddedAt>s.minutes||
-      b.loftWoodSpent!==4||typeof b.loftWorkHours!=='number'||
+      b.loftWoodSpent!==4||typeof b.loftCauseId!=='string'||
+      !b.loftCauseId.startsWith('pioneer-loft-')||typeof b.loftWorkHours!=='number'||
       !Number.isFinite(b.loftWorkHours)||b.loftWorkHours<8||
       b.loftWorkHours>8.001))||
-    (b.loftAddedAt===undefined&&(b.loftWoodSpent!==undefined||b.loftWorkHours!==undefined))||
+    (b.loftAddedAt===undefined&&(b.loftWoodSpent!==undefined||b.loftWorkHours!==undefined||b.loftCauseId!==undefined))||
     (b.kind==='cottage'&&b.occupants.length>(b.loftAddedAt!==undefined?3:2))||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
     !(b.materialsSpent.wood>=0)||b.materialsSpent.wood>20||
     !Number.isFinite(b.parcel.x)||!Number.isFinite(b.parcel.z)||
