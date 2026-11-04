@@ -30,7 +30,12 @@ test('v0.5.1: 5 years create real tea shed and bounded distinct visitors, not ph
   JSON.stringify({built:s.buildings.map(b=>b.kind),stage:s.commons.stage,
    people:s.founders.length,wood:s.resources.wood,roads:s.roads.length,
    intent:s.intent?.kind,journal:s.journal.slice(-4),
-   survey:surveyPioneerPlot(s,'tea-stop')?.parcel??null,
+   survey:(()=>{
+    const metrics={candidateParcels:0,legalGeometry:0,openedLand:0,routeReached:0,
+     resourceRoutesKept:0};
+    const parcel=surveyPioneerPlot(s,'tea-stop',metrics)?.parcel??null;
+    return {parcel,metrics,clearings:s.frontier.clearings};
+   })(),
    nextSurveyAt:s.nextSurveyAt,latestSurveys:s.journal.filter(e=>e.title==='勘地暂缓').slice(-4),
    elapsed:s.minutes,route:s.commerce.nextVisitorAt}));
  assert.ok(tea!.materialsSpent.wood>=9&&tea!.workHours>=12);
