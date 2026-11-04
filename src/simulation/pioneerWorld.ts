@@ -372,7 +372,16 @@ function step(s:PioneerWorld){
  }else if(building)work(s,he);
  else allocate(s,he,'shelter');
  const waterTarget=s.policy==='food'?8:s.policy==='shelter'?2.8:4.3;
- if(s.resources.water<waterTarget||!building&&s.resources.water<6){
+ const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
+  !crisis&&s.resources.food>=s.founders.length*.72&&
+  s.resources.water>=Math.max(waterTarget,s.founders.length*.55);
+ if(commonsShift){
+  // Reserve this actual hour BEFORE Lu would fetch resources or build a
+  // cottage. No person can receive two work credits in the same hour.
+  allocate(s,lu,'commons-build');
+  if(lu.activity==='commons-build')
+   performPioneerCommonsWork(s,weather==='rain'?.7:1);
+ }else if(s.resources.water<waterTarget||!building&&s.resources.water<6){
   if(!gather(s,lu,'spring',1.36,'fetch-water'))allocate(s,lu,'rest');
  }else if(crisis){
   if(!foodTask(lu,.72))allocate(s,lu,'rest');
@@ -388,19 +397,6 @@ function step(s:PioneerWorld){
    if(!gather(s,f,'forest',.85,'collect-wood'))
     allocate(s,f,'rest');
   }else allocate(s,f,'shelter');
- }
- // One available resident can spend a real work hour on the public
- // commons, without blocking urgent food, water or the current shelter.
- if(hour===15&&s.commons.project?.phase==='building'&&
-  s.resources.food>=s.founders.length*.72&&
-  s.resources.water>=s.founders.length*.55){
-  const worker=s.founders.find(f=>f.activity==='shelter'||f.activity==='tend-fire'||
-   f.activity==='rest')??s.founders[1];
-  if(worker){
-   allocate(s,worker,'commons-build');
-   if(worker.activity==='commons-build')
-    performPioneerCommonsWork(s,weather==='rain'?.7:1);
-  }
  }
  if(intent?.phase==='materials'){
   if(s.resources.wood>=intent.woodRequired&&s.resources.food>=Math.min(2,s.founders.length*.5)&&s.resources.water>=.5){
