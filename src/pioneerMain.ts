@@ -180,8 +180,11 @@ function renderUI(){
    '已实际消耗木料 '+amount(intent.woodCommitted)+' 份。':
   intent?.pauseReason??'营火旁尚无住屋，乡邻正筹划安全的避雨处。';
  $('pioneerReason').textContent=cause;
- $('founderTasks').innerHTML=world.founders.slice(0,6).map(f=>
+ const taskChoices=world.founders.slice(0,6).map(f=>
   '<button type="button" class="founder-task" data-pick-person="'+f.id+'"><b>'+safe(f.name)+'</b><span>'+safe(labels[f.activity])+'</span></button>').join('');
+ // Preserve the pointer target while the 340ms HUD refresh is running.
+ const taskList=$('founderTasks');
+ if(taskList.innerHTML!==taskChoices)taskList.innerHTML=taskChoices;
  for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]')))
   btn.classList.toggle('active',btn.dataset.policy===world.policy);
  $('pioneerJournal').innerHTML=world.journal.slice(-5).reverse().map(e=>
