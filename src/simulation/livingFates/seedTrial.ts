@@ -7,7 +7,7 @@ import type {PioneerWorld,PioneerFounder,PioneerResourceSite} from '../pioneerWo
  * Every hour here replaces another exclusive resident job. */
 export interface SeedTrial{
  id:string;gardenId:string;actorIds:[number,number];startedAt:number;
- resolveAt:number;workBy:[number,number];seedsSpent:number;
+ resolveAt:number;workBy:[number,number];lastWorkAt:[number,number];seedsSpent:number;
  phase:'working'|'resolved'|'abandoned';completedAt:number|null;
  outcomeEventId:number|null;effectId:string|null;
 }
@@ -96,7 +96,7 @@ export function considerSeedTrial(s:PioneerWorld){
   if(s.foodStats)s.foodStats.consumed=round(s.foodStats.consumed+SEEDS);
   const id='seed-trial-'+garden.id+'-'+(prior.length+1);
   const trial:SeedTrial={id,gardenId:garden.id,actorIds:pair,startedAt:s.minutes,
-   resolveAt:boundary,workBy:[0,0],seedsSpent:SEEDS,phase:'working',
+   resolveAt:boundary,workBy:[0,0],lastWorkAt:[0,0],seedsSpent:SEEDS,phase:'working',
    completedAt:null,outcomeEventId:null,effectId:null};
   s.livingFates.seedTrials.push(trial);
   const names=pair.map(id=>s.founders.find(f=>f.id===id)?.name??'乡邻');
@@ -112,13 +112,14 @@ export function considerSeedTrial(s:PioneerWorld){
 export function performSeedTrialShift(s:PioneerWorld,f:PioneerFounder,
  field:PioneerResourceSite){
  const trial=activeSeedTrial(s);
- if(!trial||field.id!=='field-'+trial.gardenId||
-  s.minutes>=trial.resolveAt||!safeFood(s))return false;
+ if(!trial||field.kind!=='field'||field.id!=='field-'+trial.gardenId||
+  s.minutes>=trial.resolveAt||!safeFood(s)||f.activity!=='seed-trial')return false;
  const index=trial.actorIds.indexOf(f.id);
- if(index<0)return false;
+ if(index<0||trial.lastWorkAt[index]===s.minutes)return false;
  const garden=s.buildings.find(b=>b.id===trial.gardenId);
  if(!garden||!isPioneerFacilityActive(garden))return false;
  trial.workBy[index]=Math.min(SHIFT_HOURS,trial.workBy[index]+1);
+ trial.lastWorkAt[index]=s.minutes;
  return true;
 }
 export function dueSeedTrial(s:PioneerWorld){
@@ -183,6 +184,8 @@ export function validateSeedFates(s:PioneerWorld){
    trial.actorIds[0]>=trial.actorIds[1]||
    !Array.isArray(trial.workBy)||trial.workBy.length!==2||
    !trial.workBy.every(n=>Number.isInteger(n)&&n>=0&&n<=SHIFT_HOURS)||
+   !Array.isArray(trial.lastWorkAt)||trial.lastWorkAt.length!==2||
+   !trial.lastWorkAt.every(n=>Number.isFinite(n)&&n>=0&&n<=s.minutes)||
    trial.seedsSpent!==SEEDS||!Number.isFinite(trial.startedAt)||
    trial.startedAt<0||trial.startedAt>s.minutes||
    !Number.isFinite(trial.resolveAt)||trial.resolveAt<=trial.startedAt||
@@ -191,9 +194,9 @@ export function validateSeedFates(s:PioneerWorld){
    (trial.phase==='working'&&(trial.completedAt!==null||
     trial.outcomeEventId!==null||trial.effectId!==null||trial.resolveAt<=s.minutes))||
    (trial.phase!=='working'&&(!Number.isFinite(trial.completedAt)||
-    trial.completedAt!<trial.resolveAt||trial.completedAt!>s.minutes||
-    !Number.isSafeInteger(trial.outcomeEventId)||trial.outcomeEventId!<1||
-    trial.outcomeEventId!>=s.nextEventId))||
+    trial.completedAt! < trial.resolveAt||trial.completedAt! > s.minutes||
+    !Number.isSafeInteger(trial.outcomeEventId)||trial.outcomeEventId! < 1||
+    trial.outcomeEventId! >= s.nextEventId))||
    (trial.phase==='resolved'&&(!trial.workBy.every(n=>n===SHIFT_HOURS)||
     trial.effectId!=='field-knowledge-'+trial.id))||
    (trial.phase==='abandoned'&&(trial.effectId!==null||
