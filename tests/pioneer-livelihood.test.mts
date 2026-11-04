@@ -85,6 +85,31 @@ test('v0.5: four years of actual autonomous resident work form a new livelihood,
   ...s.buildings.filter(b=>b.id!==hut.id).map(b=>b.parcel)];
  assert.ok(findPioneerWalk([s.camp.x,s.camp.z],pioneerEntrance(hut.parcel),blockers));
 });
+
+test('v0.5: same-seed river and field councils prioritize distinct paid physical facilities',()=>{
+ const base=createPioneerWorld(42,1000);
+ advancePioneerWorld(base,(9*DAY_MINUTES-base.minutes)/3);
+ assert.ok(base.buildings.some(b=>b.kind==='shelter'));
+ const river=structuredClone(base),fields=structuredClone(base);
+ assert.equal(setPioneerDirection(river,'river'),true);
+ assert.equal(setPioneerDirection(fields,'fields'),true);
+ const target=48*3*DAY_MINUTES;
+ advancePioneerWorld(river,(target-river.minutes)/3);
+ advancePioneerWorld(fields,(target-fields.minutes)/3);
+ const first=(s:typeof base)=>s.buildings
+  .filter(b=>b.kind==='fish-hut'||b.kind==='granary')
+  .sort((a,b)=>a.completedAt-b.completedAt)[0];
+ const r=first(river),f=first(fields);
+ assert.equal(r?.kind,'fish-hut','river vote must first fund a real fish hut');
+ assert.equal(f?.kind,'granary','fields vote must first fund actual grain storage');
+ assert.ok(r!.materialsSpent.wood>=7&&r!.workHours>=12);
+ assert.ok(f!.materialsSpent.wood>=8&&f!.workHours>=12);
+ assert.equal(river.livelihood.direction,'river');
+ assert.equal(fields.livelihood.direction,'fields');
+ assert.ok(importPioneerWorld(JSON.stringify(river)));
+ assert.ok(importPioneerWorld(JSON.stringify(fields)));
+});
+
 test('v0.5: suggestions persist with causal records, no instant production, bounded grain storage',()=>{
  const s=createPioneerWorld(42,1000);
  advancePioneerWorld(s,(9*DAY_MINUTES-s.minutes)/3);
