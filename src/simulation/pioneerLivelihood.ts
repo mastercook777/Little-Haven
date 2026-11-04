@@ -1,4 +1,5 @@
 import {DAY_MINUTES} from './calendar.ts';
+import {appendPioneerJournal} from './pioneerChronicle.ts';
 import type {PioneerWorld,PioneerFounder} from './pioneerWorld.ts';
 
 export type PioneerDirection='autonomous'|'river'|'fields'|'craft';
@@ -19,8 +20,7 @@ export const PIONEER_DIRECTIONS:{id:PioneerDirection;label:string;description:st
 export const PIONEER_CRAFT_WOOD=4,PIONEER_CRAFT_HOURS=6;
 const round=(n:number)=>Math.round(n*1000)/1000;
 const entry=(s:PioneerWorld,title:string,text:string,causeId:string|null)=>{
- if(s.journal.length>=160)s.journal.shift();
- s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId});
+ appendPioneerJournal(s,title,text,causeId);
 };
 export const createPioneerLivelihood=():PioneerLivelihood=>({
  direction:'autonomous',chosenAt:0,
