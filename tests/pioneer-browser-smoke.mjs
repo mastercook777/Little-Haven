@@ -72,6 +72,7 @@ try{
    JSON.stringify({earlyIntro,looked}));
  await screenshot(page,'01b-look-at-first-woodcutting');
  await page.locator('#inspectClose').click();
+ await page.locator('#pioneerCamera').click(); // Restore the baseline viewport.
  // v0.4.4: public person inspection must be accessible without leaks.
  await page.locator('#founderTasks button[data-pick-person="1"]').click();
  const personCard=await page.evaluate(()=>{
@@ -410,6 +411,7 @@ try{
  if(!mobileMoment.inspector||mobileMoment.selection?.kind!=='site')
   throw Error('Mobile chapter button does not inspect real forest: '+JSON.stringify(mobileMoment));
  await mpage.locator('#inspectClose').tap();
+ await mpage.locator('#pioneerCamera').tap();
  await mpage.evaluate(()=>window.__PIONEER_DEBUG__.advance(1200));
  await screenshot(mpage,'04-mobile-shelter');
  // A touch gesture must still allow inspection without mouse hover.
