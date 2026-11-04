@@ -9,7 +9,7 @@ import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type 
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
-import {pioneerParcelOpened} from './pioneerFrontier.ts';
+import {pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
 const hash=(n:number)=>{
@@ -51,7 +51,7 @@ export interface PioneerSurveyMetrics{
  routeReached:number;resourceRoutesKept:number;
 }
 export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>,
- metrics?:PioneerSurveyMetrics):
+ metrics?:PioneerSurveyMetrics,allowUnopened=false):
  {parcel:VillageParcel;path:WalkPoint[]}|null{
  if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
   routeReached:0,resourceRoutesKept:0});
@@ -105,8 +105,8 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
    if(metrics)metrics.candidateParcels++;
    if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
    if(metrics)metrics.legalGeometry++;
-   if(!pioneerParcelOpened(s,parcel))continue;
-   if(metrics)metrics.openedLand++;
+   if(!pioneerParcelOpened(s,parcel)&&!allowUnopened)continue;
+   if(metrics&&pioneerParcelOpened(s,parcel))metrics.openedLand++;
    const proximity=distance({x,z},center);
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
@@ -135,6 +135,9 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  for(const candidate of choices.slice(0,candidates)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
+  if(allowUnopened&&!pioneerParcelOpened(s,candidate.parcel)&&
+   !findPioneerWalk([s.camp.x,s.camp.z],
+    [candidate.parcel.x,candidate.parcel.z],taken))continue;
   if(metrics)metrics.routeReached++;
   const blockers=[...taken,candidate.parcel];
   if(!critical.every(site=>findPioneerWalk(
@@ -206,6 +209,16 @@ export function schedulePioneerProject(s:PioneerWorld){
   return true;
  }
  const proposal=surveyPioneerPlot(s,kind);
+ if(!proposal&&kind==='tea-stop'){
+  // This is a legal future build site, not free new land. First reserve a
+  // real clearing job for residents, whose eight hours must fully complete
+  // before any future construction or visitor can appear.
+  const future=surveyPioneerPlot(s,kind,undefined,true);
+  if(future&&requestPioneerExpansionClearing(s,future.parcel)){
+   s.nextSurveyAt=s.minutes+3*DAY_MINUTES;
+   return false;
+  }
+ }
  if(!proposal){
   // A full old village centre has no legal fourth-cottage plot. In this
   // case existing families can invest real lumber and labour in loft
