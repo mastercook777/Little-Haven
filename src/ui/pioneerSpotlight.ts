@@ -78,7 +78,7 @@ export function getPioneerSpotlight(s:PioneerWorld):PioneerSpotlight{
     '这处工地已投入 '+material(project.workDone)+' / '+
     material(project.workRequired)+' 小时；材料已从库存扣除。';
    return pick(current+' · 屋舍在长大',
-    project.kind==='repair'?'旧屋还要有人修':'乡邻正在建'+pioneerBuildingLabel(project.kind??'shelter'),
+    project.kind==='repair'?'旧屋还要有人修':project.kind==='loft'?'山居在添木阁':'乡邻正在建'+pioneerBuildingLabel(project.kind??'shelter'),
     detail,{kind:'intent',id:project.id},
     'project-'+project.id+'-'+project.phase,'看工地');
   }
