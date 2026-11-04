@@ -436,3 +436,16 @@ v0.4.2 已正式上线后，用户明确继续下一阶段。依据 `docs/V04X_P
 
 - [GitHub Actions #41775467122](https://github.com/mastercook777/Little-Haven/actions/runs/41775467122)：commit `dbf82cf`，89/89 模拟测试、TypeScript、Vite/Pages、Chromium 旧谷/新谷 desktop/mobile 完整成功；包含经过真实游戏 JSON 导入的试田跨季持久化与实际 3D 证据。
 - PR #16 squash merge 到 `main`，commit `29c4c43`；v0.4.4-alpha.1 build mark 和 package 版本对齐。仍缺医疗/护路/物流及真机低端 GPU 认证。
+
+
+---
+
+# v0.4.5 · 玩家可直接看见的生活变化（PR #17，待发布 QA）
+
+玩家反馈「目前我还没有体验到太多的变化」。复核旧版的几个体验误区：左上永远静止「三人一火」，28 株青苗无视田地库存，真实木料收支只在 HUD 裸数字。缺少引导定位建好的屋舍/刚来到的乡邻，令 v0.4.4 的因果链很难被体验到。
+
+**实现：** `pioneerSpotlight.ts` 从真实日志和当前工单挑选可检查事件，左上章节按档案动态变换，守谷人点击直接移动相机并检视同一实体；物理场景营火木堆数量直接读取 `resources.wood`，28 苗菜田读取相应 `field.stock/capacity` 和季节，选中村民有地面标记。无新增资源、非绘制时钟、存档 schema 或人口类型。
+
+**使用 Skill：** 实读了仓库 `threejs-game-director`、`threejs-gameplay-systems`、`threejs-game-ui-designer` 与 `references/ui-patterns.md`、`threejs-qa-release`。选用现有程序化模型，不调用外部模型、音乐或素材接口。
+
+**QA 门槛：** 新增纯模拟台账与旧档断言，真实 Chromium 桌面/390px 手机应验证首夜按钮、阶段更新、实际数量相等、相机定位和旧 v0.3 入口回归；每项须依据 PR 最新提交 CI，不以文档宣称通过。低端手机 GPU、精细角色动作、独立运货仍未做。
