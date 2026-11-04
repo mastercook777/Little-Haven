@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage.ts';
 import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
+import {getPioneerSpotlight,type PioneerSpotlight} from './ui/pioneerSpotlight.ts';
 import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
 import {pioneerCommonsNames} from './simulation/pioneerCommons.ts';
 import {setPioneerFacilityOperating,setPioneerFacilityPreference,
@@ -62,6 +63,8 @@ try{world=loadPioneerWorld(localStorage,Date.now(),slot);}catch{
 let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
 let selection:PioneerSelection|null=null;
+let spotlight:PioneerSpotlight=getPioneerSpotlight(world);
+let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number}|null=null;
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
 let clickStart:{x:number;y:number;at:number}|null=null,lastHover=0;
 const labels:Record<PioneerWork,string>={
@@ -139,6 +142,13 @@ function foodBalanceLabel(){
 }
 function renderUI(){
  const cal=getPioneerCalendar(world),weather=getPioneerWeather(world);
+ spotlight=getPioneerSpotlight(world);
+ $('pioneerIntroChapter').textContent=spotlight.chapter;
+ $('pioneerIntroTitle').textContent=spotlight.headline;
+ $('pioneerIntroDetail').textContent=spotlight.detail;
+ const focus=$<HTMLButtonElement>('pioneerSpotlightFocus');
+ focus.firstChild!.textContent=spotlight.action+' ';
+ focus.setAttribute('aria-label',spotlight.action+'：'+spotlight.headline);
  const w=world.resources;
  $('pioneerWeather').textContent=SEASON_NAMES[cal.season]+' · '+WEATHER_NAMES[weather];
  $('pioneerDay').textContent='第 '+cal.year+' 年 · '+SEASON_NAMES[cal.season]+' '+cal.dayOfSeason+' 日';
@@ -210,7 +220,7 @@ function replaceWorld(next:PioneerWorld){
   }
  });
  world=next;valley=buildPioneerVillage(scene,world);
- selection=null;canvas.style.cursor='grab';
+ selection=null;focusMotion=null;canvas.style.cursor='grab';
  lastLighting='';renderUI();
 }
 function persist(){try{savePioneerWorld(world,localStorage,Date.now(),slot);}catch{}}
@@ -227,6 +237,7 @@ function switchSlot(next:number){
 // Distinguish a click/tap from OrbitControls' rotation gesture. All
 // selected entities are looked up through live world-state IDs, never meshes.
 canvas.addEventListener('pointerdown',event=>{
+ focusMotion=null;
  clickStart={x:event.clientX,y:event.clientY,at:performance.now()};
 });
 canvas.addEventListener('pointerup',event=>{
@@ -259,6 +270,34 @@ $('pioneerBuildingChoices').addEventListener('click',event=>{
  const id=button?.dataset.pickBuilding;
  if(id&&world.buildings.some(b=>b.id===id))chooseInspection({kind:'building',id});
 });
+$('pioneerSpotlightFocus').addEventListener('click',()=>{
+ const now=getPioneerSpotlight(world);
+ if(!inspectPioneerSelection(world,now.selection))return;
+ const item=now.selection;
+ const building=item.kind==='building'?world.buildings.find(b=>b.id===item.id):undefined;
+ const parcel=building?.parcel??(item.kind==='intent'&&world.intent?.id===item.id?
+  world.intent.parcel:null);
+ const clearing=item.kind==='clearing'?world.frontier.clearings.find(c=>c.id===item.id):undefined;
+ const resource=item.kind==='site'?world.sites.find(site=>site.id===item.id):undefined;
+ const person=item.kind==='person'?world.founders.find(f=>String(f.id)===item.id):undefined;
+ const [x,z]=parcel?[parcel.x,parcel.z]:clearing?[clearing.x,clearing.z]:
+  resource?[resource.x,resource.z]:person?[person.target[0],person.target[1]]:
+  [world.camp.x,world.camp.z];
+ // Preserve the current orbit angle. Shift toward the actual object without
+ // creating another camera, resource or phantom piece of world history.
+ focusMotion={from:orbit.target.clone(),to:new THREE.Vector3(x,0,z),
+  started:performance.now()};
+ chooseInspection(item);
+});
+function animateFocus(now:number){
+ if(!focusMotion)return;
+ const t=Math.min(1,Math.max(0,(now-focusMotion.started)/510));
+ const eased=1-Math.pow(1-t,3);
+ const next=focusMotion.from.clone().lerp(focusMotion.to,eased);
+ const delta=next.sub(orbit.target);
+ orbit.target.add(delta);camera.position.add(delta);
+ if(t>=1)focusMotion=null;
+}
 $('inspectClose').addEventListener('click',()=>chooseInspection(null));
 $('inspectActions').addEventListener('click',event=>{
  const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button');
@@ -288,7 +327,7 @@ $('pioneerSeasonSkip').addEventListener('click',()=>{
 });
 $('pioneerPause').addEventListener('click',()=>{paused=!paused;renderUI();});
 $('pioneerCamera').addEventListener('click',()=>{
- camera.position.copy(defaultEye);orbit.target.set(-1.7,0,0);orbit.update();
+ focusMotion=null;camera.position.copy(defaultEye);orbit.target.set(-1.7,0,0);orbit.update();
 });
 $('pioneerZoomIn').addEventListener('click',()=>{camera.zoom=Math.min(2.3,camera.zoom*1.15);camera.updateProjectionMatrix();});
 $('pioneerZoomOut').addEventListener('click',()=>{camera.zoom=Math.max(.72,camera.zoom/1.15);camera.updateProjectionMatrix();});
@@ -346,6 +385,7 @@ function lighting(){
  $('pioneerApp').style.background='linear-gradient('+tint.getStyle()+',#f3e9d9)';
 }
 function tick(now:number){
+ animateFocus(now);
  const dt=Math.max(0,Math.min(.09,(now-last)/1000));last=now;
  if(!paused){
   const previous=world.buildings.length,previousPopulation=world.founders.length,
