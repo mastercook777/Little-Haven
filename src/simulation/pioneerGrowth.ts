@@ -153,7 +153,7 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
   return 'wood-yard';
  const cottages=s.buildings.filter(b=>b.kind==='cottage').length;
  const housing=pioneerHousingCapacity(s);
- if(cottages<5&&housing<=s.founders.length&&
+ if(cottages<5&&s.founders.length<12&&housing<=s.founders.length&&
   pioneerHasFacility(s,'garden')&&s.resources.food>=3)return 'cottage';
  // Real professions, not more identical cottages, keep a mature hamlet
  // changing. Suggested direction changes priority, never permanently locks.
