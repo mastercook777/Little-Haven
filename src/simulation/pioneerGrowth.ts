@@ -176,7 +176,13 @@ export function schedulePioneerProject(s:PioneerWorld){
  const proposal=surveyPioneerPlot(s,kind);
  if(!proposal){
   s.nextSurveyAt=s.minutes+3*DAY_MINUTES;
-  record(s,'勘地暂缓','屋檐、溪岸、树木与已走出的路径都要留净空，暂时没有安全可达的'+pioneerBuildingLabel(kind)+'用地。');
+  // An unavailable riverside parcel remains actionable, but repeated
+  // three-day survey failures must not erase decades of village memories.
+  const message='屋檐、溪岸、树木与已走出的路径都要留净空，暂时没有安全可达的'+
+   pioneerBuildingLabel(kind)+'用地。';
+  const recently=s.journal.some(e=>e.title==='勘地暂缓'&&e.text===message&&
+   s.minutes-e.minute<24*DAY_MINUTES);
+  if(!recently)record(s,'勘地暂缓',message);
   return false;
  }
  const id='pioneer-need-'+s.nextEventId;
