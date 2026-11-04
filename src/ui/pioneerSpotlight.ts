@@ -21,8 +21,11 @@ function fromEvent(s:PioneerWorld,e:PioneerJournal):PioneerSpotlight|null{
  const when='乡邻见闻 · '+label+'时';
  const b=s.buildings.find(x=>x.causeId===e.causeId||x.id===e.causeId);
  if((e.title==='避雨棚落成'||e.title==='菜圃落成'||
-  e.title==='山居落成'||e.title==='木作棚落成')&&b)
+  e.title==='山居落成'||e.title==='木作棚落成'||
+  e.title==='河岸渔棚落成'||e.title==='架高粮仓落成')&&b)
   return pick(when,e.title,e.text,built(b.id),'event-'+e.id,'看新建的'+pioneerBuildingLabel(b.kind));
+ if(['第一篓渔获','锯木台终于装好','木作棚试制锯台'].includes(e.title)&&b)
+  return pick(when,e.title,e.text,built(b.id),'event-'+e.id,'看新的生计');
  if(e.title==='又添一位乡邻'){
   const newcomer=s.founders.find(f=>f.id>3&&e.text.includes(f.name));
   if(newcomer)return pick(when,newcomer.name+'在谷中安下家',
@@ -89,6 +92,20 @@ export function getPioneerSpotlight(s:PioneerWorld):PioneerSpotlight{
    '梁伯、陆娘和阿禾只有营火与少量口粮。待有人真正采木、选址，才能看见第一间屋的地基。',
    forest?site(forest.id):camp,'first-night','看林地');
  }
+ const fishing=s.buildings.find(b=>b.kind==='fish-hut');
+ if(fishing){
+  const site=s.sites.find(site=>site.id==='fish-'+fishing.id);
+  return pick(current+' · 靠河吃饭',
+   s.livelihood.firstFishAt===null?'一处渔棚已经搭好':'村里多了捕鱼的人',
+   s.livelihood.firstFishAt===null?'渔棚已投入木材和工时，村民要在安全岸边实地捕到鱼才有口粮。':
+    '真实渔获累计 '+material(site?.totalGathered??0)+
+    ' 份。天气与季节决定鱼群恢复，渔夫还要占用自己的劳动时间。',
+   built(fishing.id),'fish-'+fishing.id,'看河岸渔棚');
+ }
+ const granary=s.buildings.find(b=>b.kind==='granary');
+ if(granary)return pick(current+' · 有粮好过冬','乡邻把粮存到了架高仓里',
+  '投木和施工后，全谷的粮食储备容量变大，但每一份粮仍要亲手收获。',
+  built(granary.id),'granary-'+granary.id,'看粮仓');
  const completed=s.livingFates.seedTrials.find(t=>t.phase==='resolved'&&
   s.livingFates.fieldLegacies.some(l=>l.sourceTrialId===t.id));
  if(completed&&s.buildings.some(b=>b.id===completed.gardenId)){
