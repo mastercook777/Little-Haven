@@ -108,7 +108,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // validates the site's camp->source route once. Now every proposed
  // parcel must maintain the same forest, spring and forage access when
  // added to the navigation obstacles, not just its own front-door path.
- const critical=s.sites.filter(site=>site.kind==='forest'||site.kind==='spring'||site.kind==='forage');
+ const critical=s.sites.filter(site=>site.kind==='forest'||site.kind==='spring'||site.kind==='forage'||site.kind==='fish');
  for(const candidate of choices.slice(0,210)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
