@@ -4,6 +4,7 @@ import {DAY_MINUTES,nextSeasonBoundary} from '../src/simulation/calendar.ts';
 import {createWorld} from '../src/simulation/world.ts';
 import {parcelOverlaps,reservedParcels,validateVillageParcel} from '../src/simulation/villagePlanning.ts';
 import {pioneerWalkable,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
+import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {pioneerHousingCapacity} from '../src/simulation/pioneerGrowth.ts';
 import {isPioneerFacilityActive,getPioneerFacilityPreference,setPioneerFacilityOperating,
  setPioneerFacilityPreference} from '../src/simulation/pioneerFacilities.ts';
@@ -182,7 +183,7 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
   accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
  occupied.push(camp);
  for(const b of s.buildings){
-  assert.ok(validateVillageParcel(b.parcel,occupied,4.25).ok,'unsafe '+b.id);
+  assert.ok(validatePioneerParcel(b.parcel,occupied,s.roads.filter(r=>r.buildingId!==b.id)).ok,'unsafe '+b.id);
   occupied.push(b.parcel);
  }
  for(const road of s.roads){
