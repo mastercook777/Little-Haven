@@ -55,7 +55,12 @@ test('v0.5: four years of actual autonomous resident work form a new livelihood,
  assert.ok(s.livelihood.firstFishAt!==null,'first successful catch must leave a real record');
  assert.ok(kinds.includes('granary'),'a settled population needs food storage past year two');
  assert.equal(pioneerFoodCapacity(s),54);
- assert.ok(s.founders.length>9,'population must be able to exceed original nine-person cap');
+ assert.ok(s.founders.length>9,'population must be able to exceed original nine-person cap: '+
+  JSON.stringify({people:s.founders.length,kinds,food:s.resources.food,wood:s.resources.wood,
+   fields:s.sites.filter(x=>x.kind==='field').map(x=>x.stock),
+   intent:s.intent?.kind,reason:s.intent?.pauseReason,
+   clearing:s.frontier.clearings.map(c=>({id:c.id,phase:c.phase,x:c.x,z:c.z})),
+   surveyAt:s.nextSurveyAt,minutes:s.minutes,history:s.journal.slice(-6).map(x=>x.title)}));
  assert.ok(s.founders.every(f=>f.homeBuildingId&&s.buildings.some(b=>b.id===f.homeBuildingId)));
  assert.ok(s.buildings.length<=20&&s.sites.length<=20&&s.roads.length<=20);
  const expected=s.journal.filter(x=>x.title==='河岸渔棚落成');
