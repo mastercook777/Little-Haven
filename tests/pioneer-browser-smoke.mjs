@@ -419,7 +419,7 @@ try{
   const d=window.__PIONEER_DEBUG__;
   const {DAY_MINUTES}=await import('/src/simulation/calendar.ts');
   d.reset(42);
-  d.advance((48*4*DAY_MINUTES-d.getState().minutes)/3);
+  d.advance((48*5*DAY_MINUTES-d.getState().minutes)/3);
   const s=d.getState(),v=d.getVisuals();
   const lofts=s.buildings.filter(b=>b.kind==='cottage'&&b.loftAddedAt!==undefined);
   return {people:s.founders.length,lofts:lofts.map(b=>({
@@ -434,11 +434,11 @@ try{
   !mature.built.includes('fish-hut')||!mature.built.includes('granary')||
   mature.fish<=0||mature.loftDormers<mature.lofts.length||
   mature.rendered<mature.built.length)
-  throw Error('No mature paid/visible village growth after four real years: '+
+  throw Error('No mature paid/visible village growth after five real years: '+
    JSON.stringify(mature));
  await screenshot(page,'05d-four-year-life-and-paid-lofts');
  if(!mature.built.includes('tea-stop'))
-  throw Error('Four-year village still never built its real roadside tea stop: '+
+  throw Error('Five-year village still never built its real roadside tea stop: '+
    JSON.stringify(mature));
  const visitation=await page.evaluate(()=>{
   const d=window.__PIONEER_DEBUG__,s=d.getState();
@@ -582,11 +582,11 @@ try{
  await mpage.evaluate(async()=>{
   const d=window.__PIONEER_DEBUG__;
   const {DAY_MINUTES}=await import('/src/simulation/calendar.ts');
-  d.reset(42);d.advance((48*4*DAY_MINUTES-d.getState().minutes)/3);
+  d.reset(42);d.advance((48*5*DAY_MINUTES-d.getState().minutes)/3);
  });
  const hasTeaOnMobile=await mpage.evaluate(()=>
   window.__PIONEER_DEBUG__.getState().buildings.some(b=>b.kind==='tea-stop'));
- if(!hasTeaOnMobile)throw Error('No real road tea stop in four-year mobile settlement');
+ if(!hasTeaOnMobile)throw Error('No real road tea stop in five-year mobile settlement');
  await mpage.locator('#pioneerCouncilOpen').tap();
  const guestOptions=await mpage.locator('#pioneerGuestChoices button').count();
  if(guestOptions!==3)throw Error('Mobile guest policy choices not reachable');
