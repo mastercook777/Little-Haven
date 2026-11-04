@@ -219,3 +219,24 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
  .livelihood-directions button b{font-size:10px}
  .livelihood-directions button small{font-size:8px}
 }
+
+
+/* v0.5: surface actual longer-term council near village population, while the
+   longer milestone ledger remains an opt-in details view below daily tasks. */
+.pioneer-council-open{width:100%;min-height:44px;display:flex;align-items:center;
+ justify-content:space-between;text-align:left;gap:6px;padding:8px 10px;
+ border:1px solid #c3cfb3;border-radius:10px;
+ background:linear-gradient(100deg,#eaf0df,#f1f1df);color:#55715c;
+ cursor:pointer;margin:7px 0 9px;box-shadow:0 2px 7px #50674e10}
+.pioneer-council-open span{display:flex;flex-direction:column;gap:2px;
+ font-size:11px;font-weight:800}
+.pioneer-council-open small{font-size:9px;font-weight:500;color:#7f927e}
+.pioneer-council-open strong{font-size:10px;white-space:nowrap;color:#4e7461}
+.pioneer-council-open:hover,.pioneer-council-open:focus-visible{border-color:#7d9e79;
+ background:#e1edd9;outline-offset:2px}
+@media(max-width:760px){
+ .pioneer-council-open{min-height:44px;padding:7px 6px;gap:3px;margin:5px 0 7px}
+ .pioneer-council-open span{font-size:10px}
+ .pioneer-council-open small{font-size:8px}
+ .pioneer-council-open strong{font-size:9px}
+}
