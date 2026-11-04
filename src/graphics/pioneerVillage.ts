@@ -3,6 +3,7 @@ import {buildCarvedTerrain} from './carvedTerrain.ts';
 import {buildRiverArt} from './riverArt.ts';
 import {fallingRainY,rainSegmentY} from './weatherMotion.ts';
 import {VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
+import {PIONEER_VALLEY} from '../simulation/pioneerGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
 import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
@@ -420,7 +421,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const edge:[number,number][]=[];
  for(let i=0;i<48;i++){
   const a=i/48*Math.PI*2,r=1+.032*Math.sin(i*2.9)+.020*Math.cos(i*5.8);
-  edge.push([Math.cos(a)*16.8*r,Math.sin(a)*12.2*r]);
+  edge.push([PIONEER_VALLEY.centerX+Math.cos(a)*PIONEER_VALLEY.radiusX*r,
+   Math.sin(a)*PIONEER_VALLEY.radiusZ*r]);
  }
  const shape=new THREE.Shape();shape.moveTo(...edge[0]);
  for(let i=1;i<edge.length;i++)shape.lineTo(...edge[i]);shape.closePath();
