@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage.ts';
 import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
+import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
 import {setPioneerFacilityOperating,setPioneerFacilityPreference,
  type PioneerFacilityPreference} from './simulation/pioneerFacilities.ts';
 import {SEASON_NAMES} from './simulation/calendar.ts';
@@ -138,6 +139,10 @@ function renderUI(){
  $('pioneerStatus').textContent=pioneerSummary(world);
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
+ $('pioneerBuildingChoices').innerHTML=world.buildings.length?
+  world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
+   safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
+  '<span>从荒地开始，第一间屋尚未落成。</span>';
  const intent=world.intent;
  const cause=world.buildings.length&&!intent?
   '有 '+world.buildings.filter(b=>b.kind==='cottage').length+
@@ -205,6 +210,11 @@ canvas.addEventListener('pointermove',event=>{
  if(event.pointerType!=='mouse'||clickStart||performance.now()-lastHover<110)return;
  lastHover=performance.now();
  canvas.style.cursor=hitAt(event.clientX,event.clientY)?'pointer':'grab';
+});
+$('pioneerBuildingChoices').addEventListener('click',event=>{
+ const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-pick-building]');
+ const id=button?.dataset.pickBuilding;
+ if(id&&world.buildings.some(b=>b.id===id))chooseInspection({kind:'building',id});
 });
 $('inspectClose').addEventListener('click',()=>chooseInspection(null));
 $('inspectActions').addEventListener('click',event=>{
