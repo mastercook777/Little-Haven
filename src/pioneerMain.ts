@@ -92,7 +92,7 @@ function inspectRender(){
   '<div class="inspect-fact"><span>'+safe(x.label)+'</span><b>'+
   safe(x.value)+'</b></div>').join('');
  $('inspectHistory').innerHTML=info.history.length?
-  '<div class="inspect-history-title">这处地方的经历</div>'+
+  '<div class="inspect-history-title">'+(selection?.kind==='person'?'已留下的生活记忆':'这处地方的经历')+'</div>'+ 
   info.history.map(x=>'<div class="inspect-history-line">'+safe(x)+'</div>').join(''):'';
  const controls=info.operation?
   '<button type="button" data-inspect-toggle="'+safe(info.operation.id)+
@@ -181,7 +181,7 @@ function renderUI(){
   intent?.pauseReason??'营火旁尚无住屋，乡邻正筹划安全的避雨处。';
  $('pioneerReason').textContent=cause;
  $('founderTasks').innerHTML=world.founders.slice(0,6).map(f=>
-  '<div class="founder-task"><b>'+safe(f.name)+'</b><span>'+safe(labels[f.activity])+'</span></div>').join('');
+  '<button type="button" class="founder-task" data-pick-person="'+f.id+'"><b>'+safe(f.name)+'</b><span>'+safe(labels[f.activity])+'</span></button>').join('');
  for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]')))
   btn.classList.toggle('active',btn.dataset.policy===world.policy);
  $('pioneerJournal').innerHTML=world.journal.slice(-5).reverse().map(e=>
@@ -237,6 +237,11 @@ canvas.addEventListener('pointermove',event=>{
  if(event.pointerType!=='mouse'||clickStart||performance.now()-lastHover<110)return;
  lastHover=performance.now();
  canvas.style.cursor=hitAt(event.clientX,event.clientY)?'pointer':'grab';
+});
+$('founderTasks').addEventListener('click',event=>{
+ const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-pick-person]');
+ if(button?.dataset.pickPerson&&world.founders.some(f=>String(f.id)===button.dataset.pickPerson))
+  chooseInspection({kind:'person',id:button.dataset.pickPerson});
 });
 $('pioneerBuildingChoices').addEventListener('click',event=>{
  const target=event.target as HTMLElement;
