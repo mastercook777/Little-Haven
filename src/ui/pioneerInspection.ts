@@ -101,6 +101,11 @@ export function inspectPioneerSelection(s:PioneerWorld,
    facts.push({label:'渔业始于',value:s.livelihood.firstFishAt===null?'尚未有第一篓':
     date(s.livelihood.firstFishAt)});
   }
+  if(b.kind==='cottage'){
+   facts.push({label:'现有安居容量',value:(b.loftAddedAt!==undefined?'3':'2')+' 人'});
+   if(b.loftAddedAt!==undefined)facts.push({label:'木阁改造',value:
+    date(b.loftAddedAt)+' · 4 份木料 / 8 工时 · 屋界未扩张'});
+  }
   if(b.kind==='granary'){
    facts.push({label:'全村储粮容量',value:fixed(pioneerFoodCapacity(s))+' 份'});
    facts.push({label:'眼下实有粮食',value:fixed(s.resources.food)+' 份 · 非免费填仓'});
@@ -129,7 +134,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
  }
  if(selection.kind==='intent'){
   const intent=s.intent;if(!intent||intent.id!==selection.id)return null;
-  const title=intent.kind==='repair'?'修缮中的旧屋':pioneerBuildingLabel(intent.kind??'shelter')+'工地';
+  const title=intent.kind==='repair'?'修缮中的旧屋':intent.kind==='loft'?'山居木阁改造':pioneerBuildingLabel(intent.kind??'shelter')+'工地';
   return {title,kicker:'真实施工 · '+intent.phase,description:intent.reason,
    facts:[
     {label:'申请时间',value:date(intent.createdAt)},
