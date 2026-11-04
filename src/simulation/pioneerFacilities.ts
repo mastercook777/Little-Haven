@@ -7,7 +7,7 @@ const options:Record<PioneerOperationalKind,readonly PioneerFacilityPreference[]
  garden:['harvest','seed'],'wood-yard':['timber','repair']
 };
 function entry(s:PioneerWorld,title:string,text:string,id:string){
- appendPioneerJournal(s,title,text,causeId);
+ appendPioneerJournal(s,title,text,id);
 }
 export const pioneerFacilityLabel=(kind:PioneerOperationalKind)=>
  kind==='garden'?'菜圃':'木作棚';
