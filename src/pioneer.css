@@ -240,3 +240,23 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
  .pioneer-council-open small{font-size:8px}
  .pioneer-council-open strong{font-size:9px}
 }
+
+
+/* v0.5.1: compact, touchable guest decisions. No permanent extra HUD overlay. */
+.livelihood-guest-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.livelihood-guest-choices button{min-height:44px;display:flex;flex-direction:column;
+ text-align:left;justify-content:center;padding:7px 5px;gap:3px;line-height:1.35}
+.livelihood-guest-choices button b{font-size:10px}
+.livelihood-guest-choices button small{font-size:9px;color:#768976}
+.livelihood-guest-choices button.active{background:#647f6a;border-color:#647f6a;color:#fff}
+.livelihood-guest-choices button.active small{color:#edf1dc}
+.livelihood-guest-choices button:disabled{opacity:.48}
+.livelihood-guest-ledger{margin:9px 0 4px;font-size:10px;line-height:1.6;color:#667b67;
+ background:#f2f2e6;padding:9px;border-radius:7px}
+.livelihood-guest-ledger b{color:#526b55}
+@media(max-width:760px){
+ .livelihood-guest-choices button{min-height:44px}
+ .livelihood-guest-choices button b{font-size:9px}
+ .livelihood-guest-choices button small{font-size:8px}
+ .livelihood-guest-ledger{font-size:9px}
+}
