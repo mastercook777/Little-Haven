@@ -8,31 +8,51 @@ import {activeSeedTrial,considerSeedTrial,dueSeedTrial,farmPairKey,
  validateSeedFates} from '../src/simulation/livingFates/seedTrial.ts';
 import {inspectPioneerSelection} from '../src/ui/pioneerInspection.ts';
 
+let cachedFarmFixture:{s:ReturnType<typeof createPioneerWorld>;gardenId:string;a:number;b:number}|null=null;
 function realCoFarmFixture(){
- const s=createPioneerWorld(42,1000);
- advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
- const keys=Object.entries(s.livingFates.farmCoWorkHours)
-  .filter(([key,h])=>{
-   const gardenId=key.slice(0,key.lastIndexOf(':'));
-   return h>=8&&s.buildings.some(b=>b.kind==='garden'&&b.id===gardenId);
-  }).sort((a,b)=>b[1]-a[1]);
- assert.ok(keys.length,'three years of actual field work should create at least one farm partner pair');
- const [key]=keys[0];
- const gardenId=key.slice(0,key.lastIndexOf(':'));
- const [a,b]=key.slice(key.lastIndexOf(':')+1).split('-').map(Number);
+ if(!cachedFarmFixture){
+  const s=createPioneerWorld(42,1000);
+  let found:{gardenId:string;a:number;b:number}|null=null;
+  // Advance the ACTUAL untouched simulation until two residents have
+  // shared meaningful labor at the same farm. Pick the next early-season
+  // morning before an optional autonomous trial already changes the field.
+  for(let day=0;day<48*4&&!found;day++){
+   advancePioneerWorld(s,DAY_MINUTES/3);
+   const remaining=nextSeasonBoundary(s.minutes)-s.minutes;
+   if(remaining<10*DAY_MINUTES||s.livingFates.seedTrials.some(t=>t.phase==='working'))continue;
+   for(const [key,hours] of Object.entries(s.livingFates.farmCoWorkHours)
+    .sort((a,b)=>b[1]-a[1])){
+    if(hours<8)continue;
+    const gardenId=key.slice(0,key.lastIndexOf(':'));
+    const garden=s.buildings.find(x=>x.kind==='garden'&&x.id===gardenId);
+    const field=s.sites.find(site=>site.id==='field-'+gardenId&&site.stock>=.4);
+    const [a,b]=key.slice(key.lastIndexOf(':')+1).split('-').map(Number);
+    if(!garden||!field||garden.operating===false||
+     s.livingFates.fieldLegacies.some(x=>x.gardenId===gardenId)||
+     s.livingFates.seedTrials.some(x=>x.gardenId===gardenId)||
+     (s.livingFates.people[a]?.skills.cultivation.xp??0)<12||
+     (s.livingFates.people[b]?.skills.cultivation.xp??0)<6)continue;
+    found={gardenId,a,b};break;
+   }
+  }
+  assert.ok(found,'real coordinated field shifts must generate an eligible garden pair before four years');
+  cachedFarmFixture={s,gardenId:found.gardenId,a:found.a,b:found.b};
+ }
+ const {gardenId,a,b}=cachedFarmFixture;
+ const s=structuredClone(cachedFarmFixture.s);
+ assert.equal(s.livingFates.seedTrials.length,0,'fixture predates a previous field fate');
+ assert.ok(s.livingFates.farmCoWorkHours[farmPairKey(gardenId,a,b)]>=8);
  assert.ok(s.livingFates.people[a].skills.cultivation.xp>=12);
  assert.ok(s.livingFates.people[b].skills.cultivation.xp>=6);
- assert.ok(s.livingFates.farmCoWorkHours[farmPairKey(gardenId,a,b)]>=8);
- // Controlled fixture replenishes pantry BEFORE initiating a seeded experiment:
- // the runtime must still deduct the full cost and work separate real shifts.
+ // A controlled prosperous harvest fixture must STILL be charged for seeds
+ // and labor by the production code. Do not grant a result through the test.
  s.resources.food=36;
  s.resources.water=Math.max(s.resources.water,s.founders.length*3);
- const garden=s.buildings.find(x=>x.id===gardenId)!;
  assert.equal(setPioneerFacilityPreference(s,gardenId,'seed'),true);
  return {s,gardenId,a,b};
 }
 
-test('C: actual three-year same-field work produces a candidate, not free fate',()=>{
+test('C: recorded same-field work produces a candidate, not free fate',()=>{
  const {s,gardenId,a,b}=realCoFarmFixture();
  assert.equal(activeSeedTrial(s),null);
  const food=s.resources.food;
