@@ -54,7 +54,7 @@ export interface PioneerJournal{
 }
 export interface PioneerIntent{
  id:string;reason:string;createdAt:number;requestedBy:number[];
- kind?:PioneerBuildKind|'repair';targetBuildingId?:string;path?:WalkPoint[];
+ kind?:PioneerBuildKind|'repair'|'loft';targetBuildingId?:string;path?:WalkPoint[];
  parcel:VillageParcel|null;phase:'survey'|'materials'|'foundation'|'frame';
  woodRequired:number;woodCommitted:number;workDone:number;workRequired:number;
  pauseReason:string|null;
@@ -63,6 +63,7 @@ export interface PioneerBuilding{
  id:string;kind:PioneerBuildKind;parcel:VillageParcel;completedAt:number;
  causeId:string;occupants:number[];materialsSpent:{wood:number};workHours:number;
  condition?:number;lastRepairAt?:number;
+  loftAddedAt?:number;loftWoodSpent?:number;loftWorkHours?:number;
  operating?:boolean;productionMode?:'harvest'|'seed'|'timber'|'repair';
 }
 export interface PioneerWorld{
@@ -599,18 +600,27 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   const ids=new Set<string>();
   const occupied=[...landscape(),campParcel(s)];
   for(const b of s.buildings){
-   if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
+   if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
+    (b.loftAddedAt!==undefined&&(b.kind!=='cottage'||!Number.isFinite(b.loftAddedAt)||
+      b.loftAddedAt<b.completedAt||b.loftAddedAt>s.minutes||
+      b.loftWoodSpent!==4||!Number.isFinite(b.loftWorkHours)||b.loftWorkHours<8||
+      b.loftWorkHours>8.001))||
+    (b.loftAddedAt===undefined&&(b.loftWoodSpent!==undefined||b.loftWorkHours!==undefined))||
+    (b.kind==='cottage'&&b.occupants.length>(b.loftAddedAt!==undefined?3:2))||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
     !(b.materialsSpent.wood>=0)||b.materialsSpent.wood>20||
     !Number.isFinite(b.parcel.x)||!Number.isFinite(b.parcel.z)||
     !validatePioneerParcel(b.parcel,occupied,s.roads.filter(road=>road.buildingId!==b.id)).ok)return null;
    ids.add(b.id);occupied.push(b.parcel);
   }
   if(s.intent){
+   if(s.intent.kind==='loft'&&!s.buildings.some(b=>b.kind==='cottage'&&
+     b.id===s.intent?.targetBuildingId&&b.loftAddedAt===undefined&&
+     b.parcel.id===s.intent?.parcel?.id))return null;
    if(!['survey','materials','foundation','frame'].includes(s.intent.phase)||
     !Number.isFinite(s.intent.woodCommitted)||!Number.isFinite(s.intent.workDone)||
     s.intent.woodCommitted<0||s.intent.woodCommitted>20||
     s.intent.workDone<0||s.intent.workDone>30)return null;
-   if(s.intent.parcel&&s.intent.kind!=='repair'&&
+   if(s.intent.parcel&&s.intent.kind!=='repair'&&s.intent.kind!=='loft'&&
     !validatePioneerParcel(s.intent.parcel,occupied,s.roads).ok)return null;
   }
   return s;
