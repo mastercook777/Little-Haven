@@ -32,7 +32,7 @@ const defaultEye=new THREE.Vector3(27.3,30,39);
 camera.position.copy(defaultEye);camera.lookAt(-1.7,0,0);
 const orbit=new OrbitControls(camera,canvas);
 orbit.target.set(-1.7,0,0);orbit.enablePan=true;orbit.enableDamping=true;
- orbit.minTargetRadius=0;orbit.maxTargetRadius=12;orbit.cursor.set(-1.7,0,0);
+ orbit.minTargetRadius=0;orbit.maxTargetRadius=19;orbit.cursor.set(-1.7,0,0);
 orbit.dampingFactor=.065;orbit.minPolarAngle=.43;orbit.maxPolarAngle=1.26;
 orbit.minZoom=.72;orbit.maxZoom=2.3;orbit.rotateSpeed=.64;
 orbit.mouseButtons.LEFT=THREE.MOUSE.ROTATE;
