@@ -300,7 +300,8 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
 /** The facility models share eave limits with the space planner while
  * changing the actual silhouette, not merely swapping a material. */
 function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind,
- phase:'foundation'|'frame'|'complete',progress:number,condition=100){
+ phase:'foundation'|'frame'|'complete',progress:number,condition=100,
+ seedMark?:'working'|'resolved'|'abandoned'){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
@@ -319,6 +320,22 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
    }
   }
   if(phase==='complete'){
+   if(seedMark){
+    // The seed bed and its hand-written plot marker exist only with
+    // an actual persisted trial; neither is a free-standing ghost building.
+    const label=group(g,.86,.10,.81);
+    label.name='persisted-seed-trial-'+seedMark;
+    pole(label,0,.37,0,.035,.64,lightWood);
+    const ink=seedMark==='resolved'?material('#66865a'):
+     seedMark==='working'?material('#c8b078'):material('#a08a74');
+    box(label,0,.68,0,.43,.24,.055,ink);
+    box(label,0,.66,.036,.24,.045,.018,thatchBright);
+    if(seedMark!=='abandoned')for(let i=0;i<3;i++){
+     const v=orb(g,-.84+i*.22,.39,.93,.075,
+      seedMark==='resolved'?grass:material('#afbd77'),.65,1.45,.62);
+     v.name='actual-seed-trial-bed';
+    }
+   }
    for(const x of [-1.14,1.14])for(const z of [-1.11,1.11])
     pole(g,x,.36,z,.045,.50,wood);
    for(const z of [-1.11,1.11])box(g,0,.52,z,2.40,.07,.08,lightWood);
@@ -494,15 +511,20 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const phase=s.intent?.phase??'none';
   const progress=s.intent?.workDone??0;
   const progressIndex=Math.floor(progress*2);
-  const signature=s.buildings.map(b=>b.id+':'+((b.condition??100)<78?'w':'c')).join(',')+
+  const signature=s.buildings.map(b=>b.id+':'+((b.condition??100)<78?'w':'c')+
+    (b.kind==='garden'?':'+(s.livingFates.seedTrials.filter(t=>t.gardenId===b.id).at(-1)?.phase??''):'' )).join(',')+
    '/'+(s.intent?.id??'')+'/'+phase+'/'+(s.intent?.parcel?.x??'')+'/'+
    (s.intent?.parcel?.z??'');
   if(signature!==lastBuildSig||progressIndex!==lastProgressIndex){
    while(constructionLayer.children.length){
     const old=constructionLayer.children[0];constructionLayer.remove(old);
    }
-   for(const built of s.buildings)
-    facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition);
+   for(const built of s.buildings){
+    const trial=built.kind==='garden'?
+     s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
+    facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
+     trial?.phase);
+   }
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
     if(s.intent.kind==='repair'){
      const p=s.intent.parcel,g=group(constructionLayer,p.x,.19,p.z);
