@@ -4,7 +4,7 @@ import {pioneerCommonsNames} from '../simulation/pioneerCommons.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive,isPioneerOperational} from '../simulation/pioneerFacilities.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerResourceSite} from '../simulation/pioneerWorld.ts';
 
-export type PioneerSelection={kind:'building'|'intent'|'site'|'camp';id:string};
+export type PioneerSelection={kind:'building'|'intent'|'site'|'camp'|'clearing';id:string};
 export interface PioneerInspection{
  title:string;kicker:string;description:string;
  facts:{label:string;value:string}[];
@@ -77,16 +77,42 @@ export function inspectPioneerSelection(s:PioneerWorld,
  if(selection.kind==='site'){
   const site=s.sites.find(x=>x.id===selection.id);if(!site)return null;
   return {title:siteLabels[site.kind],kicker:'真实资源点 · '+site.id,
-   description:'库存由居民劳动采集和季节回补，画面不会生成免费的资源。',
+   description:site.kind==='forest'?
+    '林木不是一次性装饰：村民确实伐木时库存减少，可见林木稀疏、倒落并留下树桩；其后自然恢复。':
+    '库存由居民劳动采集和季节回补，画面不会生成免费的资源。',
    facts:[
     {label:'现场余量',value:fixed(site.stock)+' / '+fixed(site.capacity)},
     {label:'每日自然回补',value:fixed(site.renewPerDay)+'（天气/季节影响）'},
     {label:'历史采集',value:fixed(site.totalGathered)},
+    ...(site.kind==='forest'?[
+     {label:'全谷真实伐倒事件',value:s.frontier.totalFelled+' 次'},
+     {label:'最近一次落木',value:s.frontier.lastFelling?.siteId===site.id?
+      date(s.frontier.lastFelling.minute):'暂无记录'}
+    ]:[]),
     {label:'正在工作',value:s.founders.filter(f=>
       Math.hypot(f.target[0]-site.x,f.target[1]-site.z)<2.1&&
       ['collect-wood','forage','fetch-water','farm'].includes(f.activity))
       .map(f=>f.name).join('、')||'暂无'}
    ],history:[]};
+ }
+ if(selection.kind==='clearing'){
+  const p=s.frontier.clearings.find(c=>c.id===selection.id);
+  if(!p)return null;
+  const buildings=s.buildings.filter(b=>
+   Math.hypot(b.parcel.x-p.x,b.parcel.z-p.z)<p.radius+2.7);
+  return {title:p.phase==='cleared'?'已开出的林间空地':'林缘开垦现场',
+   kicker:'逐次清障 · '+p.id,
+   description:p.phase==='cleared'?
+    '村民清去真实灌木和碎石，这块缓冲区现在进入了可调查、可选址的土地储备。':
+    '这里仍有未清的灌丛；需要居民真实抵达并花费劳动工时，不能直接在树丛中盖房。',
+   facts:[
+    {label:'建设阶段',value:p.phase==='cleared'?'已清理完成':'正在逐次开垦'},
+    {label:'实际开垦工时',value:fixed(p.workDone)+' / '+fixed(p.workRequired)},
+    {label:'开始日期',value:date(p.startedAt)},
+    {label:'清障完成',value:p.clearedAt===null?'仍需劳动':date(p.clearedAt)},
+    {label:'邻近永久设施',value:buildings.length+' 处'}
+   ],
+   history:relevant(s,p.id)};
  }
  if(selection.kind==='camp'){
   const commons=s.commons,project=commons.project;
