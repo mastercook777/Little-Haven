@@ -89,7 +89,7 @@ function inspectRender(){
  $('inspectHistory').innerHTML=info.history.length?
   '<div class="inspect-history-title">这处地方的经历</div>'+
   info.history.map(x=>'<div class="inspect-history-line">'+safe(x)+'</div>').join(''):'';
- $('inspectActions').innerHTML=info.operation?
+ const controls=info.operation?
   '<button type="button" data-inspect-toggle="'+safe(info.operation.id)+
   '" class="inspect-operate'+(info.operation.active?'':' paused')+'">'+
   (info.operation.active?'暂停此处生产':'恢复此处生产')+'</button>'+
@@ -97,6 +97,11 @@ function inspectRender(){
   info.operation.variants.map(v=>'<button type="button" data-inspect-pref="'+safe(v.value)+
    '" class="'+(info.operation?.preference===v.value?'active':'')+'">'+safe(v.label)+'</button>').join('')+
   '</div>':'';
+ // This inspector refreshes every 340ms. Rebuilding the controls at that
+ // cadence detaches buttons during pointerdown / pointerup, making real
+ // user clicks and Playwright clicks fail intermittently.
+ const actions=$('inspectActions');
+ if(actions.innerHTML!==controls)actions.innerHTML=controls;
 }
 function chooseInspection(next:PioneerSelection|null){
  selection=next;valley.setSelected(selection);inspectRender();
@@ -139,10 +144,12 @@ function renderUI(){
  $('pioneerStatus').textContent=pioneerSummary(world);
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
- $('pioneerBuildingChoices').innerHTML=world.buildings.length?
+ const buildingChoices=world.buildings.length?
   world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
    safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
   '<span>从荒地开始，第一间屋尚未落成。</span>';
+ const list=$('pioneerBuildingChoices');
+ if(list.innerHTML!==buildingChoices)list.innerHTML=buildingChoices;
  const intent=world.intent;
  const cause=world.buildings.length&&!intent?
   '有 '+world.buildings.filter(b=>b.kind==='cottage').length+
