@@ -410,6 +410,32 @@ try{
  await page.locator('#inspectClose').click();
  results.push({phaseB:grown,gardenInspected:true,gardenControlsPersist:true,
   commons:commonsInfo,frontier:pioneerFelling,clearingCard:true});
+ // A separate untouched four-year save proves real additional residents,
+ // paid in-house loft conversions, and rendered professions. Earlier tests
+ // intentionally changed a garden's operating state and must not influence it.
+ const mature=await page.evaluate(async()=>{
+  const d=window.__PIONEER_DEBUG__;
+  const {DAY_MINUTES}=await import('/src/simulation/calendar.ts');
+  d.reset(42);
+  d.advance((48*4*DAY_MINUTES-d.getState().minutes)/3);
+  const s=d.getState(),v=d.getVisuals();
+  const lofts=s.buildings.filter(b=>b.kind==='cottage'&&b.loftAddedAt!==undefined);
+  return {people:s.founders.length,lofts:lofts.map(b=>({
+   id:b.id,wood:b.loftWoodSpent,work:b.loftWorkHours,at:b.loftAddedAt
+  })),built:s.buildings.map(b=>b.kind),
+   fish:s.sites.find(x=>x.kind==='fish')?.totalGathered??0,
+   rendered:v.renderedStructures,loftDormers:v.loftDormers,
+   sawbenches:v.sawbenches,wood:s.resources.wood,food:s.resources.food};
+ });
+ if(mature.people<=9||mature.lofts.length<1||
+  mature.lofts.some(x=>x.wood!==4||x.work!==8)||
+  !mature.built.includes('fish-hut')||!mature.built.includes('granary')||
+  mature.fish<=0||mature.loftDormers<mature.lofts.length||
+  mature.rendered<mature.built.length)
+  throw Error('No mature paid/visible village growth after four real years: '+
+   JSON.stringify(mature));
+ await screenshot(page,'05d-four-year-life-and-paid-lofts');
+ results.push({matureVillage:mature});
  // A quick fresh-world playback checks an actual felling animation window.
  // The real simulation is advanced in hour-sized chunks and the GPU model
  // is refreshed by the same public debug helper used for other snapshots.
