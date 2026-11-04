@@ -4,6 +4,7 @@ import {nearestRoad,parcelLineDistance,reservedParcels,validateVillageParcel,
 import {pioneerBuildingPath,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
+import {pioneerRepairPriority} from './pioneerFacilities.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
 const hash=(n:number)=>{
@@ -90,10 +91,14 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
 }
 function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'repair'|null{
  if(!s.buildings.length||s.intent)return null;
- const old=s.buildings.find(b=>(b.condition??100)<68);
+ const old=s.buildings.find(b=>(b.condition??100)<pioneerRepairPriority(s));
  if(old&&s.resources.wood>=2)return 'repair';
- if(!pioneerHasFacility(s,'garden')&&
-  (s.policy==='food'||s.resources.food<16||s.buildings.length>=2))return 'garden';
+ const gardens=s.buildings.filter(b=>b.kind==='garden').length;
+ if(!gardens&&(s.policy==='food'||s.resources.food<16||s.buildings.length>=2))return 'garden';
+ // An actual household consumes food every day, including winter. The old
+ // growth loop built one garden for nine people and silently starved.
+ if(gardens>0&&gardens<Math.ceil(s.founders.length/4)&&
+  s.resources.food<Math.max(18,s.founders.length*3.5))return 'garden';
  if(!pioneerHasFacility(s,'cottage')&&
   (s.policy==='shelter'||pioneerHasFacility(s,'garden')||s.resources.food>=12))return 'cottage';
  if(!pioneerHasFacility(s,'wood-yard')&&
@@ -111,7 +116,7 @@ export function schedulePioneerProject(s:PioneerWorld){
  const previous=s.buildings.at(-1);
  if(previous&&s.minutes-previous.completedAt<DAY_MINUTES*.70)return false;
  if(kind==='repair'){
-  const target=s.buildings.find(b=>(b.condition??100)<68);
+  const target=s.buildings.find(b=>(b.condition??100)<pioneerRepairPriority(s));
   if(!target)return false;
   const id='repair-need-'+s.nextEventId;
   s.intent={id,kind:'repair',targetBuildingId:target.id,
@@ -189,8 +194,13 @@ const newcomers=[
 export function considerPioneerMigration(s:PioneerWorld){
  if(s.founders.length>=9||s.minutes<s.lastArrivalAt+7*DAY_MINUTES)return false;
  const cottage=s.buildings.find(b=>b.kind==='cottage'&&b.occupants.length<2);
- if(!cottage||!pioneerHasFacility(s,'garden')||s.resources.food<4||
-  s.resources.water<2)return false;
+ if(!cottage||!pioneerHasFacility(s,'garden')||
+  // A house being empty is not enough. The grain stores must cover the
+  // prospective mouth for several days before a new resident may arrive.
+  s.resources.food<Math.max(6,(s.founders.length+1)*1.5)||
+  s.resources.water<Math.max(2,s.founders.length*.6)||
+  s.sites.filter(site=>site.kind==='field').length<Math.ceil((s.founders.length+1)/4))
+  return false;
  const idx=s.founders.length-3;const data=newcomers[idx%newcomers.length];
  const id=s.nextResidentId++;
  const next:PioneerFounder={id,name:data[0],role:data[1],color:data[2],
