@@ -113,7 +113,7 @@ try{
    roadGrades:state.roads.map(r=>r.grade),visuals:d.getVisuals(),
    renderer:d.getRendererInfo()};
  });
- if(grown.people<=3||grown.roadCount<3||!grown.buildings.includes('garden')||
+ if(grown.people<6||grown.roadCount<3||!grown.buildings.includes('garden')||
   !grown.buildings.includes('cottage')||!grown.buildings.includes('wood-yard')||
   grown.visuals.renderedStructures<4||grown.visuals.people!==grown.people)
   throw Error('Phase B did not produce a visible populated village: '+JSON.stringify(grown));
