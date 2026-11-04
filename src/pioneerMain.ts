@@ -154,10 +154,12 @@ function renderUI(){
   (commonsJob?' ｜ 筹建'+pioneerCommonsNames[commonsJob.targetStage]+
    '：木料 '+amount(commonsJob.woodCommitted)+'/'+amount(commonsJob.woodRequired)+
    '，工时 '+amount(commonsJob.workDone)+'/'+amount(commonsJob.workRequired):' ｜ 点击营火/村心查看生活记录');
- const buildingChoices=world.buildings.length?
-  world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
-   safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
-  '<span>从荒地开始，第一间屋尚未落成。</span>';
+ const buildingChoices='<button type="button" data-pick-commons="camp">村心 · '+
+  safe(pioneerCommonsNames[world.commons.stage])+'</button>'+
+  (world.buildings.length?
+   world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
+    safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
+   '<span>第一间屋尚未落成。</span>');
  const list=$('pioneerBuildingChoices');
  if(list.innerHTML!==buildingChoices)list.innerHTML=buildingChoices;
  const intent=world.intent;
@@ -229,7 +231,11 @@ canvas.addEventListener('pointermove',event=>{
  canvas.style.cursor=hitAt(event.clientX,event.clientY)?'pointer':'grab';
 });
 $('pioneerBuildingChoices').addEventListener('click',event=>{
- const button=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-pick-building]');
+ const target=event.target as HTMLElement;
+ if(target.closest('button[data-pick-commons]')){
+  chooseInspection({kind:'camp',id:'camp'});return;
+ }
+ const button=target.closest<HTMLButtonElement>('button[data-pick-building]');
  const id=button?.dataset.pickBuilding;
  if(id&&world.buildings.some(b=>b.id===id))chooseInspection({kind:'building',id});
 });
