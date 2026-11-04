@@ -34,7 +34,11 @@ test('v0.5.1: 5 years create real tea shed and bounded distinct visitors, not ph
     const metrics={candidateParcels:0,legalGeometry:0,openedLand:0,routeReached:0,
      resourceRoutesKept:0};
     const parcel=surveyPioneerPlot(s,'tea-stop',metrics)?.parcel??null;
-    return {parcel,metrics,clearings:s.frontier.clearings};
+    const futureMetrics={candidateParcels:0,legalGeometry:0,openedLand:0,
+     routeReached:0,resourceRoutesKept:0};
+    const future=surveyPioneerPlot(s,'tea-stop',futureMetrics,true);
+    return {parcel,metrics,future:future?.parcel??null,futureMetrics,
+     clearings:s.frontier.clearings};
    })(),
    nextSurveyAt:s.nextSurveyAt,latestSurveys:s.journal.filter(e=>e.title==='勘地暂缓').slice(-4),
    elapsed:s.minutes,route:s.commerce.nextVisitorAt}));
