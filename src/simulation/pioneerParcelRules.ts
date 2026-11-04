@@ -18,7 +18,10 @@ export function validatePioneerParcel(parcel:VillageParcel,
  if(riverDistance(parcel)<.72)return {ok:false,reason:'river-bank'};
  if(occupied.some(other=>other.id!==parcel.id&&parcelOverlaps(parcel,other)))
   return {ok:false,reason:'existing-building'};
- if(roads.some(road=>parcelLineDistance(parcel,road.points)<.18))
+ // Pathfinding already reserves .13 units beyond each building's SAT
+ // clearance. Rejecting roads at .18 after construction used to invalidate
+ // an otherwise safe previously built home when a future route was added.
+ if(roads.some(road=>parcelLineDistance(parcel,road.points)<.12))
   return {ok:false,reason:'pioneer-road-blocked'};
  return {ok:true,reason:'ok'};
 }
