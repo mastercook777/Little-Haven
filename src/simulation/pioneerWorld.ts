@@ -3,6 +3,7 @@ import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,reservedParcels,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
 import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {agePioneerBuildings,completePioneerProject,considerPioneerMigration,
  pioneerHasFacility,pioneerHousingCapacity,pioneerBuildingLabel,
  registerPioneerTrip,schedulePioneerProject} from './pioneerGrowth.ts';
@@ -137,7 +138,7 @@ export function getPioneerCalendar(s:PioneerWorld){return getCalendarFromMinutes
 export function getPioneerWeather(s:PioneerWorld){return getWeatherForMinutes(s.minutes,s.seed);}
 function campParcel(s:PioneerWorld){return parcel('temporary-camp',s.camp.x,s.camp.z,1.25,1.25);}
 export function validatePioneerSite(s:PioneerWorld,p:VillageParcel){
- return validateVillageParcel(p,[...landscape(),campParcel(s),...s.buildings.map(b=>b.parcel)],3.75);
+ return validatePioneerParcel(p,[...landscape(),campParcel(s),...s.buildings.map(b=>b.parcel)],s.roads);
 }
 export function planPioneerShelter(s:PioneerWorld):VillageParcel|null{
  const occupied=[...landscape(),campParcel(s),...s.buildings.map(b=>b.parcel)];
@@ -410,7 +411,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    if(!b||!['shelter','garden','cottage','wood-yard'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
     !(b.materialsSpent.wood>=0)||b.materialsSpent.wood>20||
     !Number.isFinite(b.parcel.x)||!Number.isFinite(b.parcel.z)||
-    !validateVillageParcel(b.parcel,occupied,4.25).ok)return null;
+    !validatePioneerParcel(b.parcel,occupied,s.roads.filter(road=>road.buildingId!==b.id)).ok)return null;
    ids.add(b.id);occupied.push(b.parcel);
   }
   if(s.intent){
@@ -419,7 +420,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
     s.intent.woodCommitted<0||s.intent.woodCommitted>20||
     s.intent.workDone<0||s.intent.workDone>30)return null;
    if(s.intent.parcel&&s.intent.kind!=='repair'&&
-    !validateVillageParcel(s.intent.parcel,occupied,4.25).ok)return null;
+    !validatePioneerParcel(s.intent.parcel,occupied,s.roads).ok)return null;
   }
   return s;
  }catch{return null;}
