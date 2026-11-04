@@ -1,4 +1,5 @@
 import {DAY_MINUTES} from './calendar.ts';
+import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {VALLEY_RIVER} from './valleyGeography.ts';
 import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
 import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
@@ -39,8 +40,7 @@ export function pioneerHasFacility(s:PioneerWorld,kind:PioneerBuildKind){
  return s.buildings.some(b=>b.kind===kind);
 }
 function record(s:PioneerWorld,title:string,text:string,causeId:string|null=null){
- if(s.journal.length>=160)s.journal.shift();
- s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId});
+ appendPioneerJournal(s,title,text,causeId);
 }
 /** Enforce the existing real eave/SAT checks, plus every new walking trail. */
 export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>):
