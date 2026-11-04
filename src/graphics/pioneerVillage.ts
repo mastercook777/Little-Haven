@@ -265,7 +265,7 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
  plinth.name='shelter-plinth';
  return g;
 }
-interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;}
+interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;rod:THREE.Group;}
 function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  const g=group(parent,0,.19,0);g.name='pioneer-'+founder.id;
  g.userData.founderId=founder.id;
@@ -307,13 +307,18 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
   log.rotation.x=Math.PI/2;
  }
  cargo.visible=false;
- return {root:g,arms,legs,head,tool,mealBowl,axe,cargo};
+ const rod=group(g,.35,1.02,.32);rod.name='working-river-fishing-rod';
+ const stem=pole(rod,0,.36,.05,.026,.96,lightWood);stem.rotation.x=-.32;
+ box(rod,0,.92,.23,.016,.50,.018,cloth);
+ const reel=orb(rod,-.07,.22,0,.09,wood,.45,.80,1.3);
+ reel.name='fisher-reel';rod.visible=false;
+ return {root:g,arms,legs,head,tool,mealBowl,axe,cargo,rod};
 }
 /** The facility models share eave limits with the space planner while
  * changing the actual silhouette, not merely swapping a material. */
 function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind,
  phase:'foundation'|'frame'|'complete',progress:number,condition=100,
- seedMark?:'working'|'resolved'|'abandoned'){
+ seedMark?:'working'|'resolved'|'abandoned',craftReady=false){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
@@ -354,6 +359,55 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
     pole(g,x,.36,z,.045,.50,wood);
    for(const z of [-1.11,1.11])box(g,0,.52,z,2.40,.07,.08,lightWood);
    box(g,1.15,.37,0,.07,.06,2.3,lightWood);
+  }
+  return g;
+ }
+ if(kind==='fish-hut'){
+  // Real shore fishing bay: lower piling, shaded rack, net poles, baskets.
+  box(g,0,.11,0,2.52,.16,2.23,material('#a8a08b'));
+  if(phase==='foundation')return g;
+  for(const x of [-1.07,1.07])for(const z of [-.86,.86])
+   pole(g,x,.94,z,.085,1.76,wood);
+  box(g,0,1.79,0,2.48,.13,2.20,lightWood);
+  const roof=material('#ad9a70');
+  buildPioneerRoof(g,{halfWidth:1.34,halfDepth:1.11,eaveY:1.85,
+   ridgeY:2.30,thickness:.10},roof,wood,lightWood,thatchBright);
+  if(phase!=='complete')return g;
+  for(const x of [-.84,-.28,.28,.84])pole(g,x,.48,-.63,.022,.58,lightWood);
+  for(const z of [-.75,-.39,-.03,.33]){
+   const net=box(g,0,.56,z,1.82,.025,.022,material('#bcae86'));
+   net.name='real-fishing-net';
+  }
+  box(g,.75,.46,.70,.60,.14,.51,wood);
+  for(let i=0;i<5;i++){
+   const fish=orb(g,-.75+i*.20,.47,-.08,.11,
+    material('#879fa0'),1.5,.33,.58);
+   fish.name='visible-caught-fish';
+   fish.userData.fishIndex=i;
+  }
+  for(const x of [-1.12,1.12])pole(g,x,.32,1.04,.045,.48,wood);
+  return g;
+ }
+ if(kind==='granary'){
+  // Raised storage house; long-use grain jars are bound to actual supplies.
+  for(const x of [-.94,.94])for(const z of [-.83,.83])
+   pole(g,x,.75,z,.11,1.44,wood);
+  box(g,0,1.35,0,2.30,.20,2.09,stone);
+  if(phase==='foundation')return g;
+  for(const x of [-1.01,1.01])box(g,x,1.98,0,.16,1.22,1.92,lightWood);
+  box(g,0,2.03,-.94,2.05,1.19,.14,thatch);
+  box(g,0,2.48,.94,2.05,.29,.14,wood);
+  box(g,0,2.60,0,2.1,.15,2.0,thatchBright);
+  const roof=material('#8b8e75');
+  buildPioneerRoof(g,{halfWidth:1.23,halfDepth:1.14,eaveY:2.64,
+   ridgeY:3.12,thickness:.09},roof,wood,lightWood);
+  if(phase==='complete'){
+   for(let i=0;i<6;i++){
+    const jar=orb(g,-.83+(i%3)*.83,1.60,-.58+Math.floor(i/3)*.82,
+     .24,material('#b69b72'),1,.72,1);
+    jar.name='stored-real-grain-jar';jar.userData.jarIndex=i;
+   }
+   for(let k=0;k<4;k++)box(g,0,.26+k*.25,1.17,.84,.065,.12,lightWood);
   }
   return g;
  }
@@ -412,6 +466,13 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  if(phase==='frame'){
   for(const z of [-d*.42,d*.42])box(g,0,h+.21,z,w,.12,.13,wood);
   return g;
+ }
+ if(kind==='wood-yard'&&phase==='complete'&&craftReady){
+  const bench=group(g,-.54,0,.48);bench.name='actual-crafted-sawbench';
+  box(bench,0,.81,0,1.04,.13,.43,lightWood);
+  for(const x of [-.37,.37])pole(bench,x,.43,0,.061,.77,wood);
+  box(bench,0,1.02,-.13,.074,.42,.08,stone).rotation.z=.34;
+  for(let i=0;i<3;i++)box(bench,-.29+i*.29,.43,.53,.20,.16,.68,wood);
  }
  const roof=material(cottage?'#677a77':'#9c8668');
  buildPioneerRoof(g,{
