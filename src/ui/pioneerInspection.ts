@@ -1,10 +1,11 @@
 import {getCalendarFromMinutes,SEASON_NAMES} from '../simulation/calendar.ts';
+import {publicPersonHistory,publicPersonRelations} from '../simulation/livingFates/peopleState.ts';
 import {pioneerBuildingLabel} from '../simulation/pioneerGrowth.ts';
 import {pioneerCommonsNames} from '../simulation/pioneerCommons.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive,isPioneerOperational} from '../simulation/pioneerFacilities.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerResourceSite} from '../simulation/pioneerWorld.ts';
 
-export type PioneerSelection={kind:'building'|'intent'|'site'|'camp'|'clearing';id:string};
+export type PioneerSelection={kind:'building'|'intent'|'site'|'camp'|'clearing'|'person';id:string};
 export interface PioneerInspection{
  title:string;kicker:string;description:string;
  facts:{label:string;value:string}[];
@@ -25,6 +26,33 @@ const relevant=(s:PioneerWorld,causeId:string)=>{
 };
 export function inspectPioneerSelection(s:PioneerWorld,
  selection:PioneerSelection):PioneerInspection|null{
+ if(selection.kind==='person'){
+  const f=s.founders.find(x=>String(x.id)===selection.id);
+  const person=f&&s.livingFates.people[f.id];
+  if(!f||!person)return null;
+  const bonds=publicPersonRelations(s,f.id);
+  const memories=publicPersonHistory(s,f.id);
+  const notes=bonds.map(b=>{
+   const peer=s.founders.find(x=>x.id===b.id);
+   return (peer?.name??'乡邻')+' · 共劳 '+b.work+' 小时 / 同席 '+b.meals+' 次';
+  });
+  const fields=[
+   {label:'眼前的营生',value:f.role},
+   {label:'来谷之后',value:date(person.arrivalAt)},
+   {label:'落脚住处',value:f.homeBuildingId?
+    (s.buildings.find(b=>b.id===f.homeBuildingId)?.kind==='cottage'?'山居':'避雨棚'):'尚在营地'},
+   {label:'此刻正在',value:f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
+    f.activity==='build'?'参与建屋':f.activity==='eat'?'村心用餐':f.activity==='socialize'?'邻里闲谈':'村中日常'},
+   {label:'已见本领',value:person.publicFacts.knownSkills.join('、')||'仍在相处中'},
+   {label:'田间实践',value:person.skills.cultivation.xp+' 小时；经验 '+person.skills.cultivation.level+' 阶'},
+   {label:'山路实践',value:person.skills.wayfinding.xp+' 小时'},
+   {label:'有迹可循的邻里',value:notes.join('；')||'尚无共同劳动或同席记录'}
+  ];
+  return {title:f.name,kicker:'谷中常住 · 人物 '+f.id,
+   description:person.publicFacts.arrivalReason+' '+person.publicFacts.habit+
+    ' 往事只能从共同生活与实际经历里慢慢得知。',
+   facts:fields,history:memories.map(m=>date(m.minute)+' · '+m.text)};
+ }
  if(selection.kind==='building'){
   const b=s.buildings.find(x=>x.id===selection.id);
   if(!b)return null;
