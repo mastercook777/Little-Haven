@@ -1,4 +1,6 @@
 import {DAY_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.ts';
+import {createLivingFates,pioneerCultivationMultiplier,settleLivingFatesHour,validateLivingFates,
+ type LivingFatesState} from './livingFates/peopleState.ts';
 import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,reservedParcels,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
@@ -65,7 +67,7 @@ export interface PioneerWorld{
  sites:PioneerResourceSite[];intent:PioneerIntent|null;buildings:PioneerBuilding[];
  journal:PioneerJournal[];nextEventId:number;policy:PioneerPolicy;comfort:number;
  roads:PioneerRoad[];nextResidentId:number;nextSurveyAt:number;lastArrivalAt:number;
- commons:PioneerCommons;frontier:PioneerFrontier;
+ commons:PioneerCommons;frontier:PioneerFrontier;livingFates:LivingFatesState;
  foodStats?:{day:number;collected:number;consumed:number;previousCollected:number;previousConsumed:number};
 }
 const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
@@ -123,20 +125,21 @@ function resourceSites(seed:number,camp:{x:number;z:number}):PioneerResourceSite
 }
 export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
  const camp=choosePioneerCamp(seed);
- const s:PioneerWorld={
-  schemaVersion:4,mode:'pioneer',seed,minutes:8*60+20,lastSavedAt:now,camp,
-  founders:[
+ const founders:PioneerFounder[]=[
    {id:1,name:'梁伯',role:'行山人 · 樵夫',color:'#53776c',activity:'rest',
     target:point(camp.x-.8,camp.z-.3),homeBuildingId:null},
    {id:2,name:'陆娘',role:'营地掌事者',color:'#bd8069',activity:'tend-fire',
     target:point(camp.x+.6,camp.z-.5),homeBuildingId:null},
    {id:3,name:'阿禾',role:'山野采集者',color:'#8a9b64',activity:'rest',
     target:point(camp.x,camp.z+.9),homeBuildingId:null}
-  ],
+  ];
+ const s:PioneerWorld={
+  schemaVersion:4,mode:'pioneer',seed,minutes:8*60+20,lastSavedAt:now,camp,
+  founders,
   resources:{wood:1,food:5,water:5},sites:resourceSites(seed,camp),
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
   roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0,commons:createPioneerCommons(),
-  frontier:createPioneerFrontier(),
+  frontier:createPioneerFrontier(),livingFates:createLivingFates(seed,founders,8*60+20),
   foodStats:{day:0,collected:0,consumed:0,previousCollected:0,previousConsumed:0}
  };
  log(s,'荒谷点火','梁伯、陆娘和阿禾在安全的林缘安下临时营火。眼前尚无永久屋舍。');
@@ -244,7 +247,7 @@ function gather(s:PioneerWorld,f:PioneerFounder,
   if(held>=cap)return false;
   allocate(s,f,activity,site);
   if(f.activity==='rest')continue;
-  const efficiency=kind==='field'?pioneerHarvestMultiplier(s,site):
+  const efficiency=kind==='field'?pioneerHarvestMultiplier(s,site)*pioneerCultivationMultiplier(s,f.id):
    kind==='forest'?pioneerWoodWorkingMultiplier(s):1;
   const gathered=Math.max(0,Math.min(site.stock,amount*efficiency,cap-held));
   if(!gathered)continue;
@@ -437,7 +440,7 @@ export function advancePioneerWorld(s:PioneerWorld,realSeconds:number){
  if(!Number.isFinite(realSeconds)||realSeconds<0)throw new RangeError('Invalid advance');
  const from=Math.floor(s.minutes/HOUR),target=s.minutes+realSeconds*PIONEER_MINUTES_PER_SECOND;
  const to=Math.floor(target/HOUR);
- for(let i=from+1;i<=to;i++){s.minutes=i*HOUR;step(s);}
+ for(let i=from+1;i<=to;i++){s.minutes=i*HOUR;step(s);settleLivingFatesHour(s);}
  s.minutes=target;
  return {hours:to-from,buildings:s.buildings.length,
   stage:s.intent?.phase??(s.buildings.length?'in-use':'unplanned')};
@@ -489,6 +492,9 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   if(!validatePioneerFrontier(s.frontier,s))return null;
   s.roads??=[];s.nextResidentId??=Math.max(...s.founders.map(f=>f.id))+1;
   s.nextSurveyAt??=0;s.lastArrivalAt??=0;
+  // Old slots get only present-day profiles; do not invent historical memories.
+  s.livingFates??=createLivingFates(s.seed,s.founders,s.minutes);
+  if(!validateLivingFates(s))return null;
   if(!Array.isArray(s.roads)||s.roads.length>12||
    !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||
    !Number.isFinite(s.nextSurveyAt)||!Number.isFinite(s.lastArrivalAt))return null;
