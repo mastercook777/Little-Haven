@@ -1,7 +1,7 @@
 # 守望谷 v0.4 · 开荒纪元（Pioneer Era）
 ## 从一处篝火开始，长出一座真正有生活的武侠小镇
 
-> 状态：**正式设计基线 v1.0；Phase A + Phase B 核心循环已实现于 PR #10，待 CI 验收及线上公测**  
+> 状态：**正式设计基线 v1.0；Phase A + Phase B 已通过 64 项模拟测试、桌面/手机 Chromium 验收，PR #10 已合并并通过 GitHub Pages 部署（2026-11-03）。后续玩家实测的问题与优化任务见 [v0.4.x 打磨计划](V04X_PIONEER_POLISH_PLAN.md)。**  
 > 日期：2026-11-03  
 > 适用仓库：`mastercook777/Little-Haven`（v0.3.0-preview.7 基线；v0.4.0-alpha.1 开荒分支）  
 > 用户参考： [《放置领主：财富之城》Steam 页面](https://store.steampowered.com/app/4315040/) —— 只借鉴“从简陋聚落到繁荣城镇”的易读成长节奏，不复制具体美术、系统或固定建筑布点。  
