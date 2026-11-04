@@ -197,6 +197,13 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
   assert.ok(validatePioneerParcel(b.parcel,occupied,s.roads.filter(r=>r.buildingId!==b.id)).ok,'unsafe '+b.id);
   occupied.push(b.parcel);
  }
+ // The one wood source cannot become landlocked behind an otherwise
+ // legal cottage. No in-game logging can repair permanently blocked labor.
+ const blockers=[...natural,...s.buildings.map(b=>b.parcel)];
+ for(const site of s.sites.filter(x=>x.kind==='forest'||x.kind==='spring'||x.kind==='forage')){
+  assert.ok(findPioneerWalk([s.camp.x,s.camp.z],[site.x,site.z],blockers),
+   'growth cut village access to critical '+site.kind+' resource');
+ }
  for(const road of s.roads){
   const others=[...natural,...s.buildings.filter(b=>b.id!==road.buildingId).map(b=>b.parcel)];
   assert.ok(roadSegmentsSafe(road.points,others),'road intersects obstacles '+road.id);
