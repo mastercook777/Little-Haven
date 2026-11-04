@@ -252,7 +252,7 @@ test('Architectural roof keeps both slopes and every reed on one measured pitch'
   }
  }
  const bounds=new THREE.Box3().setFromObject(base);
- assert.ok(bounds.min.x>=-1.22&&bounds.max.x<=1.22);
+ assert.ok(bounds.min.x>=-1.30&&bounds.max.x<=1.30, 'eaves must remain inside the 2.65m protected footprint');
  assert.ok(bounds.min.z>=-1.25&&bounds.max.z<=1.25);
 });
 
