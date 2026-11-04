@@ -47,6 +47,32 @@ try{
   throw Error('New forest lacks genuine initial vegetation or starts pre-cleared: '+JSON.stringify(initial.scene));
  if(initial.mode!=='pioneer'||initial.founders!==3||initial.buildings!==0||
   initial.scene.renderedStructures!==0||!initial.gl)throw Error('Not a genuine empty WebGL start: '+JSON.stringify(initial));
+ // v0.4.5: the first chapter opens the REAL timber resource and moves
+ // the camera; it must not pretend a house already exists.
+ const earlyIntro=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__;
+  return {title:document.querySelector('#pioneerIntroTitle')?.textContent,
+   focus:d.getSpotlight(),camera:d.getCameraTarget(),
+   wood:d.getVisuals().campWoodLogs};
+ });
+ if(!earlyIntro.title?.includes('第一间屋')||earlyIntro.focus.selection.kind!=='site'||
+  earlyIntro.wood!==1)
+  throw Error('The first day lacks a visible actual woodcutting target: '+JSON.stringify(earlyIntro));
+ await page.locator('#pioneerSpotlightFocus').click();
+ await page.waitForTimeout(650);
+ const looked=await page.evaluate(()=>({
+  selection:window.__PIONEER_DEBUG__.getSelection(),
+  camera:window.__PIONEER_DEBUG__.getCameraTarget(),
+  visible:!document.querySelector('#pioneerInspector').hidden
+ }));
+ if(!looked.visible||looked.selection?.kind!=='site'||
+  Math.hypot(looked.camera.x-earlyIntro.camera.x,
+   looked.camera.z-earlyIntro.camera.z)<1.5)
+  throw Error('Chapter click cannot inspect and focus an actual place: '+
+   JSON.stringify({earlyIntro,looked}));
+ await screenshot(page,'01b-look-at-first-woodcutting');
+ await page.locator('#inspectClose').click();
+ await page.locator('#pioneerCamera').click(); // Restore the baseline viewport.
  // v0.4.4: public person inspection must be accessible without leaks.
  await page.locator('#founderTasks button[data-pick-person="1"]').click();
  const personCard=await page.evaluate(()=>{
@@ -54,9 +80,9 @@ try{
   return {title:document.querySelector('#inspectTitle')?.textContent,
    facts:document.querySelector('#inspectFacts')?.textContent,
    description:document.querySelector('#inspectDescription')?.textContent,
-   privateTags:p.privateFacts.tags};
+   privateTags:p.privateFacts.tags,highlighted:d.getVisuals().focusedResident};
  });
- if(personCard.title!=='梁伯'||!personCard.facts?.includes('眼前的营生')||
+ if(personCard.title!=='梁伯'||!personCard.highlighted||!personCard.facts?.includes('眼前的营生')||
   personCard.privateTags.some(tag=>
    (personCard.facts+personCard.description).includes(tag)))
   throw Error('Public identity inspector leaks or fails: '+JSON.stringify(personCard));
@@ -82,6 +108,16 @@ try{
  }
  if(!sawConstruction||!constructed)
   throw Error('No construction stages or completed shelter within early progression');
+ const grewChapter=await page.evaluate(()=>({
+  title:document.querySelector('#pioneerIntroTitle')?.textContent,
+  chapter:window.__PIONEER_DEBUG__.getSpotlight(),
+  wood:window.__PIONEER_DEBUG__.getVisuals().campWoodLogs
+ }));
+ if(grewChapter.title===earlyIntro.title||
+  !grewChapter.chapter?.selection||
+  !['building','intent','site','camp','person'].includes(grewChapter.chapter.selection.kind))
+  throw Error('The dynamic chapter did not react to a completed shelter: '+
+   JSON.stringify({earlyIntro,grewChapter}));
  const b=constructed.state.buildings[0];
  if(b.materialsSpent.wood!==7||constructed.visual.renderedStructures!==1||
   b.occupants.length!==3||constructed.state.founders.some(f=>f.homeBuildingId!==b.id))
@@ -139,6 +175,23 @@ try{
   !grown.buildings.includes('cottage')||!grown.buildings.includes('wood-yard')||
   grown.visuals.renderedStructures<4||grown.visuals.people!==grown.people)
   throw Error('Phase B did not produce a visible populated village: '+JSON.stringify(grown));
+ const fieldVisualization=await page.evaluate(async()=>{
+  const d=window.__PIONEER_DEBUG__,s=d.getState();
+  const {pioneerCropAppearance,pioneerVisibleWoodLogs}=
+   await import('/src/simulation/pioneerVisibility.ts');
+  return {actual:d.getVisuals(),expectedGardens:s.buildings
+   .filter(b=>b.kind==='garden').reduce((n,b)=>
+    n+(pioneerCropAppearance(s,b.id)?.visibleSprouts??0),0),
+   expectedWood:pioneerVisibleWoodLogs(s),
+   story:d.getSpotlight(),text:document.querySelector('#pioneerIntroTitle')?.textContent};
+ });
+ if(fieldVisualization.expectedGardens!==fieldVisualization.actual.gardenSprouts||
+  fieldVisualization.expectedWood!==fieldVisualization.actual.campWoodLogs||
+  fieldVisualization.text?.includes('第一间屋，要从一捆柴开始'))
+  throw Error('Actual 3D crops/wood/chapters diverge from saved state: '+
+   JSON.stringify(fieldVisualization));
+ results.push({livingChapter:true,woodpileCount:fieldVisualization.actual.campWoodLogs,
+  realCropMeshes:fieldVisualization.actual.gardenSprouts});
  const commonsInfo=await page.evaluate(()=>{
   const w=window.__PIONEER_DEBUG__.getState();
   return {stage:w.commons.stage,work:w.commons.workHours,
@@ -344,10 +397,21 @@ try{
   const toolbar=document.querySelector('.pioneer-toolbar').getBoundingClientRect();
   const panel=document.querySelector('.pioneer-panel').getBoundingClientRect();
   return {gl:!!(canvas.getContext('webgl2')||canvas.getContext('webgl')),
-   toolbarWidth:toolbar.width,panelRight:panel.right,viewport:innerWidth};
+   toolbarWidth:toolbar.width,panelRight:panel.right,viewport:innerWidth,
+   spotlightButtonHeight:document.querySelector('#pioneerSpotlightFocus').getBoundingClientRect().height};
  });
- if(!sizing.gl||sizing.toolbarWidth>sizing.viewport+1||sizing.panelRight>sizing.viewport+1)
+ if(!sizing.gl||sizing.toolbarWidth>sizing.viewport+1||sizing.panelRight>sizing.viewport+1||
+  sizing.spotlightButtonHeight<43)
   throw Error('Pioneer mobile overflow or blank WebGL: '+JSON.stringify(sizing));
+ await mpage.locator('#pioneerSpotlightFocus').tap();
+ const mobileMoment=await mpage.evaluate(()=>({
+  selection:window.__PIONEER_DEBUG__.getSelection(),
+  inspector:!document.querySelector('#pioneerInspector').hidden
+ }));
+ if(!mobileMoment.inspector||mobileMoment.selection?.kind!=='site')
+  throw Error('Mobile chapter button does not inspect real forest: '+JSON.stringify(mobileMoment));
+ await mpage.locator('#inspectClose').tap();
+ await mpage.locator('#pioneerCamera').tap();
  await mpage.evaluate(()=>window.__PIONEER_DEBUG__.advance(1200));
  await screenshot(mpage,'04-mobile-shelter');
  // A touch gesture must still allow inspection without mouse hover.

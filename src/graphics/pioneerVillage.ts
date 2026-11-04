@@ -11,6 +11,7 @@ import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import type {PioneerSelection} from '../ui/pioneerInspection.ts';
+import {pioneerCropAppearance,pioneerVisibleWoodLogs} from '../simulation/pioneerVisibility.ts';
 
 const material=(color:string,emissive?:string)=>new THREE.MeshStandardMaterial({
  color,roughness:.92,...(emissive?{emissive,emissiveIntensity:.35}:{})
@@ -93,6 +94,17 @@ function campVisual(root:THREE.Group,s:PioneerWorld){
  g.name='pioneer-commons-at-original-camp';
  g.userData.pioneerCamp=true;
  const stages:THREE.Group[]=[],flames:THREE.Mesh[]=[];
+ // Stocked logs are a visual receipt of actual work; construction costs
+ // reduce the pile because the same saved village wood pool is charged.
+ const timber=group(g,1.30,.02,-1.01);timber.name='shared-timber-stock';
+ const woodLogs:THREE.Mesh[]=[];
+ for(let i=0;i<12;i++){
+  const row=Math.floor(i/4),column=i%4;
+  const log=box(timber,(column-1.5)*.21,.12+row*.155,
+   (row%2)*.055,.52,.145,.145,i%3?wood:lightWood);
+  log.rotation.y=row%2?-.13:.12;log.name='real-camp-wood-log';
+  woodLogs.push(log);
+ }
  const stageRoot=(index:number,label:string)=>{
   const parent=group(g);parent.name=label;stages[index]=parent;return parent;
  };
@@ -203,7 +215,7 @@ function campVisual(root:THREE.Group,s:PioneerWorld){
   if(building)scaffold.scale.y=.45+.55*Math.min(1,Math.max(0,percent));
  }
  setStage(s.commons.stage);
- return {root:g,flames,supplies,setStage,stages};
+ return {root:g,flames,supplies,setStage,stages,woodLogs};
 }
 function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|'frame'|'complete',
  progress:number){
@@ -317,6 +329,8 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
      material(row%2?'#75a46d':'#91af6b'),.78,
      phase==='complete'?1.65:.8,.68);
     sprout.rotation.y=n;
+    sprout.name='real-garden-crop';
+    sprout.userData.cropIndex=row*7+n;
    }
   }
   if(phase==='complete'){
@@ -444,7 +458,7 @@ export interface PioneerGraphics{
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
-   seedMarkers:number};
+   seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -483,6 +497,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   color:'#c7dee2',transparent:true,opacity:.42,depthWrite:false}));
  rain.frustumCulled=false;root.add(rain);
  let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
+ const gardenCrops=new Map<string,THREE.Mesh[]>();
  let latestWorld=world;
  let selected:PioneerSelection|null=null;
  const glow=new THREE.Mesh(new THREE.RingGeometry(.89,1.0,48),
@@ -504,6 +519,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    const loc=site??clearing??s.camp;
    glow.visible=true;glow.position.set(loc.x,.25,loc.z);
    glow.scale.setScalar(clearing?clearing.radius:site?1.0:1.3);glow.rotation.set(-Math.PI/2,0,0);
+  }else if(selected.kind==='person'){
+   const index=s.founders.findIndex(f=>String(f.id)===selected?.id);
+   const figure=index>=0?people[index]:undefined;
+   if(figure){
+    glow.visible=true;glow.position.set(figure.root.position.x,.23,figure.root.position.z);
+    glow.scale.set(.55,.55,1);glow.rotation.set(-Math.PI/2,0,0);
+   }else glow.visible=false;
   }else glow.visible=false;
  }
  function update(s:PioneerWorld,seconds:number){
@@ -516,15 +538,25 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     (b.kind==='garden'?':'+(s.livingFates.seedTrials.filter(t=>t.gardenId===b.id).at(-1)?.phase??''):'' )).join(',')+
    '/'+(s.intent?.id??'')+'/'+phase+'/'+(s.intent?.parcel?.x??'')+'/'+
    (s.intent?.parcel?.z??'');
+  let rebuilt=false;
   if(signature!==lastBuildSig||progressIndex!==lastProgressIndex){
+   rebuilt=true;gardenCrops.clear();
    while(constructionLayer.children.length){
     const old=constructionLayer.children[0];constructionLayer.remove(old);
    }
    for(const built of s.buildings){
     const trial=built.kind==='garden'?
      s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
-    facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
+    const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
      trial?.phase);
+    if(built.kind==='garden'){
+     const crops:THREE.Mesh[]=[];
+     plot.traverse(child=>{
+      if(child instanceof THREE.Mesh&&child.name==='real-garden-crop')crops.push(child);
+     });
+     crops.sort((a,b)=>Number(a.userData.cropIndex)-Number(b.userData.cropIndex));
+     gardenCrops.set(built.id,crops);
+    }
    }
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
     if(s.intent.kind==='repair'){
@@ -546,6 +578,24 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   while(people.length<s.founders.length)people.push(makeFigure(root,s.founders[people.length]));
   const season=getPioneerCalendar(s).season;
   const weather=getPioneerWeather(s);
+  // Crop geometry now reflects the *same field stock* used for food collection.
+  for(const [gardenId,crops] of gardenCrops){
+   const appearance=pioneerCropAppearance(s,gardenId);
+   if(!appearance)continue;
+   for(let i=0;i<crops.length;i++){
+    const sprout=crops[i];
+    sprout.visible=((i*11)%28)<appearance.visibleSprouts;
+    sprout.scale.y=appearance.height;
+    sprout.position.y=.20+appearance.height*.86;
+    if(rebuilt||season!==lastSeason){
+     (sprout.material as THREE.MeshStandardMaterial).color.set(
+      season==='winter'?'#b7b899':
+       season==='autumn'?(i%2?'#a6a76a':'#b8b67b'):
+       season==='summer'?(i%2?'#6f9e5e':'#80ac62'):
+       i%2?'#75a46d':'#91af6b');
+    }
+   }
+  }
   if(lastSeason!==season){
    lastSeason=season;river.setSeason(season);
    grass.color.set({spring:'#8eae7d',summer:'#79a270',
@@ -570,6 +620,9 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    flame.visible=i===s.commons.stage&&!(weather==='rain'&&s.resources.wood<=0);
   });
   camp.supplies.scale.setScalar(.84+Math.min(1,s.resources.food/14)*.2);
+  const logs=pioneerVisibleWoodLogs(s);
+  for(let i=0;i<camp.woodLogs.length;i++)
+   camp.woodLogs[i].visible=i<logs;
   people.forEach((visual,i)=>{
    const f=s.founders[i],night=dayHour>=20||dayHour<7;
    const path:readonly WalkPoint[]=f.commute?.length?f.commute:[[s.camp.x,s.camp.z],[f.target[0],f.target[1]]];
@@ -641,7 +694,11 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   clearings:forest.signatures().clearings,clearedPlots:forest.signatures().cleared,
   seedMarkers:constructionLayer.children.filter(b=>b.getObjectByName('persisted-seed-trial-resolved')||
    b.getObjectByName('persisted-seed-trial-working')||
-   b.getObjectByName('persisted-seed-trial-abandoned')).length
+   b.getObjectByName('persisted-seed-trial-abandoned')).length,
+  gardenSprouts:[...gardenCrops.values()].reduce((n,crops)=>
+   n+crops.filter(c=>c.visible).length,0),
+  campWoodLogs:camp.woodLogs.filter(log=>log.visible).length,
+  focusedResident:glow.visible&&selected?.kind==='person'
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
