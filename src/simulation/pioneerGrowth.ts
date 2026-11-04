@@ -231,7 +231,7 @@ export function completePioneerProject(s:PioneerWorld){
   if(!home||home.loftAddedAt!==undefined){s.intent=null;return false;}
   home.loftAddedAt=s.minutes;
   home.loftWoodSpent=intent.woodCommitted;
-  home.loftWorkHours=intent.workDone;
+  home.loftWorkHours=intent.workDone;home.loftCauseId=intent.id;
   const cause=intent.id;s.intent=null;
   record(s,'山居木阁落成','村民在'+home.id+'原有安全屋界内耗四份木料与八工时，加出一处能住人的木阁；并没有凭空另盖屋。',cause);
   return true;
