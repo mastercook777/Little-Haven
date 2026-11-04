@@ -4,6 +4,8 @@ import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage
 import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
 import {getPioneerSpotlight,type PioneerSpotlight} from './ui/pioneerSpotlight.ts';
 import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
+import {PIONEER_DIRECTIONS,pioneerMilestoneBoard,setPioneerDirection,
+ type PioneerDirection} from './simulation/pioneerLivelihood.ts';
 import {pioneerCommonsNames} from './simulation/pioneerCommons.ts';
 import {setPioneerFacilityOperating,setPioneerFacilityPreference,
  type PioneerFacilityPreference} from './simulation/pioneerFacilities.ts';
@@ -63,6 +65,7 @@ try{world=loadPioneerWorld(localStorage,Date.now(),slot);}catch{
 let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
 let selection:PioneerSelection|null=null;
+let lastLivelihoodMarkup='',lastMilestoneMarkup='';
 let spotlight:PioneerSpotlight=getPioneerSpotlight(world);
 let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number;
  fromZoom:number;toZoom:number}|null=null;
@@ -74,7 +77,8 @@ const labels:Record<PioneerWork,string>={
  'shelter':'回家休息','farm':'耕作收菜','seed-trial':'试种留种','repair':'修屋补梁',
  'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'家中吃饭',
  'socialize':'村心闲谈','commons-build':'修建公共村心',
- 'clear-land':'林缘清障开荒'
+ 'clear-land':'林缘清障开荒',
+ fish:'河岸捕鱼',craft:'木坊锯作'
 };
 const safe=(input:string)=>input.replace(/[&<>"']/g,c=>
  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
@@ -160,6 +164,27 @@ function renderUI(){
  const trend=$('pioneerFoodTrend');trend.textContent=foodBalanceLabel();
  trend.classList.toggle('shortage',w.food<world.founders.length*1.2);
  $('pioneerStatus').textContent=pioneerSummary(world);
+ const directionName=PIONEER_DIRECTIONS.find(d=>d.id===world.livelihood.direction)!.label;
+ $('pioneerLivelihoodLabel').textContent=directionName;
+ $('pioneerCouncilPreview').textContent=directionName;
+ const livelihoodControls=PIONEER_DIRECTIONS.map(d=>
+  '<button type="button" data-livelihood="'+d.id+'" title="'+safe(d.description)+
+  '" '+(!world.buildings.some(b=>b.kind==='shelter')?'disabled':'')+'>'+
+  '<b>'+safe(d.label)+'</b><small>'+safe(d.description)+'</small></button>').join('');
+ const council=$('pioneerDirections');
+ if(lastLivelihoodMarkup!==livelihoodControls){
+  council.innerHTML=livelihoodControls;lastLivelihoodMarkup=livelihoodControls;
+ }
+ for(const btn of Array.from(council.querySelectorAll<HTMLButtonElement>('[data-livelihood]')))
+  btn.classList.toggle('active',btn.dataset.livelihood===world.livelihood.direction);
+ const milestones=pioneerMilestoneBoard(world).map(m=>
+  '<div class="livelihood-milestone '+(m.done?'done':'pending')+'">'+
+  '<span class="mark">'+(m.done?'✓':'○')+'</span><div><b>'+safe(m.label)+'</b>'+
+  '<p>'+safe(m.progress)+' · '+safe(m.requirement)+'</p></div></div>').join('');
+ const page=$('pioneerMilestones');
+ if(lastMilestoneMarkup!==milestones){
+  page.innerHTML=milestones;lastMilestoneMarkup=milestones;
+ }
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
  const commons=world.commons,commonsJob=commons.project;
@@ -317,6 +342,24 @@ $('inspectActions').addEventListener('click',event=>{
 for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-speed]'))){
  btn.addEventListener('click',()=>{speed=Number(btn.dataset.speed)||1;renderUI();});
 }
+const councilPanel=$<HTMLDetailsElement>('pioneerLivelihoodPanel');
+const councilOpen=$<HTMLButtonElement>('pioneerCouncilOpen');
+councilOpen.addEventListener('click',()=>{
+ councilPanel.open=!councilPanel.open;
+ councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
+ if(councilPanel.open)$('pioneerDirections').scrollIntoView({block:'center',behavior:'auto'});
+});
+councilPanel.addEventListener('toggle',()=>{
+ councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
+});
+$('pioneerDirections').addEventListener('click',event=>{
+ const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-livelihood]');
+ if(!btn||btn.disabled)return;
+ const direction=btn.dataset.livelihood as PioneerDirection;
+ if(setPioneerDirection(world,direction)){
+  renderUI();persist();toast('村落议事已记入守望录。村民会根据真实资源和工作机会调整建设方向。');
+ }
+});
 for(const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('[data-policy]'))){
  btn.addEventListener('click',()=>{
   const changed=setPioneerPolicy(world,btn.dataset.policy as PioneerPolicy);

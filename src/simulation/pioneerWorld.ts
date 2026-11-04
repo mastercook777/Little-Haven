@@ -1,4 +1,5 @@
 import {DAY_MINUTES,getCalendarFromMinutes,nextSeasonBoundary} from './calendar.ts';
+import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {createLivingFates,pioneerCultivationMultiplier,settleLivingFatesHour,validateLivingFates,
  type LivingFatesState} from './livingFates/peopleState.ts';
 import {activeSeedTrial,considerSeedTrial,dueSeedTrial,performSeedTrialShift,
@@ -16,6 +17,9 @@ import {createPioneerCommons,schedulePioneerCommons,reservePioneerCommonsMateria
  type PioneerCommons} from './pioneerCommons.ts';
 import {availablePioneerFields,pioneerFieldRenewMultiplier,pioneerHarvestMultiplier,
  pioneerWoodWorkingMultiplier,validatePioneerFacilityConfiguration} from './pioneerFacilities.ts';
+import {createPioneerLivelihood,considerPioneerCraft,performPioneerCraftShift,
+ pioneerFoodCapacity,pioneerCraftMultiplier,markPioneerFishing,validPioneerLivelihood,
+ type PioneerLivelihood} from './pioneerLivelihood.ts';
 import {createPioneerFrontier,recordPioneerFelling,schedulePioneerClearing,
  performPioneerClearing,pioneerClearingReachable,validatePioneerFrontier,
  type PioneerFrontier} from './pioneerFrontier.ts';
@@ -34,8 +38,8 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land';
-export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard';
+export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land'|'fish'|'craft';
+export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard'|'fish-hut'|'granary';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
  id:number;name:string;role:string;color:string;
@@ -43,7 +47,7 @@ export interface PioneerFounder{
  commute?:WalkPoint[];pathRoadId?:string;
 }
 export interface PioneerResourceSite{
- id:string;kind:'forest'|'forage'|'spring'|'field';x:number;z:number;
+ id:string;kind:'forest'|'forage'|'spring'|'field'|'fish';x:number;z:number;
  stock:number;capacity:number;renewPerDay:number;totalGathered:number;
 }
 export interface PioneerJournal{
@@ -51,7 +55,7 @@ export interface PioneerJournal{
 }
 export interface PioneerIntent{
  id:string;reason:string;createdAt:number;requestedBy:number[];
- kind?:PioneerBuildKind|'repair';targetBuildingId?:string;path?:WalkPoint[];
+ kind?:PioneerBuildKind|'repair'|'loft';targetBuildingId?:string;path?:WalkPoint[];
  parcel:VillageParcel|null;phase:'survey'|'materials'|'foundation'|'frame';
  woodRequired:number;woodCommitted:number;workDone:number;workRequired:number;
  pauseReason:string|null;
@@ -60,6 +64,7 @@ export interface PioneerBuilding{
  id:string;kind:PioneerBuildKind;parcel:VillageParcel;completedAt:number;
  causeId:string;occupants:number[];materialsSpent:{wood:number};workHours:number;
  condition?:number;lastRepairAt?:number;
+  loftAddedAt?:number;loftWoodSpent?:number;loftWorkHours?:number;loftCauseId?:string;
  operating?:boolean;productionMode?:'harvest'|'seed'|'timber'|'repair';
 }
 export interface PioneerWorld{
@@ -70,6 +75,7 @@ export interface PioneerWorld{
  journal:PioneerJournal[];nextEventId:number;policy:PioneerPolicy;comfort:number;
  roads:PioneerRoad[];nextResidentId:number;nextSurveyAt:number;lastArrivalAt:number;
  commons:PioneerCommons;frontier:PioneerFrontier;livingFates:LivingFatesState;
+ livelihood:PioneerLivelihood;
  foodStats?:{day:number;collected:number;consumed:number;previousCollected:number;previousConsumed:number};
 }
 const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
@@ -94,8 +100,7 @@ export function choosePioneerCamp(seed:number):{x:number;z:number}{
  return {x:options[0].x,z:options[0].z};
 }
 function log(s:PioneerWorld,title:string,text:string,causeId:string|null=null){
- if(s.journal.length>=160)s.journal.shift();
- s.journal.push({id:s.nextEventId++,minute:s.minutes,title,text,causeId});
+ appendPioneerJournal(s,title,text,causeId);
 }
 function resourceSites(seed:number,camp:{x:number;z:number}):PioneerResourceSite[]{
  const jitter=(n:number)=>(hash(seed+n)-.5)*1.05;
@@ -142,6 +147,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
   roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0,commons:createPioneerCommons(),
   frontier:createPioneerFrontier(),livingFates:createLivingFates(seed,founders,8*60+20),
+   livelihood:createPioneerLivelihood(),
   foodStats:{day:0,collected:0,consumed:0,previousCollected:0,previousConsumed:0}
  };
  log(s,'荒谷点火','梁伯、陆娘和阿禾在安全的林缘安下临时营火。眼前尚无永久屋舍。');
@@ -206,7 +212,8 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  const atCommons=['eat','cook','socialize','commons-build'].includes(activity);
  const workClearing=activity==='clear-land'?
   s.frontier.clearings.find(c=>c.phase==='clearing'):undefined;
- const targetBuilding=activity==='build'||activity==='repair'?
+ const targetBuilding=activity==='craft'?s.buildings.find(b=>b.kind==='wood-yard'):
+  activity==='build'||activity==='repair'?
   s.buildings.find(b=>b.id===task?.targetBuildingId):shelter;
  const jobRoute=(activity==='build'||activity==='repair')?
   task?.path&&task.path.length?task.path:
@@ -221,6 +228,7 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
     Math.sin(fieldBuilding.parcel.rotation)*(f.id%3-1)*.34)
   ]:site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
+  activity==='craft'&&targetBuilding?pioneerEntrance(targetBuilding.parcel):
   shelter?pioneerEntrance(shelter.parcel):
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
  const isSame=f.activity===activity&&f.target[0]===goal[0]&&f.target[1]===goal[1];
@@ -254,7 +262,8 @@ function gather(s:PioneerWorld,f:PioneerFounder,
  const choices=(preferred?[preferred]:kind==='field'?availablePioneerFields(s):
   s.sites.filter(site=>site.kind===kind&&site.stock>.001))
   .slice().sort((a,b)=>b.stock-a.stock||a.id.localeCompare(b.id));
- const cap=kind==='forest'?48:36;
+ const cap=kind==='forest'?48:kind==='field'||kind==='fish'||kind==='forage'?
+  pioneerFoodCapacity(s):36;
  const held=kind==='forest'?s.resources.wood:kind==='spring'?s.resources.water:s.resources.food;
  for(const site of choices){
   if(held>=cap)return false;
@@ -262,7 +271,7 @@ function gather(s:PioneerWorld,f:PioneerFounder,
   if(f.activity==='rest')continue;
   const efficiency=kind==='field'?pioneerHarvestMultiplier(s,site)*pioneerCultivationMultiplier(s,f.id)*
    pioneerFieldLegacyMultiplier(s,site.id):
-   kind==='forest'?pioneerWoodWorkingMultiplier(s):1;
+   kind==='forest'?pioneerWoodWorkingMultiplier(s)*pioneerCraftMultiplier(s):1;
   const gathered=Math.max(0,Math.min(site.stock,amount*efficiency,cap-held));
   if(!gathered){allocate(s,f,'rest');continue;}
   registerPioneerTrip(s,f.pathRoadId);
@@ -276,6 +285,7 @@ function gather(s:PioneerWorld,f:PioneerFounder,
   else {
    s.resources.food=round(s.resources.food+gathered);
    if(s.foodStats)s.foodStats.collected=round(s.foodStats.collected+gathered);
+   if(kind==='fish')markPioneerFishing(s,f,gathered);
   }
   return true;
  }
@@ -305,7 +315,8 @@ function step(s:PioneerWorld){
   const season=getPioneerCalendar(s).season;
   for(const site of s.sites){
    const factor=(site.kind==='forage'||site.kind==='field')&&season==='winter'?.38:1;
-   const renewal=site.kind==='field'?pioneerFieldRenewMultiplier(s,site):1;
+   const renewal=site.kind==='field'?pioneerFieldRenewMultiplier(s,site):
+    site.kind==='fish'?(season==='winter'?.34:season==='spring'?1.18:1):1;
    site.stock=round(Math.min(site.capacity,site.stock+site.renewPerDay*factor*renewal));
   }
  }
@@ -325,6 +336,7 @@ function step(s:PioneerWorld){
  if(s.minutes%DAY_MINUTES===0&&(s.resources.food<1||s.resources.water<1))
   log(s,'储备告急','乡邻缺少粮水，暂缓非必要劳动，改去水源或有余量的林地采集。');
  requestShelter(s);schedulePioneerProject(s);considerPioneerMigration(s);
+ if(hour===8)considerPioneerCraft(s);
  schedulePioneerCommons(s);reservePioneerCommonsMaterials(s);
  schedulePioneerClearing(s);
  const intent=s.intent;
@@ -400,6 +412,28 @@ function step(s:PioneerWorld){
    }
   }
  }
+ const livelihoodWorkers=new Set<number>();
+ // Real fishing means a resident works at the reached bank, using one
+ // exclusive hour. Fishing stock is seasonal and never minted by the model.
+ if(hour===8||hour===11||hour===16){
+  const reach=s.sites.find(x=>x.kind==='fish'&&x.stock>.08);
+  const fisher=s.founders.find(f=>f.id===6)??s.founders.find(f=>f.id===3);
+  // Fishers try a genuine morning shift before the usual farmers replenish
+  // every basket; if the store is full they cannot mint surplus food.
+  const freeSpace=pioneerFoodCapacity(s)-s.resources.food;
+  if(reach&&fisher&&freeSpace>=.55&&
+   gather(s,fisher,'fish',weather==='rain'?.58:1.05,'fish',reach))
+   livelihoodWorkers.add(fisher.id);
+ }
+ // The woodshop bench is a real paid job, not an instantaneous policy buff.
+ if(hour===16&&s.livelihood.craft.phase==='building'){
+  const artisan=s.founders.find(f=>f.id===5)??s.founders[0];
+  if(!livelihoodWorkers.has(artisan.id)&&!crisis&&s.resources.food>s.founders.length*.72){
+   allocate(s,artisan,'craft');
+   if(artisan.activity==='craft'&&performPioneerCraftShift(s,artisan))
+    livelihoodWorkers.add(artisan.id);
+  }
+ }
  const seedWorkers=new Set<number>();
  if(hour===10&&!crisis){
   considerSeedTrial(s);
@@ -420,7 +454,7 @@ function step(s:PioneerWorld){
   if(field.length&&gather(s,f,'field',amount, 'farm'))return true;
   return gather(s,f,'forage',amount,'forage');
  };
- if(seedWorkers.has(liang.id)||coFarmWorkers.has(liang.id)){
+ if(seedWorkers.has(liang.id)||coFarmWorkers.has(liang.id)||livelihoodWorkers.has(liang.id)){
   // This resident spent the hour at the trial plot instead of collecting.
  }else if(crisis&&!needWood){
   if(!foodTask(liang,.86))allocate(s,liang,'rest');
@@ -430,7 +464,7 @@ function step(s:PioneerWorld){
  else allocate(s,liang,'tend-fire');
  const foodTarget=Math.max(s.founders.length*2.65,
   s.policy==='food'?18:s.policy==='shelter'?5.5:9.5);
- if(seedWorkers.has(he.id)||coFarmWorkers.has(he.id)){
+ if(seedWorkers.has(he.id)||coFarmWorkers.has(he.id)||livelihoodWorkers.has(he.id)){
   // Trial work replaces the ordinary farm shift.
  }else if(s.resources.food<foodTarget||!building||crisis){
   if(!foodTask(he,weather==='rain'?.63:.94))allocate(s,he,'rest');
@@ -445,7 +479,7 @@ function step(s:PioneerWorld){
  const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
   !crisis&&s.resources.food>=s.founders.length*.72&&
   s.resources.water>=Math.max(waterTarget,s.founders.length*.55);
- if(seedWorkers.has(lu.id)||coFarmWorkers.has(lu.id)){
+ if(seedWorkers.has(lu.id)||coFarmWorkers.has(lu.id)||livelihoodWorkers.has(lu.id)){
   // Seed trial work is exclusive of fetching water or clearing land.
  }else if(clearingShift&&clearing){
   // Clearing consumes Lu's assigned hour instead of crediting two jobs.
@@ -467,7 +501,7 @@ function step(s:PioneerWorld){
  }else if(building)work(s,lu);
  else allocate(s,lu,'tend-fire');
  for(const f of s.founders.slice(3)){
-  if(seedWorkers.has(f.id)||coFarmWorkers.has(f.id))continue;
+  if(seedWorkers.has(f.id)||coFarmWorkers.has(f.id)||livelihoodWorkers.has(f.id))continue;
   if(s.resources.food<foodTarget||crisis){
    if(!foodTask(f,.86))allocate(s,f,'rest');
   }else if(s.resources.water<s.founders.length*1.2){
@@ -521,13 +555,13 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    !Number.isInteger(s.nextEventId)||s.nextEventId<1||
    !['balanced','shelter','food'].includes(s.policy)||
    !s.camp||!Number.isFinite(s.camp.x)||!Number.isFinite(s.camp.z)||
-   !Array.isArray(s.founders)||s.founders.length<3||s.founders.length>9||
+   !Array.isArray(s.founders)||s.founders.length<3||s.founders.length>12||
    !s.founders.every(f=>Number.isInteger(f.id)&&f.id>=1&&Number.isFinite(f.target?.[0])&&Number.isFinite(f.target?.[1]))||
    new Set(s.founders.map(f=>f.id)).size!==s.founders.length||
    !s.resources||!['wood','food','water'].every(k=>Number.isFinite(s.resources[k as keyof typeof s.resources])&&s.resources[k as keyof typeof s.resources]>=0)||
-   !Array.isArray(s.sites)||s.sites.length<3||s.sites.length>12||
+   !Array.isArray(s.sites)||s.sites.length<3||s.sites.length>20||
    !s.sites.every(site=>Number.isFinite(site.stock)&&site.stock>=0&&Number.isFinite(site.capacity)&&site.capacity>=site.stock&&Number.isFinite(site.totalGathered))||
-   !Array.isArray(s.buildings)||s.buildings.length>12||
+   !Array.isArray(s.buildings)||s.buildings.length>20||
    !Array.isArray(s.journal)||s.journal.length>160)return null;
   if(s.foodStats){
    const fs=s.foodStats;
@@ -558,24 +592,42 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    life.fieldLegacies=[];life.appliedEffectIds=[];
   }
   if(!validateLivingFates(s))return null;
-  if(!Array.isArray(s.roads)||s.roads.length>12||
+   s.livelihood??=createPioneerLivelihood();
+   if(!validPioneerLivelihood(s))return null;
+  if(!Array.isArray(s.roads)||s.roads.length>20||
    !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||
    !Number.isFinite(s.nextSurveyAt)||!Number.isFinite(s.lastArrivalAt))return null;
   const ids=new Set<string>();
   const occupied=[...landscape(),campParcel(s)];
   for(const b of s.buildings){
-   if(!b||!['shelter','garden','cottage','wood-yard'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
+   if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
+    (b.loftAddedAt!==undefined&&(b.kind!=='cottage'||!Number.isFinite(b.loftAddedAt)||
+      b.loftAddedAt<b.completedAt||b.loftAddedAt>s.minutes||
+      b.loftWoodSpent!==4||typeof b.loftCauseId!=='string'||
+      !b.loftCauseId.startsWith('pioneer-loft-')||typeof b.loftWorkHours!=='number'||
+      !Number.isFinite(b.loftWorkHours)||b.loftWorkHours<8||
+      b.loftWorkHours>8.001))||
+    (b.loftAddedAt===undefined&&(b.loftWoodSpent!==undefined||b.loftWorkHours!==undefined||b.loftCauseId!==undefined))||
+    (b.kind==='cottage'&&b.occupants.length>(b.loftAddedAt!==undefined?3:2))||typeof b.id!=='string'||ids.has(b.id)||!b.parcel||!b.materialsSpent||
     !(b.materialsSpent.wood>=0)||b.materialsSpent.wood>20||
     !Number.isFinite(b.parcel.x)||!Number.isFinite(b.parcel.z)||
     !validatePioneerParcel(b.parcel,occupied,s.roads.filter(road=>road.buildingId!==b.id)).ok)return null;
    ids.add(b.id);occupied.push(b.parcel);
   }
   if(s.intent){
+   if(s.intent.kind==='loft'&&(
+    s.intent.woodRequired!==4||s.intent.workRequired!==8||
+    ![0,4].includes(s.intent.woodCommitted)||
+    (s.intent.phase==='materials'&&s.intent.woodCommitted!==0)||
+    (['foundation','frame'].includes(s.intent.phase)&&s.intent.woodCommitted!==4)||
+    !s.buildings.some(b=>b.kind==='cottage'&&
+     b.id===s.intent?.targetBuildingId&&b.loftAddedAt===undefined&&
+     b.parcel.id===s.intent?.parcel?.id)))return null;
    if(!['survey','materials','foundation','frame'].includes(s.intent.phase)||
     !Number.isFinite(s.intent.woodCommitted)||!Number.isFinite(s.intent.workDone)||
     s.intent.woodCommitted<0||s.intent.woodCommitted>20||
     s.intent.workDone<0||s.intent.workDone>30)return null;
-   if(s.intent.parcel&&s.intent.kind!=='repair'&&
+   if(s.intent.parcel&&s.intent.kind!=='repair'&&s.intent.kind!=='loft'&&
     !validatePioneerParcel(s.intent.parcel,occupied,s.roads).ok)return null;
   }
   return s;
@@ -595,7 +647,7 @@ export function loadPioneerWorld(storage:Pick<Storage,'getItem'>,now=Date.now(),
 export function pioneerSummary(s:PioneerWorld){
  const project=s.intent;
  if(project){
-  const label=project.kind==='repair'?'修缮旧屋':pioneerBuildingLabel(project.kind??'shelter');
+  const label=project.kind==='repair'?'修缮旧屋':project.kind==='loft'?'山居木阁改造':pioneerBuildingLabel(project.kind??'shelter');
   if(project.phase==='survey')return project.pauseReason||'正在寻找安全可达的屋址';
   if(project.phase==='materials')return '筹建'+label+' · '+(project.pauseReason||'正在备料');
   if(project.phase==='foundation')return label+' · 地基施工中';

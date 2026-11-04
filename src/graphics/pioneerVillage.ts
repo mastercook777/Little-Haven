@@ -265,7 +265,7 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
  plinth.name='shelter-plinth';
  return g;
 }
-interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;}
+interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;rod:THREE.Group;}
 function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  const g=group(parent,0,.19,0);g.name='pioneer-'+founder.id;
  g.userData.founderId=founder.id;
@@ -307,13 +307,18 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
   log.rotation.x=Math.PI/2;
  }
  cargo.visible=false;
- return {root:g,arms,legs,head,tool,mealBowl,axe,cargo};
+ const rod=group(g,.35,1.02,.32);rod.name='working-river-fishing-rod';
+ const stem=pole(rod,0,.36,.05,.026,.96,lightWood);stem.rotation.x=-.32;
+ box(rod,0,.92,.23,.016,.50,.018,cloth);
+ const reel=orb(rod,-.07,.22,0,.09,wood,.45,.80,1.3);
+ reel.name='fisher-reel';rod.visible=false;
+ return {root:g,arms,legs,head,tool,mealBowl,axe,cargo,rod};
 }
 /** The facility models share eave limits with the space planner while
  * changing the actual silhouette, not merely swapping a material. */
 function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind,
  phase:'foundation'|'frame'|'complete',progress:number,condition=100,
- seedMark?:'working'|'resolved'|'abandoned'){
+ seedMark?:'working'|'resolved'|'abandoned',craftReady=false,loftReady=false){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
@@ -357,6 +362,55 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   }
   return g;
  }
+ if(kind==='fish-hut'){
+  // Real shore fishing bay: lower piling, shaded rack, net poles, baskets.
+  box(g,0,.11,0,2.52,.16,2.23,material('#a8a08b'));
+  if(phase==='foundation')return g;
+  for(const x of [-1.07,1.07])for(const z of [-.86,.86])
+   pole(g,x,.94,z,.085,1.76,wood);
+  box(g,0,1.79,0,2.48,.13,2.20,lightWood);
+  const roof=material('#ad9a70');
+  buildPioneerRoof(g,{halfWidth:1.34,halfDepth:1.11,eaveY:1.85,
+   ridgeY:2.30,thickness:.10},roof,wood,lightWood,thatchBright);
+  if(phase!=='complete')return g;
+  for(const x of [-.84,-.28,.28,.84])pole(g,x,.48,-.63,.022,.58,lightWood);
+  for(const z of [-.75,-.39,-.03,.33]){
+   const net=box(g,0,.56,z,1.82,.025,.022,material('#bcae86'));
+   net.name='real-fishing-net';
+  }
+  box(g,.75,.46,.70,.60,.14,.51,wood);
+  for(let i=0;i<5;i++){
+   const fish=orb(g,-.75+i*.20,.47,-.08,.11,
+    material('#879fa0'),1.5,.33,.58);
+   fish.name='visible-caught-fish';
+   fish.userData.fishIndex=i;
+  }
+  for(const x of [-1.12,1.12])pole(g,x,.32,1.04,.045,.48,wood);
+  return g;
+ }
+ if(kind==='granary'){
+  // Raised storage house; long-use grain jars are bound to actual supplies.
+  for(const x of [-.94,.94])for(const z of [-.83,.83])
+   pole(g,x,.75,z,.11,1.44,wood);
+  box(g,0,1.35,0,2.30,.20,2.09,stone);
+  if(phase==='foundation')return g;
+  for(const x of [-1.01,1.01])box(g,x,1.98,0,.16,1.22,1.92,lightWood);
+  box(g,0,2.03,-.94,2.05,1.19,.14,thatch);
+  box(g,0,2.48,.94,2.05,.29,.14,wood);
+  box(g,0,2.60,0,2.1,.15,2.0,thatchBright);
+  const roof=material('#8b8e75');
+  buildPioneerRoof(g,{halfWidth:1.23,halfDepth:1.14,eaveY:2.64,
+   ridgeY:3.12,thickness:.09},roof,wood,lightWood);
+  if(phase==='complete'){
+   for(let i=0;i<6;i++){
+    const jar=orb(g,-.83+(i%3)*.83,1.60,-.58+Math.floor(i/3)*.82,
+     .24,material('#b69b72'),1,.72,1);
+    jar.name='stored-real-grain-jar';jar.userData.jarIndex=i;
+   }
+   for(let k=0;k<4;k++)box(g,0,.26+k*.25,1.17,.84,.065,.12,lightWood);
+  }
+  return g;
+ }
  const cottage=kind==='cottage';
  const w=cottage?2.64:2.38,d=cottage?2.50:2.31,h=cottage?1.68:1.57;
  const plaster=material('#d4c5a7');
@@ -382,6 +436,16 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   for(const x of [-w*.45,w*.45])box(g,x,h+.16,0,.14,.14,d*.9,wood);
   box(g,0,h-.07,d*.475,.86,.29,.14,lightWood); // lintel above door
   if(phase==='complete'){
+   if(loftReady){
+    // A dormer reveals the paid interior bed without expanding the
+    // original SAT/eave footprint or clipping into a neighbouring lane.
+    const dormer=group(g,0,2.11,.58);dormer.name='paid-residential-loft';
+    box(dormer,0,.06,0,.72,.49,.18,plaster);
+    box(dormer,0,.08,.107,.43,.30,.045,paper);
+    for(const x of [-.22,.22])box(dormer,x,.08,.13,.036,.37,.038,wood);
+    box(dormer,0,.08,.14,.47,.038,.035,lightWood);
+    box(dormer,0,.34,0,.94,.10,.49,material('#697e7a')).rotation.z=.08;
+   }
    const doorMesh=box(g,0,.77,d*.51,.66,1.04,.075,door);
    doorMesh.name='cottage-door';
    orb(g,.22,.78,d*.56,.035,lightWood);
@@ -412,6 +476,13 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  if(phase==='frame'){
   for(const z of [-d*.42,d*.42])box(g,0,h+.21,z,w,.12,.13,wood);
   return g;
+ }
+ if(kind==='wood-yard'&&phase==='complete'&&craftReady){
+  const bench=group(g,-.54,0,.48);bench.name='actual-crafted-sawbench';
+  box(bench,0,.81,0,1.04,.13,.43,lightWood);
+  for(const x of [-.37,.37])pole(bench,x,.43,0,.061,.77,wood);
+  box(bench,0,1.02,-.13,.074,.42,.08,stone).rotation.z=.34;
+  for(let i=0;i<3;i++)box(bench,-.29+i*.29,.43,.53,.20,.16,.68,wood);
  }
  const roof=material(cottage?'#677a77':'#9c8668');
  buildPioneerRoof(g,{
@@ -458,7 +529,8 @@ export interface PioneerGraphics{
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
-   seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean};
+   seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
+   fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -498,6 +570,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  rain.frustumCulled=false;root.add(rain);
  let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
  const gardenCrops=new Map<string,THREE.Mesh[]>();
+ const fishProps=new Map<string,THREE.Mesh[]>(),grainProps=new Map<string,THREE.Mesh[]>();
  let latestWorld=world;
  let selected:PioneerSelection|null=null;
  const glow=new THREE.Mesh(new THREE.RingGeometry(.89,1.0,48),
@@ -535,12 +608,14 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const progress=s.intent?.workDone??0;
   const progressIndex=Math.floor(progress*2);
   const signature=s.buildings.map(b=>b.id+':'+((b.condition??100)<78?'w':'c')+
+    (b.kind==='cottage'&&b.loftAddedAt!==undefined?':loft':'')+
+    (b.kind==='wood-yard'?':'+s.livelihood.craft.phase:'')+
     (b.kind==='garden'?':'+(s.livingFates.seedTrials.filter(t=>t.gardenId===b.id).at(-1)?.phase??''):'' )).join(',')+
    '/'+(s.intent?.id??'')+'/'+phase+'/'+(s.intent?.parcel?.x??'')+'/'+
    (s.intent?.parcel?.z??'');
   let rebuilt=false;
   if(signature!==lastBuildSig||progressIndex!==lastProgressIndex){
-   rebuilt=true;gardenCrops.clear();
+   rebuilt=true;gardenCrops.clear();fishProps.clear();grainProps.clear();
    while(constructionLayer.children.length){
     const old=constructionLayer.children[0];constructionLayer.remove(old);
    }
@@ -548,7 +623,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     const trial=built.kind==='garden'?
      s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
     const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
-     trial?.phase);
+     trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined);
     if(built.kind==='garden'){
      const crops:THREE.Mesh[]=[];
      plot.traverse(child=>{
@@ -557,11 +632,20 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
      crops.sort((a,b)=>Number(a.userData.cropIndex)-Number(b.userData.cropIndex));
      gardenCrops.set(built.id,crops);
     }
+    if(built.kind==='fish-hut'||built.kind==='granary'){
+     const items:THREE.Mesh[]=[];
+     plot.traverse(child=>{
+      if(child instanceof THREE.Mesh&&child.name===(built.kind==='fish-hut'?
+       'visible-caught-fish':'stored-real-grain-jar'))items.push(child);
+     });
+     if(built.kind==='fish-hut')fishProps.set(built.id,items);
+     else grainProps.set(built.id,items);
+    }
    }
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
-    if(s.intent.kind==='repair'){
+    if(s.intent.kind==='repair'||s.intent.kind==='loft'){
      const p=s.intent.parcel,g=group(constructionLayer,p.x,.19,p.z);
-     g.rotation.y=p.rotation;g.name='pioneer-repair-scaffold';
+     g.rotation.y=p.rotation;g.name=s.intent.kind==='loft'?'pioneer-loft-scaffold':'pioneer-repair-scaffold';
      for(const x of [-p.width*.41,p.width*.41])for(const z of [-p.depth*.43,p.depth*.43])
       pole(g,x,.9,z,.04,1.72,lightWood);
      box(g,0,1.68,0,p.width*.88,.07,.12,lightWood);
@@ -595,6 +679,14 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
        i%2?'#75a46d':'#91af6b');
     }
    }
+  }
+  for(const [id,props] of fishProps){
+   const caught=s.sites.find(site=>site.id==='fish-'+id)?.totalGathered??0;
+   props.forEach((mesh,i)=>{mesh.visible=caught>=i+1;});
+  }
+  for(const props of grainProps.values()){
+   const stored=s.resources.food;
+   props.forEach((jar,i)=>{jar.visible=stored>=(i+1)*8;});
   }
   if(lastSeason!==season){
    lastSeason=season;river.setSeason(season);
@@ -646,16 +738,21 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    visual.mealBowl.visible=f.activity==='eat'||f.activity==='eat-home';
    const forester=f.activity==='collect-wood'||f.activity==='clear-land';
    visual.axe.visible=forester&&!(moving&&phaseHour>.78);
+   visual.rod.visible=f.activity==='fish'&&!moving;
    visual.cargo.visible=f.activity==='collect-wood'&&moving&&phaseHour>.78;
    visual.axe.rotation.z=forester&&!moving?
     .32*Math.sin(seconds*6+i):0;
-   if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build')&&!moving){
+   if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build'||f.activity==='craft')&&!moving){
     const effort=Math.sin(seconds*5+i)*.20;
     visual.arms[0].rotation.x=-.72+effort;visual.arms[1].rotation.x=-.72-effort;
    }else if(forester&&!moving){
     visual.arms[0].rotation.x=-1.03+.35*Math.sin(seconds*7+i);
     visual.arms[1].rotation.x=-.38;
     visual.head.rotation.x=.15;
+   }else if(f.activity==='fish'&&!moving){
+    visual.arms[0].rotation.x=-.83+.10*Math.sin(seconds*2.4+i);
+    visual.arms[1].rotation.x=-.61;
+    visual.rod.rotation.x=.12*Math.sin(seconds*2+i);
    }else if(f.activity==='cook'&&!moving){
     visual.arms[0].rotation.x=-1.0+.3*Math.sin(seconds*4+i);
     visual.arms[1].rotation.x=-.50+.25*Math.cos(seconds*4+i);
@@ -698,7 +795,14 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   gardenSprouts:[...gardenCrops.values()].reduce((n,crops)=>
    n+crops.filter(c=>c.visible).length,0),
   campWoodLogs:camp.woodLogs.filter(log=>log.visible).length,
-  focusedResident:glow.visible&&selected?.kind==='person'
+  focusedResident:glow.visible&&selected?.kind==='person',
+  fishCaughtProps:[...fishProps.values()].reduce((n,items)=>
+   n+items.filter(p=>p.visible).length,0),
+  grainJars:[...grainProps.values()].reduce((n,items)=>
+   n+items.filter(p=>p.visible).length,0),
+  sawbenches:constructionLayer.children.filter(g=>g.getObjectByName('actual-crafted-sawbench')).length,
+  fishingActors:latestWorld.founders.filter(f=>f.activity==='fish').length,
+  loftDormers:constructionLayer.children.filter(g=>g.getObjectByName('paid-residential-loft')).length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}

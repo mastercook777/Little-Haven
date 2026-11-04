@@ -1,6 +1,7 @@
 import {getCalendarFromMinutes,SEASON_NAMES} from '../simulation/calendar.ts';
 import {publicPersonHistory,publicPersonRelations} from '../simulation/livingFates/peopleState.ts';
 import {pioneerBuildingLabel} from '../simulation/pioneerGrowth.ts';
+import {pioneerFoodCapacity} from '../simulation/pioneerLivelihood.ts';
 import {gardenSeedTrial} from '../simulation/livingFates/seedTrial.ts';
 import {pioneerCommonsNames} from '../simulation/pioneerCommons.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive,isPioneerOperational} from '../simulation/pioneerFacilities.ts';
@@ -19,7 +20,7 @@ const date=(minutes:number)=>{
  return '第 '+c.year+' 年 · '+SEASON_NAMES[c.season]+c.dayOfSeason+' 日';
 };
 const siteLabels:Record<PioneerResourceSite['kind'],string>={
- forest:'山林木料区',forage:'野食采集地',spring:'山泉水源',field:'村民菜圃'
+ forest:'山林木料区',forage:'野食采集地',spring:'山泉水源',field:'村民菜圃',fish:'河岸鱼群'
 };
 const relevant=(s:PioneerWorld,causeId:string)=>{
  const entries=s.journal.filter(x=>x.causeId===causeId);
@@ -42,7 +43,8 @@ export function inspectPioneerSelection(s:PioneerWorld,
    {label:'来谷记录',value:person.arrivalKnown?date(person.arrivalAt):'旧档已有乡邻 · 来时未详'},
    {label:'落脚住处',value:f.homeBuildingId?
     (s.buildings.find(b=>b.id===f.homeBuildingId)?.kind==='cottage'?'山居':'避雨棚'):'尚在营地'},
-   {label:'此刻正在',value:f.activity==='seed-trial'?'留种照料试田':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
+   {label:'此刻正在',value:f.activity==='seed-trial'?'留种照料试田':f.activity==='fish'?'河岸捕鱼':
+     f.activity==='craft'?'木坊锯作':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
     f.activity==='build'?'参与建屋':f.activity==='eat'?'村心用餐':f.activity==='socialize'?'邻里闲谈':'村中日常'},
    {label:'已见本领',value:person.publicFacts.knownSkills.join('、')||'仍在相处中'},
    {label:'田间实践',value:person.skills.cultivation.xp+' 小时；经验 '+person.skills.cultivation.level+' 阶'},
@@ -86,6 +88,27 @@ export function inspectPioneerSelection(s:PioneerWorld,
   }
   if(b.kind==='wood-yard'){
    facts.push({label:'当前功能',value:'木材整理与工具保养'});
+   facts.push({label:'锯木台进展',value:s.livelihood.craft.phase==='idle'?'尚未投资':
+    s.livelihood.craft.phase==='building'?'已耗 4 份木料，已作 '+s.livelihood.craft.workHours+' / 6 小时':
+    '已由乡邻做完 6 小时 · 此后采木再多整理 16%'});
+  }
+  if(b.kind==='fish-hut'){
+   const fish=s.sites.find(x=>x.id==='fish-'+b.id);
+   facts.push({label:'渔点存量',value:fixed(fish?.stock??0)+' / '+fixed(fish?.capacity??0)});
+   facts.push({label:'真实总渔获',value:fixed(fish?.totalGathered??0)+' 份入村粮'});
+   facts.push({label:'这次有谁捕鱼',value:s.founders.filter(f=>f.activity==='fish')
+    .map(f=>f.name).join('、')||'此时无人下竿'});
+   facts.push({label:'渔业始于',value:s.livelihood.firstFishAt===null?'尚未有第一篓':
+    date(s.livelihood.firstFishAt)});
+  }
+  if(b.kind==='cottage'){
+   facts.push({label:'现有安居容量',value:(b.loftAddedAt!==undefined?'3':'2')+' 人'});
+   if(b.loftAddedAt!==undefined)facts.push({label:'木阁改造',value:
+    date(b.loftAddedAt)+' · 4 份木料 / 8 工时 · 屋界未扩张'});
+  }
+  if(b.kind==='granary'){
+   facts.push({label:'全村储粮容量',value:fixed(pioneerFoodCapacity(s))+' 份'});
+   facts.push({label:'眼下实有粮食',value:fixed(s.resources.food)+' 份 · 非免费填仓'});
   }
   const operation=isPioneerOperational(b)?{
    id:b.id,active:isPioneerFacilityActive(b),
@@ -97,6 +120,8 @@ export function inspectPioneerSelection(s:PioneerWorld,
   const description=b.kind==='shelter'?'开荒三人亲手建成的避雨之处。':
    b.kind==='cottage'?'乡邻拥有真实住户与出入路径的山居。':
    b.kind==='garden'?'季节和生产安排决定收成，不能凭空供粮。':
+   b.kind==='fish-hut'?'河岸先要合法落地、村民出工，冬季鱼群恢复慢。每一篓才会变成村中的粮食。':
+   b.kind==='granary'?'架高的储粮阁扩大储量但不生产粮食，所有仓中口粮仍来自真实劳动。':
    '木匠在这里晾晒材料、维护工具和准备建筑木料。';
   return {title:pioneerBuildingLabel(b.kind),kicker:'已建成 · '+b.id,
    description,facts,history:[
@@ -109,7 +134,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
  }
  if(selection.kind==='intent'){
   const intent=s.intent;if(!intent||intent.id!==selection.id)return null;
-  const title=intent.kind==='repair'?'修缮中的旧屋':pioneerBuildingLabel(intent.kind??'shelter')+'工地';
+  const title=intent.kind==='repair'?'修缮中的旧屋':intent.kind==='loft'?'山居木阁改造':pioneerBuildingLabel(intent.kind??'shelter')+'工地';
   return {title,kicker:'真实施工 · '+intent.phase,description:intent.reason,
    facts:[
     {label:'申请时间',value:date(intent.createdAt)},
@@ -137,7 +162,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
     ]:[]),
     {label:'正在工作',value:s.founders.filter(f=>
       Math.hypot(f.target[0]-site.x,f.target[1]-site.z)<2.1&&
-      ['collect-wood','forage','fetch-water','farm'].includes(f.activity))
+      ['collect-wood','forage','fetch-water','farm','fish'].includes(f.activity))
       .map(f=>f.name).join('、')||'暂无'}
    ],history:[]};
  }

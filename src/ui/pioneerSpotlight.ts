@@ -21,8 +21,16 @@ function fromEvent(s:PioneerWorld,e:PioneerJournal):PioneerSpotlight|null{
  const when='乡邻见闻 · '+label+'时';
  const b=s.buildings.find(x=>x.causeId===e.causeId||x.id===e.causeId);
  if((e.title==='避雨棚落成'||e.title==='菜圃落成'||
-  e.title==='山居落成'||e.title==='木作棚落成')&&b)
+  e.title==='山居落成'||e.title==='木作棚落成'||
+  e.title==='河岸渔棚落成'||e.title==='架高粮仓落成')&&b)
   return pick(when,e.title,e.text,built(b.id),'event-'+e.id,'看新建的'+pioneerBuildingLabel(b.kind));
+ if(['第一篓渔获','锯木台终于装好','木作棚试制锯台'].includes(e.title)&&b)
+  return pick(when,e.title,e.text,built(b.id),'event-'+e.id,'看新的生计');
+ if(e.title==='山居木阁落成'){
+  const home=s.buildings.find(x=>x.kind==='cottage'&&x.loftCauseId===e.causeId);
+  if(home)return pick(when,'老屋檐下又有了新床位',
+   e.text,built(home.id),'event-'+e.id,'看添出的木阁');
+ }
  if(e.title==='又添一位乡邻'){
   const newcomer=s.founders.find(f=>f.id>3&&e.text.includes(f.name));
   if(newcomer)return pick(when,newcomer.name+'在谷中安下家',
@@ -75,7 +83,7 @@ export function getPioneerSpotlight(s:PioneerWorld):PioneerSpotlight{
     '这处工地已投入 '+material(project.workDone)+' / '+
     material(project.workRequired)+' 小时；材料已从库存扣除。';
    return pick(current+' · 屋舍在长大',
-    project.kind==='repair'?'旧屋还要有人修':'乡邻正在建'+pioneerBuildingLabel(project.kind??'shelter'),
+    project.kind==='repair'?'旧屋还要有人修':project.kind==='loft'?'山居在添木阁':'乡邻正在建'+pioneerBuildingLabel(project.kind??'shelter'),
     detail,{kind:'intent',id:project.id},
     'project-'+project.id+'-'+project.phase,'看工地');
   }
@@ -89,12 +97,53 @@ export function getPioneerSpotlight(s:PioneerWorld):PioneerSpotlight{
    '梁伯、陆娘和阿禾只有营火与少量口粮。待有人真正采木、选址，才能看见第一间屋的地基。',
    forest?site(forest.id):camp,'first-night','看林地');
  }
+ // Once multiple trades exist, do not pin the billboard to fishing
+ // forever. Rotate *observations*, not simulation events, and always link to
+ // an actual built structure. There is no fake date-based construction.
+ const candidates:PioneerSpotlight[]=[];
+ const fishing=s.buildings.find(b=>b.kind==='fish-hut');
+ if(fishing){
+  const site=s.sites.find(site=>site.id==='fish-'+fishing.id);
+  candidates.push(pick(current+' · 靠河吃饭',
+   s.livelihood.firstFishAt===null?'渔棚建好，还等第一篓鱼':'河水养着一份新生计',
+   '河岸实际渔获累计 '+material(site?.totalGathered??0)+
+   ' 份；眼下鱼群库存 '+material(site?.stock??0)+
+   ' 份。天气和季节会影响下一次出工。',
+   built(fishing.id),'fish-'+fishing.id,'去河岸看看'));
+ }
+ const granary=s.buildings.find(b=>b.kind==='granary');
+ if(granary)candidates.push(pick(current+' · 田园有余',
+  '今年的余粮，有了地方安放',
+  '投过木料和工时的粮仓现在能储 54 份口粮；实际已有 '+material(s.resources.food)+
+   ' 份，存储容量并不会自己生产粮食。',
+  built(granary.id),'granary-'+granary.id,'看粮仓'));
+ const lofts=s.buildings.filter(b=>b.kind==='cottage'&&b.loftAddedAt!==undefined);
+ if(lofts.length){
+  const home=lofts.at(-1)!;
+  candidates.push(pick(current+' · 安家添丁',
+   '屋檐之下，又容得下一位乡邻',
+   '有人花木料和八个真实施工小时在原屋界内修好木阁。谷里现有 '+
+    s.founders.length+' 位常住乡邻，新增床位仍得等人真正迁来。',
+   built(home.id),'loft-'+home.id,'看新木阁'));
+ }
+ const yard=s.buildings.find(b=>b.kind==='wood-yard');
+ if(yard&&s.livelihood.craft.phase!=='idle')
+  candidates.push(pick(current+' · 林间匠村',
+   s.livelihood.craft.phase==='complete'?'锯台装好，木料更有用处':'木匠正在琢磨一座锯台',
+   s.livelihood.craft.phase==='complete'?
+    '木工已耗四份木料、完成六小时锯作。之后每次真实伐木都能多整理出可用木料。':
+    '乡邻已花四份木料，锯作进度 '+
+      material(s.livelihood.craft.workHours)+' / 6 小时，未完工不会获得加成。',
+   built(yard.id),'craft-'+yard.id,'看木作棚'));
  const completed=s.livingFates.seedTrials.find(t=>t.phase==='resolved'&&
   s.livingFates.fieldLegacies.some(l=>l.sourceTrialId===t.id));
- if(completed&&s.buildings.some(b=>b.id===completed.gardenId)){
-  return pick(current+' · 人与土地','两人的本事留在了田里',
+ if(completed&&s.buildings.some(b=>b.id===completed.gardenId))
+  candidates.push(pick(current+' · 人与土地','两人的本事留在了田里',
    '这块真实菜圃因为两人共劳、花种粮又跨过一季，如今实际采收多得 6%。',
-   built(completed.gardenId),'legacy-'+completed.id,'看留下的田');
+   built(completed.gardenId),'legacy-'+completed.id,'看留下的田'));
+ if(candidates.length){
+  const turn=Math.floor(s.minutes/(6*DAY_MINUTES));
+  return candidates[turn%candidates.length];
  }
  const garden=s.buildings.find(b=>b.kind==='garden');
  const settlement=s.founders.length>3?current+' · 有了新邻居':

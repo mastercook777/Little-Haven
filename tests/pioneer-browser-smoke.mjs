@@ -124,6 +124,23 @@ try{
   throw Error('Shelter was not caused by the real resource/work/occupancy system');
  const finishDigest=await screenshot(page,'03-occupied-shelter');
  if(finishDigest===startDigest)throw Error('Pioneer island did not visibly change');
+ // The new low-frequency council must have real options beyond the
+ // original 3 survival policies, and each vote persists independently.
+ await page.locator('#pioneerCouncilOpen').click();
+ if(!await page.locator('#pioneerLivelihoodPanel').evaluate(node=>node.open))
+  throw Error('Quick village council cannot open development options');
+ const available=await page.locator('#pioneerDirections button[data-livelihood]').count();
+ if(available!==4)throw Error('Village council still offers only the old 3 advice buttons');
+ await page.locator('#pioneerDirections button[data-livelihood="river"]').click();
+ const directionState=await page.evaluate(()=>({
+  direction:window.__PIONEER_DEBUG__.getState().livelihood.direction,
+  story:document.querySelector('#pioneerJournal')?.textContent,
+  council:document.querySelector('#pioneerLivelihoodLabel')?.textContent
+ }));
+ if(directionState.direction!=='river'||!directionState.story?.includes('守谷人提议生计方向')||
+  directionState.council!=='靠河吃饭')
+  throw Error('Village council vote does not change real persistent world state: '+
+   JSON.stringify(directionState));
  const diagnostics=await page.evaluate(()=>window.__PIONEER_DEBUG__.getRendererInfo());
  if(diagnostics.calls<=0||diagnostics.triangles<=0)throw Error('No real WebGL drawing: '+JSON.stringify(diagnostics));
  results.push({desktop:initial,construction:true,completed:true,renderer:diagnostics});
@@ -135,7 +152,8 @@ try{
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
  const restored=await page.evaluate(()=>window.__PIONEER_DEBUG__.getState());
- if(restored.buildings.length!==1||restored.buildings[0].id!==b.id)
+ if(restored.buildings.length!==1||restored.buildings[0].id!==b.id||
+  restored.livelihood?.direction!=='river')
   throw Error('Pioneer local save not restored after browser reload');
  // Verify the mesh, not a debug-only button, opens the actual registry card.
  const firstPoint=await page.evaluate(id=>window.__PIONEER_DEBUG__.projectBuilding(id),b.id);
@@ -192,6 +210,26 @@ try{
    JSON.stringify(fieldVisualization));
  results.push({livingChapter:true,woodpileCount:fieldVisualization.actual.campWoodLogs,
   realCropMeshes:fieldVisualization.actual.gardenSprouts});
+ const laterChoices=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,s=d.getState(),v=d.getVisuals();
+  const milestones=Array.from(document.querySelectorAll('#pioneerMilestones .done'))
+   .map(x=>x.textContent);
+  return {kinds:s.buildings.map(b=>b.kind),people:s.founders.length,
+   fish:s.sites.filter(x=>x.kind==='fish'),jobs:s.founders.map(f=>f.activity),
+   visual:v,storage:s.resources.food,way:s.livelihood.direction,
+   craft:s.livelihood.craft,progress:milestones};
+ });
+ if(!laterChoices.kinds.includes('fish-hut')||
+  laterChoices.fish.length!==1||laterChoices.fish[0].totalGathered<=0)
+  throw Error('After 3 years and a river vote, there is still no real fishing: '+
+   JSON.stringify(laterChoices));
+ if(!laterChoices.visual.renderedStructures||laterChoices.visual.fishCaughtProps<1||
+  !laterChoices.progress.some(x=>x.includes('靠河吃饭')))
+  throw Error('Fish livelihood lacks distinct geometry or real milestone record: '+
+   JSON.stringify(laterChoices));
+ await screenshot(page,'05c-actual-river-livelihood');
+ results.push({riverVote:true,realRiverStock:laterChoices.fish[0].stock,
+  actualFishCaught:laterChoices.fish[0].totalGathered,fishProps:laterChoices.visual.fishCaughtProps});
  const commonsInfo=await page.evaluate(()=>{
   const w=window.__PIONEER_DEBUG__.getState();
   return {stage:w.commons.stage,work:w.commons.workHours,
@@ -229,6 +267,20 @@ try{
  },gardenId);
  if(settings?.productionMode!=='seed'||settings.operating!==false)
   throw Error('Real facility controls did not update simulation/save: '+JSON.stringify(settings));
+ const validAtReload=await page.evaluate(async()=>{
+  const s=window.__PIONEER_DEBUG__.getState();
+  const {importPioneerWorld}=await import('/src/simulation/pioneerWorld.ts');
+  const {validateLivingFates}=await import('/src/simulation/livingFates/peopleState.ts');
+  const {validPioneerLivelihood}=await import('/src/simulation/pioneerLivelihood.ts');
+  const {validatePioneerFrontier}=await import('/src/simulation/pioneerFrontier.ts');
+  return {importOK:!!importPioneerWorld(JSON.stringify(s)),life:validateLivingFates(s),
+   business:validPioneerLivelihood(s),forest:validatePioneerFrontier(s.frontier,s),
+   population:s.founders.length,huts:s.buildings.map(b=>b.kind),
+   sites:s.sites.map(x=>({kind:x.kind,id:x.id})),journal:s.journal.length,
+   fish:s.livelihood,active:s.livingFates.relationships.length};
+ });
+ if(!validAtReload.importOK)throw Error('Full lived-in v4 settlement cannot roundtrip: '+
+  JSON.stringify(validAtReload));
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
  const savedConfig=await page.evaluate(id=>window.__PIONEER_DEBUG__.getState()
@@ -360,6 +412,32 @@ try{
  await page.locator('#inspectClose').click();
  results.push({phaseB:grown,gardenInspected:true,gardenControlsPersist:true,
   commons:commonsInfo,frontier:pioneerFelling,clearingCard:true});
+ // A separate untouched four-year save proves real additional residents,
+ // paid in-house loft conversions, and rendered professions. Earlier tests
+ // intentionally changed a garden's operating state and must not influence it.
+ const mature=await page.evaluate(async()=>{
+  const d=window.__PIONEER_DEBUG__;
+  const {DAY_MINUTES}=await import('/src/simulation/calendar.ts');
+  d.reset(42);
+  d.advance((48*4*DAY_MINUTES-d.getState().minutes)/3);
+  const s=d.getState(),v=d.getVisuals();
+  const lofts=s.buildings.filter(b=>b.kind==='cottage'&&b.loftAddedAt!==undefined);
+  return {people:s.founders.length,lofts:lofts.map(b=>({
+   id:b.id,wood:b.loftWoodSpent,work:b.loftWorkHours,at:b.loftAddedAt
+  })),built:s.buildings.map(b=>b.kind),
+   fish:s.sites.find(x=>x.kind==='fish')?.totalGathered??0,
+   rendered:v.renderedStructures,loftDormers:v.loftDormers,
+   sawbenches:v.sawbenches,wood:s.resources.wood,food:s.resources.food};
+ });
+ if(mature.people<=9||mature.lofts.length<1||
+  mature.lofts.some(x=>x.wood!==4||x.work!==8)||
+  !mature.built.includes('fish-hut')||!mature.built.includes('granary')||
+  mature.fish<=0||mature.loftDormers<mature.lofts.length||
+  mature.rendered<mature.built.length)
+  throw Error('No mature paid/visible village growth after four real years: '+
+   JSON.stringify(mature));
+ await screenshot(page,'05d-four-year-life-and-paid-lofts');
+ results.push({matureVillage:mature});
  // A quick fresh-world playback checks an actual felling animation window.
  // The real simulation is advanced in hour-sized chunks and the GPU model
  // is refreshed by the same public debug helper used for other snapshots.
@@ -398,10 +476,11 @@ try{
   const panel=document.querySelector('.pioneer-panel').getBoundingClientRect();
   return {gl:!!(canvas.getContext('webgl2')||canvas.getContext('webgl')),
    toolbarWidth:toolbar.width,panelRight:panel.right,viewport:innerWidth,
-   spotlightButtonHeight:document.querySelector('#pioneerSpotlightFocus').getBoundingClientRect().height};
+   spotlightButtonHeight:document.querySelector('#pioneerSpotlightFocus').getBoundingClientRect().height,
+   councilButtonHeight:document.querySelector('#pioneerCouncilOpen').getBoundingClientRect().height};
  });
  if(!sizing.gl||sizing.toolbarWidth>sizing.viewport+1||sizing.panelRight>sizing.viewport+1||
-  sizing.spotlightButtonHeight<43)
+  sizing.spotlightButtonHeight<43||sizing.councilButtonHeight<43)
   throw Error('Pioneer mobile overflow or blank WebGL: '+JSON.stringify(sizing));
  await mpage.locator('#pioneerSpotlightFocus').tap();
  const mobileMoment=await mpage.evaluate(()=>({
@@ -413,6 +492,13 @@ try{
  await mpage.locator('#inspectClose').tap();
  await mpage.locator('#pioneerCamera').tap();
  await mpage.evaluate(()=>window.__PIONEER_DEBUG__.advance(1200));
+ await mpage.locator('#pioneerCouncilOpen').tap();
+ const touchChoices=await mpage.locator('#pioneerDirections button').count();
+ if(touchChoices!==4)throw Error('Mobile council decisions not reachable');
+ await mpage.locator('#pioneerDirections button[data-livelihood="fields"]').tap();
+ if(await mpage.evaluate(()=>window.__PIONEER_DEBUG__.getState().livelihood.direction)!=='fields')
+  throw Error('Mobile village council vote did not change the model');
+ await mpage.locator('.pioneer-livelihood summary').tap();
  await screenshot(mpage,'04-mobile-shelter');
  // A touch gesture must still allow inspection without mouse hover.
  const mobileShelter=await mpage.evaluate(()=>{
