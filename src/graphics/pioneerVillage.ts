@@ -318,7 +318,7 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  * changing the actual silhouette, not merely swapping a material. */
 function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind,
  phase:'foundation'|'frame'|'complete',progress:number,condition=100,
- seedMark?:'working'|'resolved'|'abandoned',craftReady=false){
+ seedMark?:'working'|'resolved'|'abandoned',craftReady=false,loftReady=false){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
@@ -436,6 +436,16 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   for(const x of [-w*.45,w*.45])box(g,x,h+.16,0,.14,.14,d*.9,wood);
   box(g,0,h-.07,d*.475,.86,.29,.14,lightWood); // lintel above door
   if(phase==='complete'){
+   if(loftReady){
+    // A dormer reveals the paid interior bed without expanding the
+    // original SAT/eave footprint or clipping into a neighbouring lane.
+    const dormer=group(g,0,2.11,.58);dormer.name='paid-residential-loft';
+    box(dormer,0,.06,0,.72,.49,.18,plaster);
+    box(dormer,0,.08,.107,.43,.30,.045,paper);
+    for(const x of [-.22,.22])box(dormer,x,.08,.13,.036,.37,.038,wood);
+    box(dormer,0,.08,.14,.47,.038,.035,lightWood);
+    box(dormer,0,.34,0,.94,.10,.49,material('#697e7a')).rotation.z=.08;
+   }
    const doorMesh=box(g,0,.77,d*.51,.66,1.04,.075,door);
    doorMesh.name='cottage-door';
    orb(g,.22,.78,d*.56,.035,lightWood);
@@ -598,6 +608,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const progress=s.intent?.workDone??0;
   const progressIndex=Math.floor(progress*2);
   const signature=s.buildings.map(b=>b.id+':'+((b.condition??100)<78?'w':'c')+
+    (b.kind==='cottage'&&b.loftAddedAt!==undefined?':loft':'')+
     (b.kind==='wood-yard'?':'+s.livelihood.craft.phase:'')+
     (b.kind==='garden'?':'+(s.livingFates.seedTrials.filter(t=>t.gardenId===b.id).at(-1)?.phase??''):'' )).join(',')+
    '/'+(s.intent?.id??'')+'/'+phase+'/'+(s.intent?.parcel?.x??'')+'/'+
@@ -612,7 +623,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     const trial=built.kind==='garden'?
      s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
     const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
-     trial?.phase,s.livelihood.craft.phase==='complete');
+     trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined);
     if(built.kind==='garden'){
      const crops:THREE.Mesh[]=[];
      plot.traverse(child=>{
@@ -632,9 +643,9 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     }
    }
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
-    if(s.intent.kind==='repair'){
+    if(s.intent.kind==='repair'||s.intent.kind==='loft'){
      const p=s.intent.parcel,g=group(constructionLayer,p.x,.19,p.z);
-     g.rotation.y=p.rotation;g.name='pioneer-repair-scaffold';
+     g.rotation.y=p.rotation;g.name=s.intent.kind==='loft'?'pioneer-loft-scaffold':'pioneer-repair-scaffold';
      for(const x of [-p.width*.41,p.width*.41])for(const z of [-p.depth*.43,p.depth*.43])
       pole(g,x,.9,z,.04,1.72,lightWood);
      box(g,0,1.68,0,p.width*.88,.07,.12,lightWood);
