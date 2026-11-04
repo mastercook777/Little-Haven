@@ -160,7 +160,7 @@ test('Phase B grows genuine facilities and safe roads rather than revealing stat
  assert.ok(kinds.has('cottage'),'housing demand must cause a real new dwelling');
  assert.ok(kinds.has('wood-yard'),'resource logistics must produce a workplace');
  assert.ok(s.roads.length>=3,'resident-made paths must connect finished facilities');
- assert.ok(s.founders.length>3,'new occupied cottages invite actual named residents');
+ assert.ok(s.founders.length>=6,'food capacity should still permit a growing population by year 3');
  assert.ok(s.founders.every(f=>f.homeBuildingId&&s.buildings.some(b=>b.id===f.homeBuildingId)));
  assert.ok(pioneerHousingCapacity(s)>=s.founders.length);
  assert.ok(s.journal.some(e=>e.title==='又添一位乡邻'));
@@ -315,6 +315,7 @@ test('Four-year food security scales actual farm capacity before filling every h
  advancePioneerWorld(s,(48*4*DAY_MINUTES-s.minutes)/3);
  const crops=s.buildings.filter(b=>b.kind==='garden');
  const population=s.founders.length;
+ assert.ok(population>=6,'food security must not lock the settlement at one cottage');
  assert.ok(crops.length>=Math.ceil(population/4),
   'must build enough real field parcels for population '+population);
  assert.ok(s.resources.food>0,'year-four starvation persists: '+JSON.stringify({
