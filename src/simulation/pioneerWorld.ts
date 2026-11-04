@@ -640,7 +640,7 @@ export function loadPioneerWorld(storage:Pick<Storage,'getItem'>,now=Date.now(),
 export function pioneerSummary(s:PioneerWorld){
  const project=s.intent;
  if(project){
-  const label=project.kind==='repair'?'修缮旧屋':pioneerBuildingLabel(project.kind??'shelter');
+  const label=project.kind==='repair'?'修缮旧屋':project.kind==='loft'?'山居木阁改造':pioneerBuildingLabel(project.kind??'shelter');
   if(project.phase==='survey')return project.pauseReason||'正在寻找安全可达的屋址';
   if(project.phase==='materials')return '筹建'+label+' · '+(project.pauseReason||'正在备料');
   if(project.phase==='foundation')return label+' · 地基施工中';
