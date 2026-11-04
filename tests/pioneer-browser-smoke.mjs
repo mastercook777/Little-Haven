@@ -224,6 +224,10 @@ try{
   if(final.phase!=='resolved')return {error:'Genuine trial did not complete in a season',
    first,final,food:s.resources.food};
   s.lastSavedAt=Date.now();
+  const {importPioneerWorld}=await import('/src/simulation/pioneerWorld.ts');
+  const checked=importPioneerWorld(JSON.stringify(s));
+  if(!checked)return {error:'Completed fate cannot survive save validation',gardenId:entry.gardenId,
+   trial:final,seedFates:s.livingFates,buildings:s.buildings.map(x=>x.id)};
   localStorage.setItem(PIONEER_SLOT_KEYS[0],JSON.stringify(s));
   return {gardenId:entry.gardenId,first,final,
    legacy:s.livingFates.fieldLegacies.find(l=>l.gardenId===entry.gardenId),
@@ -235,6 +239,13 @@ try{
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
  await page.locator('.pioneer-building-list').evaluate(el=>el.open=true);
+ const listed=await page.evaluate(gardenId=>{
+  const w=window.__PIONEER_DEBUG__.getState();
+  return {name:gardenId,found:w.buildings.some(b=>b.id===gardenId),
+   buildings:w.buildings.map(b=>b.id),people:w.founders.length,
+   saveKeys:Object.keys(w.livingFates)};
+ },seedFate.gardenId);
+ if(!listed.found)throw Error('Completed trial save did not restore field: '+JSON.stringify(listed));
  await page.locator('button[data-pick-building="'+seedFate.gardenId+'"]').click();
  const seedFateCard=await page.evaluate(()=>({
   visible:!document.querySelector('#pioneerInspector').hidden,
