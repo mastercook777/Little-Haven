@@ -105,6 +105,15 @@ export function validatePioneerCommons(value:PioneerCommons){
    .every(x=>Number.isFinite(x)&&x>=0)||
   !Array.isArray(value.stageCompletedAt)||value.stageCompletedAt.length!==3||
   !value.stageCompletedAt.every(x=>x===null||(Number.isFinite(x)&&x>=0)))return false;
+ const cumulativeWood=[0,1.5,4.5,8.5],cumulativeWork=[0,4,10,19];
+ if(value.woodSpent+1e-5<cumulativeWood[value.stage]||
+  value.workHours+1e-5<cumulativeWork[value.stage])return false;
+ for(let i=0;i<3;i++){
+  const at=value.stageCompletedAt[i];
+  if(i<value.stage?at===null:at!==null)return false;
+  if(i>0&&i<value.stage&&
+   value.stageCompletedAt[i]!<value.stageCompletedAt[i-1]!)return false;
+ }
  const project=value.project;
  if(project){
   if(![1,2,3].includes(project.targetStage)||project.targetStage!==value.stage+1||
