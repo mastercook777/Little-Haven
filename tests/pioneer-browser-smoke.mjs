@@ -124,6 +124,21 @@ try{
   throw Error('Shelter was not caused by the real resource/work/occupancy system');
  const finishDigest=await screenshot(page,'03-occupied-shelter');
  if(finishDigest===startDigest)throw Error('Pioneer island did not visibly change');
+ // The new low-frequency council must have real options beyond the
+ // original 3 survival policies, and each vote persists independently.
+ await page.locator('.pioneer-livelihood summary').click();
+ const available=await page.locator('#pioneerDirections button[data-livelihood]').count();
+ if(available!==4)throw Error('Village council still offers only the old 3 advice buttons');
+ await page.locator('#pioneerDirections button[data-livelihood="river"]').click();
+ const directionState=await page.evaluate(()=>({
+  direction:window.__PIONEER_DEBUG__.getState().livelihood.direction,
+  story:document.querySelector('#pioneerJournal')?.textContent,
+  council:document.querySelector('#pioneerLivelihoodLabel')?.textContent
+ }));
+ if(directionState.direction!=='river'||!directionState.story?.includes('守谷人提议生计方向')||
+  directionState.council!=='靠河吃饭')
+  throw Error('Village council vote does not change real persistent world state: '+
+   JSON.stringify(directionState));
  const diagnostics=await page.evaluate(()=>window.__PIONEER_DEBUG__.getRendererInfo());
  if(diagnostics.calls<=0||diagnostics.triangles<=0)throw Error('No real WebGL drawing: '+JSON.stringify(diagnostics));
  results.push({desktop:initial,construction:true,completed:true,renderer:diagnostics});
@@ -135,7 +150,8 @@ try{
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__PIONEER_DEBUG__?.getState);
  const restored=await page.evaluate(()=>window.__PIONEER_DEBUG__.getState());
- if(restored.buildings.length!==1||restored.buildings[0].id!==b.id)
+ if(restored.buildings.length!==1||restored.buildings[0].id!==b.id||
+  restored.livelihood?.direction!=='river')
   throw Error('Pioneer local save not restored after browser reload');
  // Verify the mesh, not a debug-only button, opens the actual registry card.
  const firstPoint=await page.evaluate(id=>window.__PIONEER_DEBUG__.projectBuilding(id),b.id);
@@ -192,6 +208,26 @@ try{
    JSON.stringify(fieldVisualization));
  results.push({livingChapter:true,woodpileCount:fieldVisualization.actual.campWoodLogs,
   realCropMeshes:fieldVisualization.actual.gardenSprouts});
+ const laterChoices=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__,s=d.getState(),v=d.getVisuals();
+  const milestones=Array.from(document.querySelectorAll('#pioneerMilestones .done'))
+   .map(x=>x.textContent);
+  return {kinds:s.buildings.map(b=>b.kind),people:s.founders.length,
+   fish:s.sites.filter(x=>x.kind==='fish'),jobs:s.founders.map(f=>f.activity),
+   visual:v,storage:s.resources.food,way:s.livelihood.direction,
+   craft:s.livelihood.craft,progress:milestones};
+ });
+ if(!laterChoices.kinds.includes('fish-hut')||
+  laterChoices.fish.length!==1||laterChoices.fish[0].totalGathered<=0)
+  throw Error('After 3 years and a river vote, there is still no real fishing: '+
+   JSON.stringify(laterChoices));
+ if(!laterChoices.visual.renderedStructures||laterChoices.visual.fishCaughtProps<1||
+  !laterChoices.progress.some(x=>x.includes('靠河吃饭')))
+  throw Error('Fish livelihood lacks distinct geometry or real milestone record: '+
+   JSON.stringify(laterChoices));
+ await screenshot(page,'05c-actual-river-livelihood');
+ results.push({riverVote:true,realRiverStock:laterChoices.fish[0].stock,
+  actualFishCaught:laterChoices.fish[0].totalGathered,fishProps:laterChoices.visual.fishCaughtProps});
  const commonsInfo=await page.evaluate(()=>{
   const w=window.__PIONEER_DEBUG__.getState();
   return {stage:w.commons.stage,work:w.commons.workHours,
@@ -413,6 +449,13 @@ try{
  await mpage.locator('#inspectClose').tap();
  await mpage.locator('#pioneerCamera').tap();
  await mpage.evaluate(()=>window.__PIONEER_DEBUG__.advance(1200));
+ await mpage.locator('.pioneer-livelihood summary').tap();
+ const touchChoices=await mpage.locator('#pioneerDirections button').count();
+ if(touchChoices!==4)throw Error('Mobile council decisions not reachable');
+ await mpage.locator('#pioneerDirections button[data-livelihood="fields"]').tap();
+ if(await mpage.evaluate(()=>window.__PIONEER_DEBUG__.getState().livelihood.direction)!=='fields')
+  throw Error('Mobile village council vote did not change the model');
+ await mpage.locator('.pioneer-livelihood summary').tap();
  await screenshot(mpage,'04-mobile-shelter');
  // A touch gesture must still allow inspection without mouse hover.
  const mobileShelter=await mpage.evaluate(()=>{
