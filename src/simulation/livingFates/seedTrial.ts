@@ -116,7 +116,8 @@ export function performSeedTrialShift(s:PioneerWorld,f:PioneerFounder,
  if(!trial||field.kind!=='field'||field.id!=='field-'+trial.gardenId||
   s.minutes>=trial.resolveAt||!safeToWork(s)||f.activity!=='seed-trial')return false;
  const index=trial.actorIds.indexOf(f.id);
- if(index<0||trial.lastWorkAt[index]===s.minutes)return false;
+ if(index<0||trial.lastWorkAt[index]===s.minutes||
+  trial.workBy[index]>=SHIFT_HOURS)return false;
  const garden=s.buildings.find(b=>b.id===trial.gardenId);
  if(!garden||!isPioneerFacilityActive(garden))return false;
  trial.workBy[index]=Math.min(SHIFT_HOURS,trial.workBy[index]+1);
