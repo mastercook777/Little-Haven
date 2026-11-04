@@ -1,5 +1,6 @@
 import {DAY_MINUTES} from './calendar.ts';
 import {appendPioneerJournal} from './pioneerChronicle.ts';
+import {onPioneerTeaStopBuilt} from './pioneerCommerce.ts';
 import {VALLEY_RIVER} from './valleyGeography.ts';
 import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
 import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
@@ -28,7 +29,9 @@ const spec:Record<Exclude<PioneerBuildKind,'shelter'>,{wood:number;hours:number;
  'fish-hut':{wood:7,hours:12,width:2.85,depth:2.65,
   why:'田里的收成有季节，乡邻想借河水多添一门生计。先探安全岸边，再真实捕鱼。',label:'河岸渔棚'},
  granary:{wood:8,hours:12,width:2.65,depth:2.45,
-  why:'田里有余粮，露天存粮不方便。乡邻想建一处能多储十八份口粮的架高粮仓。',label:'架高粮仓'}
+  why:'田里有余粮，露天存粮不方便。乡邻想建一处能多储十八份口粮的架高粮仓。',label:'架高粮仓'},
+ 'tea-stop':{wood:9,hours:12,width:3.10,depth:2.78,
+  why:'村里有余粮、成形乡路和来往的需求，乡邻愿意用真木料与工时建一处临路茶棚。',label:'山路茶棚'}
 };
 const woodFor=(kind:PioneerBuildKind)=>kind==='shelter'?7:spec[kind].wood;
 const hoursFor=(kind:PioneerBuildKind)=>kind==='shelter'?9:spec[kind].hours;
@@ -67,6 +70,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   {x:opened.x,z:opened.z}:
   kind==='fish-hut'?{x:3.6,z:-2.1}:
   kind==='granary'?{x:s.camp.x+3.3,z:s.camp.z+1.6}:
+  kind==='tea-stop'?{x:s.camp.x+4.6,z:s.camp.z-2.4}:
   kind==='garden'?(s.policy==='food'?
   {x:s.camp.x-2.1,z:s.camp.z+5.0}:s.policy==='shelter'?
   {x:s.camp.x-5.4,z:s.camp.z+2.0}:
@@ -156,6 +160,10 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
  const stable=s.commons.stage>=2&&s.founders.length>=5&&gardens>=2;
  const river=stable&&!pioneerHasFacility(s,'fish-hut');
  const stores=stable&&!pioneerHasFacility(s,'granary');
+ const travelers=s.commons.stage>=3&&s.founders.length>=8&&s.roads.length>=7&&
+  (pioneerHasFacility(s,'granary')||pioneerHasFacility(s,'fish-hut'))&&
+  !pioneerHasFacility(s,'tea-stop');
+ if(s.livelihood.direction==='road'&&travelers)return 'tea-stop';
  if(s.livelihood.direction==='river'&&river)return 'fish-hut';
  if(s.livelihood.direction==='fields'&&stores)return 'granary';
  if(s.livelihood.direction==='craft'&&pioneerHasFacility(s,'wood-yard')&&
@@ -163,6 +171,7 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
   return null; // Give residents actual spare wood and six shifts before other expansion.
  if(river)return 'fish-hut';
  if(stores)return 'granary';
+ if(travelers)return 'tea-stop';
  return null;
 }
 export function schedulePioneerProject(s:PioneerWorld){
@@ -273,12 +282,14 @@ export function completePioneerProject(s:PioneerWorld){
   s.sites.push({id:'fish-'+b.id,kind:'fish',x:dock[0],z:dock[1],
    stock:5.5,capacity:13,renewPerDay:3.5,totalGathered:0});
  }
+ if(kind==='tea-stop')onPioneerTeaStopBuilt(s);
  if(kind==='wood-yard')s.resources.wood=round(Math.min(48,s.resources.wood));
  if(kind==='shelter'){
   for(const resident of s.founders.slice(0,3))resident.homeBuildingId=b.id;
  }
  record(s,pioneerBuildingLabel(kind)+'落成',
-  (kind==='fish-hut'?'乡邻造出靠近真正河岸且可走到的渔棚，渔点有季节库存，仍需居民每日出工。':
+  (kind==='tea-stop'?'山路上出现有灶台、供客歇脚的真正茶棚。仍须村里有粮、行路实际可达，旅人才会来；来客不算常住人口。':
+   kind==='fish-hut'?'乡邻造出靠近真正河岸且可走到的渔棚，渔点有季节库存，仍需居民每日出工。':
    kind==='granary'?'乡邻架高屋底和储谷桶，粮库可以多存十八份口粮，但并不凭空产粮。':
    kind==='garden'?'阿禾开出田畦，粮食今后要靠四季耕作、采收而来。':
    kind==='cottage'?'一户新的住处终于空出来，是否有人落脚仍取决于粮食与生计。':
