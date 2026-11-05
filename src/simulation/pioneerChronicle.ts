@@ -8,7 +8,7 @@ const HISTORY_TITLES=new Set([
  '安家火塘落成','公共灶台落成','村心空地落成',
  '又添一位乡邻','林地开出空场','第一篓渔获','锯木台终于装好',
  '山居木阁落成','留种试种有成','留种试种暂止',
- '山路茶棚落成','山谷第一次交换了货物'
+ '山路茶棚落成','山谷第一次交换了货物','山路上认出了故人'
 ]);
 function isPermanentHistory(s:PioneerWorld,e:PioneerJournal,causes:Set<string>){
  if(HISTORY_TITLES.has(e.title))return true;

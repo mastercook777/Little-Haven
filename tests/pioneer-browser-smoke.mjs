@@ -445,11 +445,14 @@ try{
   return {visits:s.commerce.totalArrivals,exchanges:s.commerce.totalExchanges,
    hosted:s.commerce.totalHosted,food:s.commerce.netFood,
    wood:s.commerce.netWood,stored:s.commerce.visits.length,
+   receptionHours:s.commerce.receptionHours,
+   contacts:s.commerce.contacts.map(c=>({name:c.name,hostId:c.hostResidentId,meetings:c.meetings})),
    direction:s.livelihood.direction,people:s.founders.length,
    tea:s.buildings.find(b=>b.kind==='tea-stop')?.id};
  });
  if(visitation.visits<1||visitation.exchanges<1||
-  !visitation.tea||visitation.people!==mature.people)
+  !visitation.tea||visitation.people!==mature.people||
+  visitation.receptionHours<visitation.exchanges+visitation.hosted)
   throw Error('Roadside tea building has no real trade and separate visitor history: '+
    JSON.stringify(visitation));
  const liveTraveler=await page.evaluate(()=>{
@@ -470,7 +473,26 @@ try{
   liveTraveler.population!==mature.people||liveTraveler.guest.route.length<2)
   throw Error('The actual road visitor has no saved presence or visible 3D model: '+
    JSON.stringify(liveTraveler));
+ // In v0.5.2 a village guest is served by one actual resident who cannot
+ // simultaneously farm or fell trees. No noon auto-trade is acceptable.
+ const actualHost=await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__;
+  d.advance(60); // the following three authoritative hourly shifts
+  const s=d.getState(),guest=s.commerce.activeVisitor;
+  const host=s.founders.find(f=>f.id===guest?.hostResidentId);
+  return {guest:guest&&{name:guest.name,outcome:guest.outcome,
+    hostResidentId:guest.hostResidentId},
+   host:host&&{name:host.name,activity:host.activity,
+    target:host.target,commute:host.commute},
+   receptions:s.commerce.receptionHours};
+ });
+ if(!actualHost.guest||actualHost.guest.outcome==='pending'||
+  !actualHost.host||actualHost.host.activity!=='host-guest'||
+  actualHost.host.commute?.length<2)
+  throw Error('Visitor was paid without a reachable resident doing exactly one tea shift: '+
+   JSON.stringify(actualHost));
  await screenshot(page,'05e-actual-visitor-at-roadside-tea-stop');
+ results.push({actualTeaHost:actualHost.host.name,guest:actualHost.guest.name});
  results.push({matureVillage:mature,teaVisitation:visitation,
   visibleTraveler:liveTraveler.guest.name});
  // A quick fresh-world playback checks an actual felling animation window.

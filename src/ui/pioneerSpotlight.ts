@@ -36,6 +36,12 @@ function fromEvent(s:PioneerWorld,e:PioneerJournal):PioneerSpotlight|null{
   const tea=s.buildings.find(b=>b.kind==='tea-stop');
   if(tea)return pick(when,e.title,e.text,built(tea.id),'event-'+e.id,'去茶棚看客');
  }
+ if(e.title==='山路上认出了故人'){
+  const guest=s.commerce.visits.find(v=>v.id===e.causeId);
+  const host=guest?.hostResidentId&&s.founders.find(f=>f.id===guest.hostResidentId);
+  if(host)return pick('人物命运 · 山路故人',host.name+'在茶棚认出了旧客',
+   e.text,{kind:'person',id:String(host.id)},'event-'+e.id,'认识这位主事人');
+ }
  if(e.title==='又添一位乡邻'){
   const newcomer=s.founders.find(f=>f.id>3&&e.text.includes(f.name));
   if(newcomer)return pick(when,newcomer.name+'在谷中安下家',
@@ -106,6 +112,17 @@ export function getPioneerSpotlight(s:PioneerWorld):PioneerSpotlight{
  // forever. Rotate *observations*, not simulation events, and always link to
  // an actual built structure. There is no fake date-based construction.
  const candidates:PioneerSpotlight[]=[];
+ const acquaintances=s.commerce.contacts.filter(c=>c.meetings>=2);
+ if(acquaintances.length){
+  const c=acquaintances.at(-1)!;
+  const host=s.founders.find(f=>f.id===c.hostResidentId);
+  if(host)candidates.push(pick(current+' · 人物与山路',
+   host.name+'与'+c.name+'渐渐成了熟路上的故人',
+   '不是名字重复就成朋友：他们在真实茶棚已交换或招待 '+c.meetings+
+    ' 次，每次让出一小时工。后来的客人能提早两日找到这条路。',
+   {kind:'person',id:String(host.id)},'acquaintance-'+c.key+'-'+c.meetings,
+   '去看'+host.name+'的手记'));
+ }
  const guest=s.commerce.activeVisitor,tea=s.buildings.find(b=>b.kind==='tea-stop');
  if(tea){
   candidates.push(pick(current+' · 山谷有客',
