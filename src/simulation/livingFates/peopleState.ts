@@ -156,7 +156,13 @@ export function settleLivingFatesHour(s:PioneerWorld){
    }
    edge.trust=clamp(Math.floor(edge.sharedWorkHours/12),60);
    edge.closeness=clamp(Math.floor(edge.sharedMeals/24),60);
-   if(working&&edge.sharedWorkHours===24){
+   // In a dense twelve-resident valley many valid pairs reach 24 work hours.
+   // Keep a bounded set of *first* shared-work milestones, preserving the
+   // durable relationship hours for every pair and reserving memory space for
+   // actual field-fate stories (which have stronger causal significance).
+   const storedWorkMilestones=Object.values(lives.majorMemories)
+    .filter(m=>m.kind==='shared-work').length;
+   if(working&&edge.sharedWorkHours===24&&storedWorkMilestones<24){
     const memoryId='co-work-'+id+'-24';
     if(!lives.majorMemories[memoryId]){
      lives.majorMemories[memoryId]={id:memoryId,minute:s.minutes,
