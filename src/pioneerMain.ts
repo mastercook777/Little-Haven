@@ -211,6 +211,14 @@ function renderUI(){
     ' · '+safe(commerce.visits.at(-1)!.origin)+'</div>':
     '<div>茶棚已经造好，等待第一位走得进来的旅人。</div>'):
   '还未建成茶棚。过客不会凭空出现；需真的落地并有可走乡路。';
+ if(hasTea&&commerce.contacts.some(c=>c.meetings>=2)){
+  const familiar=commerce.contacts.filter(c=>c.meetings>=2);
+  $('pioneerGuestLedger').innerHTML+='<div><b>山路故人 '+familiar.length+' 段</b> · '+
+   familiar.slice(-2).map(c=>{
+    const host=world.founders.find(f=>f.id===c.hostResidentId);
+    return safe(host?.name??'村民')+'与'+safe(c.name)+'相见 '+c.meetings+' 次';
+   }).join('；')+'。来客往返少等 2 日，但每次接待仍占工时。</div>';
+ }
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
  const commons=world.commons,commonsJob=commons.project;
