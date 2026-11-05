@@ -202,12 +202,12 @@
 
 - **验收证据**：[CI #41948530936](https://github.com/mastercook777/Little-Haven/actions/runs/41948530936)：108/108 模拟、TS/Vite、Pages、桌面与 390px 手机 Chromium 全绿；五年自然成长 12 小时真实接待对应 12 笔支付交换，主事人小满与数位旅人建立有姓名和实际工时的熟路关系。旧 v0.3／v4 存档回归通过；低端安卓、美术精修和完整江湖未在此轮验收。
 
-### v0.5.3 · 渔篓归仓（PR #21 · 待整体验收）
+### v0.5.3 · 渔篓归仓（PR #21，已合入 main）
 
 - [x] 捕鱼小时只扣有限河鱼库存，不瞬间进入全谷口粮；渔棚只允许一篓待运；每次搬运由对应乡邻占用另一个小时。
 - [x] 9 / 17 时从河岸沿合法 A* 路网背运到村心或粮仓；满仓、无路、人物缺席时物资留在渔棚，不能重复刷鱼。
 - [x] 人物背篓可视化、渔棚待运物、渔棚和粮仓真实物流台账、追加「渔篓归仓」里程碑和旧 v4 存档数据迁移。
-- [ ] PR #21 最终模拟、TypeScript/Pages、桌面/手机 Chromium 完整 CI 和 Pages 发布证据；仅以最新提交记录为准。
+- [x] [PR #21](https://github.com/mastercook777/Little-Haven/pull/21) 已在主分支合并；[CI #41954573323](https://github.com/mastercook777/Little-Haven/actions/runs/41954573323) 111/111 模拟、TypeScript、Vite/Pages、桌面和 390px 手机 Chromium 完整通过；线上发布需另以 Pages 部署结果为准。
 - [ ] 后续：跨多小时连续移动、木材/菜田运输、独立物流职业、物资腐坏以及移动端 GPU 优化。
 
 设计与实际范围见 [v0.5.3 运鱼闭环](docs/V053_FISH_HAUL.md)。
