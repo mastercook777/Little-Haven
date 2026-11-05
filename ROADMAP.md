@@ -221,6 +221,16 @@
 - [x] [PR #22](https://github.com/mastercook777/Little-Haven/pull/22) 最新 [CI #41963981991](https://github.com/mastercook777/Little-Haven/actions/runs/41963981991)：115/115 项模拟、TypeScript、Pages、桌面和 390px 手机 Chromium 全绿；冬季 4/4 个经典瓦顶雪层开关与真实完成建筑一致。开局 draw calls 493（旧版 444），第五年 1063 次 / 75442 triangles / 268 geometries；未宣称移动端高性能。
 - [ ] [美术验收与剩余边界](docs/V054_PIONEER_HERITAGE_ART.md)：人工四方位近景、低端 Android GPU 真实性能和更精细的绑定角色动画尚未验收。
 
+### v0.5.5 · 四时有声（PR #23 已合入 main）
+
+- [x] **开荒雨幕接入经典同源渲染器**：730 条桌面雨线 / 340 条手机雨线、22 / 12 处地面 Instanced 涟漪及单批三叉溅水花；岛内、河岸禁区外的种子稳定落点与小片反光积水、谷底薄雾。
+- [x] **春、秋、冬真实树下季相**：只在已有两棵受保护阔叶树位的区域，春季 92 片地面/空中花瓣，秋季 110 片落地叶 + 20 片动态下降叶，冬季 24 处树根雪；手机与减少动画配置减载，不增加树木/碰撞/存档信息。
+- [x] **雨从实际屋檐落下**：只从已施工完成的山居、粮仓、渔棚、木坊、茶棚外檐生成雨丝。独立 0 建筑开局无檐滴，后期建筑按保存的地块朝向动态配置。
+- [x] **技术验收**：[PR #23](https://github.com/mastercook777/Little-Haven/pull/23) 已合入 main；[CI #42004577737](https://github.com/mastercook777/Little-Haven/actions/runs/42004577737) **120/120** 模拟测试、TS、Pages、经典/开荒 Chromium 桌面/手机、实际四季及雨天截图通过。第五年 1066 draw calls / 75626 triangles / 269 geometries（上一版 1063 calls），仍超低端安卓建议预算。
+- [ ] **后续未完成**：雨滴逐粒真实地形碰撞、按积水时间变化的水纹、持续风场/枝叶摆动、雨雪蓄积、真实手机 GPU FPS 和四方向近景人工艺术审查。不能仅因 CI 通过而宣称顶级美术完成。
+
+详见 [v0.5.5「四时有声」美术与验收规格](docs/V055_PIONEER_SEASONS_WEATHER.md)。
+
 ### v0.4 的发布门槛
 
 1. 开荒新档永久建筑数必须为 0；不能仅隐藏 v0.3 旧村建筑 Mesh。
