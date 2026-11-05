@@ -80,7 +80,7 @@ const labels:Record<PioneerWork,string>={
  'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'家中吃饭',
  'socialize':'村心闲谈','commons-build':'修建公共村心',
  'clear-land':'林缘清障开荒',
- fish:'河岸捕鱼',craft:'木坊锯作','host-guest':'茶棚接客'
+ fish:'河岸捕鱼','haul-fish':'背鱼归仓',craft:'木坊锯作','host-guest':'茶棚接客'
 };
 const safe=(input:string)=>input.replace(/[&<>"']/g,c=>
  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
