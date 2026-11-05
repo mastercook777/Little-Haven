@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import {buildCarvedTerrain} from './carvedTerrain.ts';
 import {buildRiverArt} from './riverArt.ts';
-import {fallingRainY,rainSegmentY} from './weatherMotion.ts';
+import {createWeatherArt} from './weatherArt.ts';
+import {createPioneerSeasonalVfx} from './pioneerSeasonalVfx.ts';
+import {PIONEER_DECIDUOUS_TREES,pioneerWeatherPlacement,pioneerRoofDrips} from './pioneerAtmospherePlacement.ts';
 import {VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
 import {PIONEER_VALLEY} from '../simulation/pioneerGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
@@ -573,7 +575,9 @@ export interface PioneerGraphics{
    fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number;
    roadsideVisitor:boolean;activeVisitorName:string|null;
    heritageRoofs:number;heritageClothed:number;seasonalProtectedTrees:number;
-   snowyHeritageRoofs:number};
+   snowyHeritageRoofs:number;weatherMode:string;rainStreaks:number;rainSplashes:number;
+ rainPuddles:number;roofDrips:number;fallingLeaves:number;fallenLeaves:number;
+ springPetals:number;winterSnowPatches:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -596,7 +600,12 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const river=buildRiverArt(root);vegetation(root);resourceLandmarks(root,world);
  const forest=buildPioneerForestArt(root,world);
  const camp=campVisual(root,world);
- const heritageGrove=makePioneerSeasonalGrove(root,VALLEY_PINES.filter((_,i)=>i%4===2));
+ const heritageGrove=makePioneerSeasonalGrove(root,PIONEER_DECIDUOUS_TREES);
+ const mobile=typeof window!=='undefined'&&window.innerWidth<760;
+ const reducedMotion=typeof window!=='undefined'&&
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
+ const seasonalVfx=createPioneerSeasonalVfx(root,PIONEER_DECIDUOUS_TREES,mobile,reducedMotion);
+ const weatherArt=createWeatherArt(root,mobile,reducedMotion,pioneerWeatherPlacement(world));
  const constructionLayer=group(root);constructionLayer.name='actual-settlement-registry';
  let roadLayer=drawFootpaths(root,world.roads);
  let lastRoads=roadGeometrySignature(world.roads);
@@ -612,17 +621,6 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  orb(traveler,0,1.72,0,.40,material('#6b6253'),1,.26,1).name='traveler-broad-hat';
  box(traveler,0,.87,-.34,.47,.68,.26,material('#8f765a')).name='traveler-trade-pack';
  traveler.visible=false;
- const rainGeo=new THREE.BufferGeometry(),rainVertices=new Float32Array(270*6);
- const rainSeed=new Float32Array(270*3);
- for(let i=0;i<270;i++){
-  rainSeed[3*i]=-15.1+hashFloat(i*19)*30.2;
-  rainSeed[3*i+1]=.6+hashFloat(i*23+11)*9.4;
-  rainSeed[3*i+2]=-10.1+hashFloat(i*31+7)*20.2;
- }
- rainGeo.setAttribute('position',new THREE.BufferAttribute(rainVertices,3).setUsage(THREE.DynamicDrawUsage));
- const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({
-  color:'#c7dee2',transparent:true,opacity:.42,depthWrite:false}));
- rain.frustumCulled=false;root.add(rain);
  let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
  const gardenCrops=new Map<string,THREE.Mesh[]>();
  const fishProps=new Map<string,THREE.Mesh[]>(),grainProps=new Map<string,THREE.Mesh[]>();
@@ -712,6 +710,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
       s.intent.phase,Math.min(1,progress/s.intent.workRequired));
    }
    renderedStructures=constructionLayer.children.length;
+    weatherArt.setRoofDrips(pioneerRoofDrips(s));
    lastBuildSig=signature;lastProgressIndex=progressIndex;
   }
   const roadSignature=roadGeometrySignature(s.roads);
@@ -722,6 +721,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const season=getPioneerCalendar(s).season;
   const weather=getPioneerWeather(s);
   heritageGrove.update(season);
+   seasonalVfx.setSeason(season);seasonalVfx.animate(seconds);
+   weatherArt.setWeather(weather);weatherArt.animate(seconds);
   // Reused classic tiled roofs carry snow matching their actual curved
   // geometry. Scene rebuilding on new building/repair keeps this in sync.
   if(rebuilt||season!==lastSeason)constructionLayer.traverse(obj=>{
@@ -759,16 +760,6 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    lastSeason=season;river.setSeason(season);
    grass.color.set({spring:'#8eae7d',summer:'#79a270',
     autumn:'#c4b07d',winter:'#c8d0bc'}[season]);
-  }
-  rain.visible=weather==='rain';
-  if(rain.visible){
-   for(let i=0;i<270;i++){
-    const y=fallingRainY(rainSeed[3*i+1],seconds,6.2);
-    const [head,tail]=rainSegmentY(y),idx=i*6;
-    rainVertices.set([rainSeed[3*i],head,rainSeed[3*i+2],
-     rainSeed[3*i]-.06,tail,rainSeed[3*i+2]+.02],idx);
-   }
-   (rainGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate=true;
   }
   const dayHour=getPioneerCalendar(s).hour;
   const commonsProject=s.commons.project;
@@ -897,7 +888,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   heritageClothed:people.filter(p=>p.upper.userData.heritageCloth===true).length,
   seasonalProtectedTrees:heritageGrove.count,
   snowyHeritageRoofs:constructionLayer.children.filter(g=>
-   g.getObjectByName('seasonally-frosted-authored-roof')?.visible===true).length
+   g.getObjectByName('seasonally-frosted-authored-roof')?.visible===true).length,
+   weatherMode:weatherArt.mode(),
+   rainStreaks:weatherArt.mode()==='rain'?weatherArt.streakCount:0,
+   rainSplashes:weatherArt.mode()==='rain'?weatherArt.splashCount:0,
+   rainPuddles:weatherArt.mode()==='rain'?weatherArt.puddleCount:0,
+   roofDrips:weatherArt.mode()==='rain'?weatherArt.roofDripCount():0,
+   ...seasonalVfx.signatures()
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}

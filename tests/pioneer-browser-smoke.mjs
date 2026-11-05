@@ -8,6 +8,26 @@ import {createHash} from 'node:crypto';
 const base='http://127.0.0.1:5190/';
 const output='artifacts/pioneer-browser-smoke';
 await mkdir(output,{recursive:true});
+// Seek only real simulation days. No forced visual season or weather flags.
+async function seekPioneerAtmosphere(page,season=null,weather=null){
+ return page.evaluate(async({season,weather})=>{
+  const d=window.__PIONEER_DEBUG__;
+  const {DAY_MINUTES,getCalendarFromMinutes}=await import('/src/simulation/calendar.ts');
+  const {getWeatherForMinutes}=await import('/src/simulation/weather.ts');
+  const s=d.getState(),start=Math.floor(s.minutes/DAY_MINUTES)+1;
+  for(let day=start;day<start+144;day++){
+   const minute=day*DAY_MINUTES+12*60;
+   const actualSeason=getCalendarFromMinutes(minute).season;
+   const actualWeather=getWeatherForMinutes(minute,s.seed);
+   if((!season||actualSeason===season)&&(!weather||actualWeather===weather)){
+    d.advance((minute-s.minutes)/3);
+    return {season:actualSeason,weather:actualWeather,
+     visuals:d.getVisuals(),buildings:d.getState().buildings.length};
+   }
+  }
+  return null;
+ },{season,weather});
+}
 const processVite=spawn('npm',['run','dev','--','--host','127.0.0.1','--port','5190','--strictPort'],{stdio:'pipe'});
 let logs='';processVite.stdout.on('data',d=>logs+=d.toString());
 processVite.stderr.on('data',d=>logs+=d.toString());
@@ -527,6 +547,37 @@ try{
  await screenshot(page,'05f-heritage-curved-roofs-in-winter');
  results.push({mountainWinter:{roofs:mountainWinter.visuals.heritageRoofs,
   snow:mountainWinter.visuals.snowyHeritageRoofs,buildingCount:mountainWinter.buildings}});
+ if(mountainWinter.visuals.winterSnowPatches<12||
+  mountainWinter.visuals.fallingLeaves!==0)
+  throw Error('Protected grove ground snow not synchronized with actual winter: '+
+   JSON.stringify(mountainWinter.visuals));
+ const springVfx=await seekPioneerAtmosphere(page,'spring');
+ if(!springVfx||springVfx.visuals.springPetals<70||
+  springVfx.visuals.fallingLeaves!==0)
+  throw Error('Actual spring transition lost the protected blossom-petal layer: '+
+   JSON.stringify(springVfx));
+ await screenshot(page,'05g-spring-petals-under-protected-trees');
+ const autumnVfx=await seekPioneerAtmosphere(page,'autumn');
+ if(!autumnVfx||autumnVfx.visuals.fallingLeaves<16||
+  autumnVfx.visuals.fallenLeaves<100||autumnVfx.visuals.winterSnowPatches!==0)
+  throw Error('Actual autumn transition lost the falling/settled foliage: '+
+   JSON.stringify(autumnVfx));
+ await screenshot(page,'05h-autumn-animated-grove-leaves');
+ const rainyVfx=await seekPioneerAtmosphere(page,null,'rain');
+ if(!rainyVfx||rainyVfx.visuals.weatherMode!=='rain'||
+  rainyVfx.visuals.rainStreaks<700||rainyVfx.visuals.rainSplashes<20||
+  rainyVfx.visuals.rainPuddles<3||rainyVfx.visuals.roofDrips<5)
+  throw Error('Actual rain lacks batched impacts/puddles/paid roof runoff: '+
+   JSON.stringify(rainyVfx));
+ await screenshot(page,'05i-rainfall-real-ground-splashes');
+ results.push({atmosphere:{winterSnow:mountainWinter.visuals.winterSnowPatches,
+  springPetals:springVfx.visuals.springPetals,
+  fallingLeaves:autumnVfx.visuals.fallingLeaves,
+  fallenLeaves:autumnVfx.visuals.fallenLeaves,
+  rainStreaks:rainyVfx.visuals.rainStreaks,
+  rainSplashes:rainyVfx.visuals.rainSplashes,
+  rainPuddles:rainyVfx.visuals.rainPuddles,
+  roofDrips:rainyVfx.visuals.roofDrips}});
  // A quick fresh-world playback checks an actual felling animation window.
  // The real simulation is advanced in hour-sized chunks and the GPU model
  // is refreshed by the same public debug helper used for other snapshots.
