@@ -426,13 +426,16 @@ try{
    id:b.id,wood:b.loftWoodSpent,work:b.loftWorkHours,at:b.loftAddedAt
   })),built:s.buildings.map(b=>b.kind),
    fish:s.sites.find(x=>x.kind==='fish')?.totalGathered??0,
+   fishHaul:s.livelihood.fishTransport,
    rendered:v.renderedStructures,loftDormers:v.loftDormers,
    sawbenches:v.sawbenches,wood:s.resources.wood,food:s.resources.food};
  });
  if(mature.people<=9||mature.lofts.length<1||
   mature.lofts.some(x=>x.wood!==4||x.work!==8)||
   !mature.built.includes('fish-hut')||!mature.built.includes('granary')||
-  mature.fish<=0||mature.loftDormers<mature.lofts.length||
+  mature.fish<=0||mature.fishHaul.totalDelivered<=0||
+  mature.fishHaul.haulHours<=0||mature.fishHaul.totalDelivered>mature.fish+.002||
+  mature.loftDormers<mature.lofts.length||
   mature.rendered<mature.built.length)
   throw Error('No mature paid/visible village growth after five real years: '+
    JSON.stringify(mature));

@@ -7,9 +7,17 @@ export interface PioneerCraftProject{
  phase:'idle'|'building'|'complete';
  woodSpent:number;workHours:number;completedAt:number|null;
 }
+export interface PioneerFishCargo{
+ siteId:string;workerId:number;amount:number;caughtAt:number;
+}
+export interface PioneerFishTransport{
+ pending:PioneerFishCargo|null;
+ totalDelivered:number;haulHours:number;lastDeliveredAt:number|null;
+}
 export interface PioneerLivelihood{
  direction:PioneerDirection;chosenAt:number;
  craft:PioneerCraftProject;firstFishAt:number|null;
+ fishTransport:PioneerFishTransport;
 }
 export const PIONEER_DIRECTIONS:{id:PioneerDirection;label:string;description:string}[]=[
  {id:'autonomous',label:'顺着人心',description:'乡邻仍会自发尝试渔业、储粮与手艺，谁也不被强迫'},
@@ -23,13 +31,16 @@ const round=(n:number)=>Math.round(n*1000)/1000;
 const entry=(s:PioneerWorld,title:string,text:string,causeId:string|null)=>{
  appendPioneerJournal(s,title,text,causeId);
 };
+export const createPioneerFishTransport=():PioneerFishTransport=>({
+ pending:null,totalDelivered:0,haulHours:0,lastDeliveredAt:null
+});
 export const createPioneerLivelihood=():PioneerLivelihood=>({
  direction:'autonomous',chosenAt:0,
  craft:{phase:'idle',woodSpent:0,workHours:0,completedAt:null},
- firstFishAt:null
+ firstFishAt:null,fishTransport:createPioneerFishTransport()
 });
 export function validPioneerLivelihood(s:PioneerWorld){
- const p=s.livelihood,c=p?.craft;
+ const p=s.livelihood,c=p?.craft,t=p?.fishTransport;
  if(!p||!['autonomous','river','fields','craft','road'].includes(p.direction)||
   !Number.isFinite(p.chosenAt)||p.chosenAt<0||p.chosenAt>s.minutes||
   !c||!['idle','building','complete'].includes(c.phase)||
@@ -37,6 +48,25 @@ export function validPioneerLivelihood(s:PioneerWorld){
   !Number.isFinite(c.completedAt??0)||
   !((c.completedAt===null)||(c.completedAt>=0&&c.completedAt<=s.minutes))||
   (p.firstFishAt!==null&&(!Number.isFinite(p.firstFishAt)||p.firstFishAt<0||p.firstFishAt>s.minutes)))return false;
+ // Catches stay on the shore until a separate, real carrying shift.
+ const caught=s.sites.filter(x=>x.kind==='fish').reduce((n,x)=>n+x.totalGathered,0);
+ if(!t||!Number.isFinite(t.totalDelivered)||t.totalDelivered<0||
+  t.totalDelivered>caught+.002||
+  !Number.isSafeInteger(t.haulHours)||t.haulHours<0||
+  (t.haulHours===0)!==(t.lastDeliveredAt===null)||
+  (t.haulHours>0&&t.totalDelivered<=0)||
+  (t.lastDeliveredAt!==null&&(!Number.isFinite(t.lastDeliveredAt)||
+   t.lastDeliveredAt<0||t.lastDeliveredAt>s.minutes)))return false;
+ if(t.pending!==null){
+  const a=t.pending;
+  if(!a||typeof a.siteId!=='string'||!Number.isInteger(a.workerId)||
+   !s.founders.some(f=>f.id===a.workerId)||
+   !Number.isFinite(a.amount)||a.amount<=0||a.amount>2||
+   !Number.isFinite(a.caughtAt)||a.caughtAt<0||a.caughtAt>s.minutes||
+   !s.sites.some(x=>x.id===a.siteId&&x.kind==='fish')||
+   !s.buildings.some(b=>b.kind==='fish-hut'&&a.siteId==='fish-'+b.id)||
+   t.totalDelivered+a.amount>caught+.002)return false;
+ }
  if(c.phase==='idle')return c.woodSpent===0&&c.workHours===0&&c.completedAt===null;
  if(!s.buildings.some(b=>b.kind==='wood-yard')||c.woodSpent!==PIONEER_CRAFT_WOOD||
   c.workHours<0||c.workHours>PIONEER_CRAFT_HOURS)return false;
@@ -89,12 +119,40 @@ export function performPioneerCraftShift(s:PioneerWorld,worker:PioneerFounder){
  }
  return true;
 }
+/** Stock was taken from the finite fish site, but is not yet village food. */
+export function stagePioneerFish(s:PioneerWorld,worker:PioneerFounder,siteId:string,amount:number){
+ const t=s.livelihood.fishTransport;
+ if(t.pending||worker.activity!=='fish'||!Number.isFinite(amount)||
+  amount<=0||amount>2||!s.sites.some(x=>x.id===siteId&&x.kind==='fish'))return false;
+ t.pending={siteId,workerId:worker.id,amount:round(amount),caughtAt:s.minutes};
+ return true;
+}
+/** A reachable, exclusive carrying shift is required; a full store never eats
+ * a basket or grants free food. */
+export function deliverPioneerFish(s:PioneerWorld,worker:PioneerFounder){
+ const t=s.livelihood.fishTransport,c=t.pending;
+ if(!c||worker.id!==c.workerId||worker.activity!=='haul-fish'||
+  s.minutes<c.caughtAt+60||s.resources.food+c.amount>pioneerFoodCapacity(s)+.0001||
+  !s.sites.some(x=>x.id===c.siteId&&x.kind==='fish'))return false;
+ s.resources.food=round(s.resources.food+c.amount);
+ if(s.foodStats)s.foodStats.collected=round(s.foodStats.collected+c.amount);
+ t.totalDelivered=round(t.totalDelivered+c.amount);t.haulHours++;
+ t.lastDeliveredAt=s.minutes;t.pending=null;
+ if(t.haulHours===1||t.haulHours%24===0){
+  const destination=s.buildings.find(b=>b.kind==='granary');
+  entry(s,t.haulHours===1?'渔获真正入仓':'河岸日常运鱼',
+   worker.name+'另花一小时从河岸背回 '+round(c.amount)+
+   ' 份渔获，送至'+(destination?'架高粮仓':'村心')+
+   '。累计运回 '+t.totalDelivered+' 份。',destination?.id??null);
+ }
+ return true;
+}
 export function markPioneerFishing(s:PioneerWorld,worker:PioneerFounder,fish:number){
  if(fish<=0||s.livelihood.firstFishAt!==null)return;
  s.livelihood.firstFishAt=s.minutes;
  const hut=s.buildings.find(b=>b.kind==='fish-hut');
  entry(s,'第一篓渔获',worker.name+'在真实河岸站位收下 '+round(fish)+
-  ' 份渔获，计入村里实际口粮；不是来访人口或免费赏赐。',hut?.id??null);
+  ' 份渔获，先放在渔棚待运；另需乡邻花工时送回村里才能成为口粮。',hut?.id??null);
 }
 export interface PioneerMilestoneView{
  id:string;label:string;done:boolean;requirement:string;progress:string;
@@ -115,7 +173,11 @@ export function pioneerMilestoneBoard(s:PioneerWorld):PioneerMilestoneView[]{
     ' 座木阁 · 眼下 '+s.founders.length+' 位常住乡邻'},
   {id:'fish',label:'靠河吃饭',done:!!fish&&fish.totalGathered>0,
    requirement:'四位居民、菜圃与村心 → 安全河岸渔棚 → 真实捕鱼',
-   progress:fish?'累计捕鱼 '+round(fish.totalGathered)+' 份':counts('fish-hut')?'渔棚已落成':'尚无渔棚'},
+   progress:fish?'累计捕获 '+round(fish.totalGathered)+' 份；实际运回 '+s.livelihood.fishTransport.totalDelivered+' 份':counts('fish-hut')?'渔棚已落成':'尚无渔棚'},
+  {id:'fish-haul',label:'渔篓归仓',done:s.livelihood.fishTransport.haulHours>0,
+   requirement:'真实河岸捕鱼后，沿可达乡路由一位乡邻另花一小时送至村心或粮仓',
+   progress:'已运回 '+s.livelihood.fishTransport.totalDelivered+' 份 · 搬运 '+s.livelihood.fishTransport.haulHours+' 小时'+
+    (s.livelihood.fishTransport.pending?' · 仍有一篓待运':'')},
   {id:'granary',label:'田园有余',done:counts('granary')>0,
    requirement:'人口增长与两处菜圃 → 投材建粮仓',
    progress:counts('granary')?'存粮上限 54 份':'存粮上限 36 份'},

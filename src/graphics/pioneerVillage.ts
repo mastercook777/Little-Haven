@@ -266,7 +266,7 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
  plinth.name='shelter-plinth';
  return g;
 }
-interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;rod:THREE.Group;}
+interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;fishBasket:THREE.Group;rod:THREE.Group;}
 function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  const g=group(parent,0,.19,0);g.name='pioneer-'+founder.id;
  g.userData.founderId=founder.id;
@@ -308,12 +308,17 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
   log.rotation.x=Math.PI/2;
  }
  cargo.visible=false;
+ const fishBasket=group(g,0,.62,-.30);fishBasket.name='carried-fish-basket';
+ box(fishBasket,0,0,0,.55,.32,.42,material('#9d815e'));
+ for(let i=0;i<3;i++)orb(fishBasket,(i-1)*.15,.21,.01,.10,
+  material('#8da8a8'),1.28,.36,.67);
+ fishBasket.visible=false;
  const rod=group(g,.35,1.02,.32);rod.name='working-river-fishing-rod';
  const stem=pole(rod,0,.36,.05,.026,.96,lightWood);stem.rotation.x=-.32;
  box(rod,0,.92,.23,.016,.50,.018,cloth);
  const reel=orb(rod,-.07,.22,0,.09,wood,.45,.80,1.3);
  reel.name='fisher-reel';rod.visible=false;
- return {root:g,arms,legs,head,tool,mealBowl,axe,cargo,rod};
+ return {root:g,arms,legs,head,tool,mealBowl,axe,cargo,fishBasket,rod};
 }
 /** The facility models share eave limits with the space planner while
  * changing the actual silhouette, not merely swapping a material. */
@@ -380,7 +385,9 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
    net.name='real-fishing-net';
   }
   box(g,.75,.46,.70,.60,.14,.51,wood);
-  for(let i=0;i<5;i++){
+   const waitingFish=orb(g,.75,.59,.70,.19,material('#91a9a4'),1.4,.40,.65);
+   waitingFish.name='pending-fish-basket';waitingFish.visible=false;
+   for(let i=0;i<5;i++){
    const fish=orb(g,-.75+i*.20,.47,-.08,.11,
     material('#879fa0'),1.5,.33,.58);
    fish.name='visible-caught-fish';
@@ -608,6 +615,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  let lastBuildSig='',lastSeason='',lastProgressIndex=-1,renderedStructures=0;
  const gardenCrops=new Map<string,THREE.Mesh[]>();
  const fishProps=new Map<string,THREE.Mesh[]>(),grainProps=new Map<string,THREE.Mesh[]>();
+ const waitingFishProps=new Map<string,THREE.Object3D>();
  let latestWorld=world;
  let selected:PioneerSelection|null=null;
  const glow=new THREE.Mesh(new THREE.RingGeometry(.89,1.0,48),
@@ -652,7 +660,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    (s.intent?.parcel?.z??'');
   let rebuilt=false;
   if(signature!==lastBuildSig||progressIndex!==lastProgressIndex){
-   rebuilt=true;gardenCrops.clear();fishProps.clear();grainProps.clear();
+   rebuilt=true;gardenCrops.clear();fishProps.clear();grainProps.clear();waitingFishProps.clear();
    while(constructionLayer.children.length){
     const old=constructionLayer.children[0];constructionLayer.remove(old);
    }
@@ -675,8 +683,11 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
       if(child instanceof THREE.Mesh&&child.name===(built.kind==='fish-hut'?
        'visible-caught-fish':'stored-real-grain-jar'))items.push(child);
      });
-     if(built.kind==='fish-hut')fishProps.set(built.id,items);
-     else grainProps.set(built.id,items);
+     if(built.kind==='fish-hut'){
+      fishProps.set(built.id,items);
+      const waiting=plot.getObjectByName('pending-fish-basket');
+      if(waiting)waitingFishProps.set(built.id,waiting);
+     }else grainProps.set(built.id,items);
     }
    }
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
@@ -721,7 +732,9 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    const caught=s.sites.find(site=>site.id==='fish-'+id)?.totalGathered??0;
    props.forEach((mesh,i)=>{mesh.visible=caught>=i+1;});
   }
-  for(const props of grainProps.values()){
+  for(const [id,mesh] of waitingFishProps)
+    mesh.visible=s.livelihood.fishTransport.pending?.siteId==='fish-'+id;
+   for(const props of grainProps.values()){
    const stored=s.resources.food;
    props.forEach((jar,i)=>{jar.visible=stored>=(i+1)*8;});
   }
@@ -777,6 +790,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    visual.axe.visible=forester&&!(moving&&phaseHour>.78);
    visual.rod.visible=f.activity==='fish'&&!moving;
    visual.cargo.visible=f.activity==='collect-wood'&&moving&&phaseHour>.78;
+   visual.fishBasket.visible=f.activity==='haul-fish';
    visual.axe.rotation.z=forester&&!moving?
     .32*Math.sin(seconds*6+i):0;
    if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build'||f.activity==='craft')&&!moving){
@@ -790,6 +804,9 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     visual.arms[0].rotation.x=-.83+.10*Math.sin(seconds*2.4+i);
     visual.arms[1].rotation.x=-.61;
     visual.rod.rotation.x=.12*Math.sin(seconds*2+i);
+   }else if(f.activity==='haul-fish'){
+    visual.arms[0].rotation.x=-.84;visual.arms[1].rotation.x=-.84;
+    visual.head.rotation.x=.08;
    }else if(f.activity==='host-guest'&&!moving){
      // The serving resident is at the actual tea stop with a bowl,
      // visibly spending this hour instead of collecting in the forest.

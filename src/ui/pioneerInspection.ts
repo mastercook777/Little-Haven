@@ -46,7 +46,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
    {label:'落脚住处',value:f.homeBuildingId?
     (s.buildings.find(b=>b.id===f.homeBuildingId)?.kind==='cottage'?'山居':'避雨棚'):'尚在营地'},
    {label:'此刻正在',value:f.activity==='seed-trial'?'留种照料试田':f.activity==='fish'?'河岸捕鱼':
-     f.activity==='craft'?'木坊锯作':f.activity==='host-guest'?'在茶棚接待过客':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
+     f.activity==='haul-fish'?'背鱼归仓':f.activity==='craft'?'木坊锯作':f.activity==='host-guest'?'在茶棚接待过客':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
     f.activity==='build'?'参与建屋':f.activity==='eat'?'村心用餐':f.activity==='socialize'?'邻里闲谈':'村中日常'},
    {label:'已见本领',value:person.publicFacts.knownSkills.join('、')||'仍在相处中'},
    {label:'田间实践',value:person.skills.cultivation.xp+' 小时；经验 '+person.skills.cultivation.level+' 阶'},
@@ -102,12 +102,18 @@ export function inspectPioneerSelection(s:PioneerWorld,
   }
   if(b.kind==='fish-hut'){
    const fish=s.sites.find(x=>x.id==='fish-'+b.id);
+   const transport=s.livelihood.fishTransport;
    facts.push({label:'渔点存量',value:fixed(fish?.stock??0)+' / '+fixed(fish?.capacity??0)});
-   facts.push({label:'真实总渔获',value:fixed(fish?.totalGathered??0)+' 份入村粮'});
+   facts.push({label:'真实总渔获',value:fixed(fish?.totalGathered??0)+' 份（仅捕获）'});
+   facts.push({label:'实际入村口粮',value:fixed(transport.totalDelivered)+' 份 · 另用 '+transport.haulHours+' 搬运工时'});
+   facts.push({label:'河岸待运鱼篓',value:transport.pending&&transport.pending.siteId===fish?.id?
+    fixed(transport.pending.amount)+' 份 · 等待沿路运回':'眼下没有待运鱼篓'});
    facts.push({label:'这次有谁捕鱼',value:s.founders.filter(f=>f.activity==='fish')
     .map(f=>f.name).join('、')||'此时无人下竿'});
    facts.push({label:'渔业始于',value:s.livelihood.firstFishAt===null?'尚未有第一篓':
     date(s.livelihood.firstFishAt)});
+   facts.push({label:'最近一次运回',value:transport.lastDeliveredAt===null?'尚无运鱼记录':
+    date(transport.lastDeliveredAt)});
   }
   if(b.kind==='cottage'){
    facts.push({label:'现有安居容量',value:(b.loftAddedAt!==undefined?'3':'2')+' 人'});
@@ -132,6 +138,8 @@ export function inspectPioneerSelection(s:PioneerWorld,
   if(b.kind==='granary'){
    facts.push({label:'全村储粮容量',value:fixed(pioneerFoodCapacity(s))+' 份'});
    facts.push({label:'眼下实有粮食',value:fixed(s.resources.food)+' 份 · 非免费填仓'});
+   facts.push({label:'从河岸实际运回',value:fixed(s.livelihood.fishTransport.totalDelivered)+
+    ' 份 · '+s.livelihood.fishTransport.haulHours+' 小时搬运'});
   }
   const operation=isPioneerOperational(b)?{
    id:b.id,active:isPioneerFacilityActive(b),
@@ -143,7 +151,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
   const description=b.kind==='shelter'?'开荒三人亲手建成的避雨之处。':
    b.kind==='cottage'?'乡邻拥有真实住户与出入路径的山居。':
    b.kind==='garden'?'季节和生产安排决定收成，不能凭空供粮。':
-   b.kind==='fish-hut'?'河岸先要合法落地、村民出工，冬季鱼群恢复慢。每一篓才会变成村中的粮食。':
+   b.kind==='fish-hut'?'河岸捕获的鱼先暂存渔棚，乡邻还须沿真实乡路另花一小时送回村心或粮仓，才计入口粮。':
    b.kind==='granary'?'架高的储粮阁扩大储量但不生产粮食，所有仓中口粮仍来自真实劳动。':
    b.kind==='tea-stop'?'客人需要沿真实道路抵达；能换粮木、付粮水招待，也可选择安静不交易。访客不会冒充常住人口。':
    '木匠在这里晾晒材料、维护工具和准备建筑木料。';
