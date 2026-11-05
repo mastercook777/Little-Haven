@@ -293,7 +293,14 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
   const leg=orb(g,sign*.14,.30,0,.22,dark,.62,1.25,.65);legs.push(leg);
   orb(g,sign*.14,.11,.10,.12,material('#5c5146'),1.10,.60,1.40);
  }
- const garment=dressCharacter(upper,founder);
+ // Classic costumes are keyed by classic cast IDs. Remap only the VISUAL
+ // wardrobe by actual pioneer occupation; never mutate a resident's saved ID.
+ const role=founder.role;
+ const costumeId=founder.id<=3?founder.id:
+  /渔夫/.test(role)?7:/织网/.test(role)?6:
+  /园|农/.test(role)?3:/采集/.test(role)?4:
+  /木匠|石匠|修路/.test(role)?1:2;
+ const garment=dressCharacter(upper,{id:costumeId,color:founder.color});
  upper.userData.classicGarment=garment;
  upper.userData.heritageCloth=true;
   const tool=group(g,0,0,0);tool.name='occupational-gear';
@@ -887,7 +894,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   heritageClothed:people.filter(p=>p.upper.userData.heritageCloth===true).length,
   seasonalProtectedTrees:heritageGrove.count,
   snowyHeritageRoofs:constructionLayer.children.filter(g=>
-   !!g.getObjectByName('seasonally-frosted-authored-roof')).length
+   g.getObjectByName('seasonally-frosted-authored-roof')?.visible===true).length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
