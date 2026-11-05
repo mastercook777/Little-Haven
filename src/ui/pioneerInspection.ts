@@ -106,7 +106,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
    facts.push({label:'渔点存量',value:fixed(fish?.stock??0)+' / '+fixed(fish?.capacity??0)});
    facts.push({label:'真实总渔获',value:fixed(fish?.totalGathered??0)+' 份（仅捕获）'});
    facts.push({label:'实际入村口粮',value:fixed(transport.totalDelivered)+' 份 · 另用 '+transport.haulHours+' 搬运工时'});
-   facts.push({label:'河岸待运鱼篓',value:transport.pending?.siteId===fish?.id?
+   facts.push({label:'河岸待运鱼篓',value:transport.pending&&transport.pending.siteId===fish?.id?
     fixed(transport.pending.amount)+' 份 · 等待沿路运回':'眼下没有待运鱼篓'});
    facts.push({label:'这次有谁捕鱼',value:s.founders.filter(f=>f.activity==='fish')
     .map(f=>f.name).join('、')||'此时无人下竿'});

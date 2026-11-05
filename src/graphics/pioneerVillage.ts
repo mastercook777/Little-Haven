@@ -266,7 +266,7 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
  plinth.name='shelter-plinth';
  return g;
 }
-interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;rod:THREE.Group;}
+interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;fishBasket:THREE.Group;rod:THREE.Group;}
 function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  const g=group(parent,0,.19,0);g.name='pioneer-'+founder.id;
  g.userData.founderId=founder.id;
