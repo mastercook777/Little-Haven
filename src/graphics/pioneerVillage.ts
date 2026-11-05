@@ -772,7 +772,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    visual.legs[0].rotation.x=-swing;visual.legs[1].rotation.x=swing;
    visual.root.scale.setScalar(i<3?1:.95);
    visual.tool.visible=f.activity==='cook';
-   visual.mealBowl.visible=f.activity==='eat'||f.activity==='eat-home';
+   visual.mealBowl.visible=f.activity==='eat'||f.activity==='eat-home'||f.activity==='host-guest';
    const forester=f.activity==='collect-wood'||f.activity==='clear-land';
    visual.axe.visible=forester&&!(moving&&phaseHour>.78);
    visual.rod.visible=f.activity==='fish'&&!moving;
@@ -790,7 +790,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     visual.arms[0].rotation.x=-.83+.10*Math.sin(seconds*2.4+i);
     visual.arms[1].rotation.x=-.61;
     visual.rod.rotation.x=.12*Math.sin(seconds*2+i);
-   }else if(f.activity==='cook'&&!moving){
+   }else if(f.activity==='host-guest'&&!moving){
+     // The serving resident is at the actual tea stop with a bowl,
+     // visibly spending this hour instead of collecting in the forest.
+     visual.arms[0].rotation.x=-.81+.12*Math.sin(seconds*2.5+i);
+     visual.arms[1].rotation.x=-.64;
+     visual.head.rotation.y=.12*Math.sin(seconds*1.7+i);
+    }else if(f.activity==='cook'&&!moving){
     visual.arms[0].rotation.x=-1.0+.3*Math.sin(seconds*4+i);
     visual.arms[1].rotation.x=-.50+.25*Math.cos(seconds*4+i);
     visual.tool.rotation.z=.15*Math.sin(seconds*4+i);
@@ -807,7 +813,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     visual.root.position.y-=.15;visual.head.rotation.x=.12;
     visual.arms[0].rotation.x=-.55;visual.arms[1].rotation.x=-.55;
    }else visual.head.rotation.x=0;
-   if(f.activity!=='socialize'){visual.head.rotation.y=0;visual.arms[0].rotation.z=0;}
+   if(f.activity!=='socialize'&&f.activity!=='host-guest'){visual.head.rotation.y=0;visual.arms[0].rotation.z=0;}
    visual.root.visible=true;
   });
   const visiting=s.commerce.activeVisitor;
