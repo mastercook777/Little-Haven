@@ -16,17 +16,23 @@ export interface PioneerVisitor{
  arrivalAt:number;leaveAt:number;settledAt:number|null;
  outcome:'pending'|'exchange'|'hosted'|'passing';
  foodDelta:number;woodDelta:number;waterDelta:number;
- teaStopId:string;route:WalkPoint[];
+ teaStopId:string;route:WalkPoint[];hostResidentId?:number|null;
 }
 export interface PioneerVisitHistory{
  id:string;name:string;origin:string;arrivedAt:number;leftAt:number;
  outcome:'exchange'|'hosted'|'passing';foodDelta:number;woodDelta:number;waterDelta:number;
+ hostResidentId?:number|null;
+}
+export interface PioneerRoadContact{
+ key:string;name:string;origin:string;hostResidentId:number;
+ meetings:number;firstMetAt:number;lastMetAt:number;recentVisitorIds:string[];
 }
 export interface PioneerCommerce{
  guestPolicy:PioneerGuestPolicy;policySetAt:number;
  nextVisitorAt:number|null;activeVisitor:PioneerVisitor|null;visits:PioneerVisitHistory[];
  totalArrivals:number;totalExchanges:number;totalHosted:number;
  netFood:number;netWood:number;netWater:number;
+ receptionHours:number;contacts:PioneerRoadContact[];
 }
 const round=(n:number)=>Math.round(n*1000)/1000;
 const chance=(n:number)=>{
@@ -57,7 +63,9 @@ const visitFields=(v:PioneerVisitor)=>{
   !(v.settledAt===null||finite(v.settledAt))||
   typeof v.teaStopId!=='string'||!Array.isArray(v.route)||
   v.route.length<2||v.route.length>200||
-  !v.route.every(p=>Array.isArray(p)&&p.length===2&&p.every(finite)))return false;
+  !v.route.every(p=>Array.isArray(p)&&p.length===2&&p.every(finite))||
+  !(v.hostResidentId===undefined||v.hostResidentId===null||
+    Number.isSafeInteger(v.hostResidentId)&&v.hostResidentId>=1))return false;
  if(v.outcome==='pending')
   return v.settledAt===null&&legalDeltas(v.outcome,v.foodDelta,v.woodDelta,v.waterDelta);
  return v.settledAt!==null&&v.settledAt>=v.arrivalAt&&v.settledAt<=v.leaveAt&&
@@ -66,7 +74,7 @@ const visitFields=(v:PioneerVisitor)=>{
 export function createPioneerCommerce():PioneerCommerce{
  return {guestPolicy:'exchange',policySetAt:0,nextVisitorAt:null,activeVisitor:null,
   visits:[],totalArrivals:0,totalExchanges:0,totalHosted:0,
-  netFood:0,netWood:0,netWater:0};
+  netFood:0,netWood:0,netWater:0,receptionHours:0,contacts:[]};
 }
 export function validPioneerCommerce(s:PioneerWorld){
  const c=s.commerce;
@@ -74,6 +82,8 @@ export function validPioneerCommerce(s:PioneerWorld){
   !finite(c.policySetAt)||c.policySetAt<0||c.policySetAt>s.minutes||
   !(c.nextVisitorAt===null||finite(c.nextVisitorAt)&&c.nextVisitorAt>=0)||
   !Array.isArray(c.visits)||c.visits.length>12||
+  !Array.isArray(c.contacts)||c.contacts.length>64||
+  !Number.isSafeInteger(c.receptionHours)||c.receptionHours<0||
   ![c.totalArrivals,c.totalExchanges,c.totalHosted,c.netFood,c.netWood,c.netWater].every(finite)||
   ![c.totalArrivals,c.totalExchanges,c.totalHosted].every(n=>Number.isInteger(n)&&n>=0)||
   c.totalExchanges+c.totalHosted>c.totalArrivals||
@@ -81,6 +91,9 @@ export function validPioneerCommerce(s:PioneerWorld){
    finite(v.arrivedAt)&&finite(v.leftAt)&&v.leftAt>=v.arrivedAt&&
    v.leftAt<=s.minutes&&['exchange','hosted','passing'].includes(v.outcome)&&
    [v.foodDelta,v.woodDelta,v.waterDelta].every(finite)&&
+   (v.hostResidentId===undefined||v.hostResidentId===null||
+    Number.isSafeInteger(v.hostResidentId)&&
+    s.founders.some(f=>f.id===v.hostResidentId))&&
    legalDeltas(v.outcome,v.foodDelta,v.woodDelta,v.waterDelta)))return false;
  // Every material inflow must be matched by a real outbound payment. A
  // forged save cannot mint wood/food by changing only the account totals.
@@ -92,12 +105,32 @@ export function validPioneerCommerce(s:PioneerWorld){
   c.totalArrivals<c.visits.length+(c.activeVisitor?1:0)||
   c.totalExchanges<c.visits.filter(v=>v.outcome==='exchange').length||
   c.totalHosted<c.visits.filter(v=>v.outcome==='hosted').length)return false;
+ const contactKeys=new Set<string>();
+ let paidMeetings=0;
+ for(const contact of c.contacts){
+  const key=contact?.name+'|'+contact?.origin+'|'+contact?.hostResidentId;
+  if(!contact||contact.key!==key||contactKeys.has(key)||
+   !contact.name||!contact.origin||!s.founders.some(f=>f.id===contact.hostResidentId)||
+   !Number.isSafeInteger(contact.meetings)||contact.meetings<1||
+   !finite(contact.firstMetAt)||!finite(contact.lastMetAt)||
+   contact.firstMetAt<0||contact.firstMetAt>contact.lastMetAt||
+   contact.lastMetAt>s.minutes||!Array.isArray(contact.recentVisitorIds)||
+   contact.recentVisitorIds.length<1||contact.recentVisitorIds.length>6||
+   contact.meetings<contact.recentVisitorIds.length||
+   new Set(contact.recentVisitorIds).size!==contact.recentVisitorIds.length||
+   !contact.recentVisitorIds.every(id=>/^visitor-\d+-\d+$/.test(id)))return false;
+  paidMeetings+=contact.meetings;contactKeys.add(key);
+ }
+ if(paidMeetings>c.totalExchanges+c.totalHosted||
+  c.receptionHours<paidMeetings)return false;
  const hut=s.buildings.find(b=>b.kind==='tea-stop');
  if(c.activeVisitor){
   const v=c.activeVisitor;
   if(!hut||!visitFields(v)||v.teaStopId!==hut.id||v.arrivalAt>s.minutes||
    v.id!=='visitor-'+(s.seed>>>0)+'-'+v.serial||
-   c.totalArrivals<v.serial||c.visits.some(h=>h.id===v.id))return false;
+   c.totalArrivals<v.serial||c.visits.some(h=>h.id===v.id)||
+   (v.hostResidentId!==undefined&&v.hostResidentId!==null&&
+    !s.founders.some(f=>f.id===v.hostResidentId)))return false;
  }else if(c.totalArrivals===0&&c.visits.length>0)return false;
  if(!hut&&(c.activeVisitor!==null||c.totalArrivals!==0||c.visits.length>0||
   c.nextVisitorAt!==null))return false;
