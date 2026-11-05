@@ -2,6 +2,7 @@ import {getCalendarFromMinutes,SEASON_NAMES} from '../simulation/calendar.ts';
 import {publicPersonHistory,publicPersonRelations} from '../simulation/livingFates/peopleState.ts';
 import {pioneerBuildingLabel} from '../simulation/pioneerGrowth.ts';
 import {pioneerFoodCapacity} from '../simulation/pioneerLivelihood.ts';
+import {pioneerResidentContacts,pioneerFamiliarRoadDays} from '../simulation/pioneerCommerce.ts';
 import {gardenSeedTrial} from '../simulation/livingFates/seedTrial.ts';
 import {pioneerCommonsNames} from '../simulation/pioneerCommons.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive,isPioneerOperational} from '../simulation/pioneerFacilities.ts';
@@ -32,6 +33,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
   const f=s.founders.find(x=>String(x.id)===selection.id);
   const person=f&&s.livingFates.people[f.id];
   if(!f||!person)return null;
+  const contacts=pioneerResidentContacts(s,f.id);
   const bonds=publicPersonRelations(s,f.id);
   const memories=publicPersonHistory(s,f.id);
   const notes=bonds.map(b=>{
@@ -44,17 +46,23 @@ export function inspectPioneerSelection(s:PioneerWorld,
    {label:'落脚住处',value:f.homeBuildingId?
     (s.buildings.find(b=>b.id===f.homeBuildingId)?.kind==='cottage'?'山居':'避雨棚'):'尚在营地'},
    {label:'此刻正在',value:f.activity==='seed-trial'?'留种照料试田':f.activity==='fish'?'河岸捕鱼':
-     f.activity==='craft'?'木坊锯作':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
+     f.activity==='craft'?'木坊锯作':f.activity==='host-guest'?'在茶棚接待过客':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
     f.activity==='build'?'参与建屋':f.activity==='eat'?'村心用餐':f.activity==='socialize'?'邻里闲谈':'村中日常'},
    {label:'已见本领',value:person.publicFacts.knownSkills.join('、')||'仍在相处中'},
    {label:'田间实践',value:person.skills.cultivation.xp+' 小时；经验 '+person.skills.cultivation.level+' 阶'},
    {label:'山路实践',value:person.skills.wayfinding.xp+' 小时'},
-   {label:'有迹可循的邻里',value:notes.join('；')||'尚无共同劳动或同席记录'}
+   {label:'有迹可循的邻里',value:notes.join('；')||'尚无共同劳动或同席记录'},
+   {label:'茶棚往来',value:contacts.reduce((n,c)=>n+c.meetings,0)+' 次有账可查的实际服务'},
+   {label:'山路故人',value:contacts.filter(c=>c.meetings>=2).map(c=>
+    c.name+'（'+c.origin+'）· 相见 '+c.meetings+' 次').join('；')||'尚未与同一旅人多次相识'}
   ];
   return {title:f.name,kicker:'谷中常住 · 人物 '+f.id,
    description:person.publicFacts.arrivalReason+' '+person.publicFacts.habit+
     ' 往事只能从共同生活与实际经历里慢慢得知。',
-   facts:fields,history:memories.map(m=>date(m.minute)+' · '+m.text)};
+   facts:fields,history:[
+    ...contacts.filter(c=>c.meetings>=2).map(c=>
+     date(c.lastMetAt)+' · 曾与'+c.name+'在茶棚真换物或待客 '+c.meetings+' 次，熟路有了名字。'),
+    ...memories.map(m=>date(m.minute)+' · '+m.text)]};
  }
  if(selection.kind==='building'){
   const b=s.buildings.find(x=>x.id===selection.id);
@@ -112,6 +120,12 @@ export function inspectPioneerSelection(s:PioneerWorld,
    facts.push({label:'真实交换',value:c.totalExchanges+' 次；交换的净木料 '+
     fixed(c.netWood)+' / 口粮 '+fixed(c.netFood)});
    facts.push({label:'热茶招待',value:c.totalHosted+' 次；水耗 '+fixed(-c.netWater)});
+   facts.push({label:'乡邻接客工时',value:c.receptionHours+' 小时 · 从其他工作里真实让出'});
+   facts.push({label:'认识的旧客',value:c.contacts.filter(p=>p.meetings>=2).map(p=>
+    (s.founders.find(f=>f.id===p.hostResidentId)?.name??'乡邻')+
+    '与'+p.name+'曾相见 '+p.meetings+' 次').join('；')||'还在初次相识'});
+   facts.push({label:'熟路后的往返',value:pioneerFamiliarRoadDays(s)?
+    '下次旅客比原先提早 2 日（仍要沿真实山路来）':'原有 12–16 日来访间隔'});
    facts.push({label:'此刻旅人',value:v?v.name+' · '+v.origin+' · '+v.occupation:'此时无客'});
    facts.push({label:'下一次来往',value:c.nextVisitorAt===null?'尚未安排':date(c.nextVisitorAt)});
   }
@@ -139,8 +153,9 @@ export function inspectPioneerSelection(s:PioneerWorld,
       date(t.completedAt??t.startedAt)+' · 留种试田'+
       (t.phase==='working'?'开始':t.phase==='resolved'?'有成':'中止')+
       '（'+t.actorIds.map(id=>s.founders.find(f=>f.id===id)?.name??'乡邻').join('、')+'）'),
-     ...s.commerce.visits.slice(-3).reverse().map(v=>
+     ...(b.kind==='tea-stop'?s.commerce.visits.slice(-3).reverse():[]).map(v=>
       date(v.arrivedAt)+' · '+v.name+'自'+v.origin+'来访'+
+       (v.hostResidentId?'，'+(s.founders.find(f=>f.id===v.hostResidentId)?.name??'乡邻')+'亲自接待':'')+
        (v.outcome==='exchange'?'，真实交换了货物':v.outcome==='hosted'?'，村民为他付出粮水':'，未作交换')),
      ...relevant(s,b.causeId)
     ],operation};
