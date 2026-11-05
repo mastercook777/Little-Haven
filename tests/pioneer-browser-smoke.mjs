@@ -428,6 +428,8 @@ try{
    fish:s.sites.find(x=>x.kind==='fish')?.totalGathered??0,
    fishHaul:s.livelihood.fishTransport,
    rendered:v.renderedStructures,loftDormers:v.loftDormers,
+   heritageRoofs:v.heritageRoofs,heritageClothed:v.heritageClothed,
+   seasonalProtectedTrees:v.seasonalProtectedTrees,snowyHeritageRoofs:v.snowyHeritageRoofs,
    sawbenches:v.sawbenches,wood:s.resources.wood,food:s.resources.food};
  });
  if(mature.people<=9||mature.lofts.length<1||
@@ -435,11 +437,18 @@ try{
   !mature.built.includes('fish-hut')||!mature.built.includes('granary')||
   mature.fish<=0||mature.fishHaul.totalDelivered<=0||
   mature.fishHaul.haulHours<=0||mature.fishHaul.totalDelivered>mature.fish+.002||
+  mature.heritageClothed!==mature.people||mature.seasonalProtectedTrees<2||
+  mature.heritageRoofs<
+   mature.built.filter(kind=>kind==='cottage'||kind==='granary').length||
   mature.loftDormers<mature.lofts.length||
   mature.rendered<mature.built.length)
   throw Error('No mature paid/visible village growth after five real years: '+
    JSON.stringify(mature));
  await screenshot(page,'05d-four-year-life-and-paid-lofts');
+ // The screenshot has rendered a complete five-year scene. Capture truthful
+ // GPU metrics here, not the stale frame before d.advance().
+ const heritagePerformance=await page.evaluate(()=>
+  window.__PIONEER_DEBUG__.getRendererInfo());
  if(!mature.built.includes('tea-stop'))
   throw Error('Five-year village still never built its real roadside tea stop: '+
    JSON.stringify(mature));
@@ -497,7 +506,27 @@ try{
  await screenshot(page,'05e-actual-visitor-at-roadside-tea-stop');
  results.push({actualTeaHost:actualHost.host.name,guest:actualHost.guest.name});
  results.push({matureVillage:mature,teaVisitation:visitation,
-  visibleTraveler:liveTraveler.guest.name});
+  visibleTraveler:liveTraveler.guest.name,
+  heritagePerformance});
+ // Prove the exact inherited classic curved snow layer is switched on by
+ // the authoritative winter calendar, without spawning an extra building.
+ const mountainWinter=await page.evaluate(async()=>{
+  const d=window.__PIONEER_DEBUG__,s=d.getState();
+  const {DAY_MINUTES}=await import('/src/simulation/calendar.ts');
+  const yearStart=Math.floor(s.minutes/(48*DAY_MINUTES))*48*DAY_MINUTES;
+  let winter=yearStart+36*DAY_MINUTES+12*60;
+  if(winter<=s.minutes)winter+=48*DAY_MINUTES;
+  d.advance((winter-s.minutes)/3);
+  return {season:d.getState().minutes,
+   visuals:d.getVisuals(),buildings:d.getState().buildings.length};
+ });
+ if(mountainWinter.visuals.heritageRoofs<1||
+  mountainWinter.visuals.snowyHeritageRoofs!==mountainWinter.visuals.heritageRoofs)
+  throw Error('Classic curved snow layers failed to follow actual winter roof states: '+
+   JSON.stringify(mountainWinter));
+ await screenshot(page,'05f-heritage-curved-roofs-in-winter');
+ results.push({mountainWinter:{roofs:mountainWinter.visuals.heritageRoofs,
+  snow:mountainWinter.visuals.snowyHeritageRoofs,buildingCount:mountainWinter.buildings}});
  // A quick fresh-world playback checks an actual felling animation window.
  // The real simulation is advanced in hour-sized chunks and the GPU model
  // is refreshed by the same public debug helper used for other snapshots.

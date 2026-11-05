@@ -140,7 +140,8 @@ function identityHeadwear(upper:THREE.Group,style:'wide'|'herbal'|'work'){
  }
  return g;
 }
-export function dressCharacter(upper:THREE.Group,v:Villager):CharacterCostume{
+/** Compatible with both classic villagers and persistent pioneer residents. */
+export function dressCharacter(upper:THREE.Group,v:Pick<Villager,'id'|'color'>):CharacterCostume{
  const base=mat(v.color),secondary=mat(new THREE.Color(v.color).multiplyScalar(.79).getStyle());
  const accent=v.id===8||v.id===9?SHARED.red:SHARED.straw;
  const hems=loinWrap(upper,secondary,accent);

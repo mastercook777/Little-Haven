@@ -31,6 +31,8 @@ const STANDARD={
  jade:new THREE.MeshStandardMaterial({color:'#738b77',roughness:1,side:THREE.DoubleSide}),
  roofFrost:new THREE.MeshStandardMaterial({color:'#e5eee6',roughness:1,transparent:true,opacity:.69,depthWrite:false,side:THREE.DoubleSide})
 };
+/** Shared classic village palette; pioneer art reuses these same materials. */
+export const MOUNTAIN_MATERIALS=STANDARD;
 const boxGeometry=new THREE.BoxGeometry(1,1,1);
 const circleGeometry=new THREE.CylinderGeometry(1,1,1,9);
 function group(parent:THREE.Object3D,x=0,y=0,z=0){
