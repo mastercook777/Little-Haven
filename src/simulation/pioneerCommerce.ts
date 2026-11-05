@@ -277,7 +277,8 @@ export function pioneerFamiliarRoadDays(s:PioneerWorld){
 }
 export function pioneerResidentContacts(s:PioneerWorld,residentId:number){
  return s.commerce.contacts.filter(c=>c.hostResidentId===residentId)
-  .sort((a,b)=>b.lastMetAt-a.lastMetAt).slice(0,5);
+  .sort((a,b)=>Number(b.meetings>=2)-Number(a.meetings>=2)||
+   b.lastMetAt-a.lastMetAt).slice(0,5);
 }
 /** One called per authoritative simulation hour; invisible world ticks
  * still advance visits, and a visitor can never transact twice. */
