@@ -22,7 +22,8 @@ function fromEvent(s:PioneerWorld,e:PioneerJournal):PioneerSpotlight|null{
  const b=s.buildings.find(x=>x.causeId===e.causeId||x.id===e.causeId);
  if((e.title==='避雨棚落成'||e.title==='菜圃落成'||
   e.title==='山居落成'||e.title==='木作棚落成'||
-  e.title==='河岸渔棚落成'||e.title==='架高粮仓落成')&&b)
+  e.title==='河岸渔棚落成'||e.title==='架高粮仓落成'||
+  e.title==='山路茶棚落成')&&b)
   return pick(when,e.title,e.text,built(b.id),'event-'+e.id,'看新建的'+pioneerBuildingLabel(b.kind));
  if(['第一篓渔获','锯木台终于装好','木作棚试制锯台'].includes(e.title)&&b)
   return pick(when,e.title,e.text,built(b.id),'event-'+e.id,'看新的生计');
@@ -30,6 +31,10 @@ function fromEvent(s:PioneerWorld,e:PioneerJournal):PioneerSpotlight|null{
   const home=s.buildings.find(x=>x.kind==='cottage'&&x.loftCauseId===e.causeId);
   if(home)return pick(when,'老屋檐下又有了新床位',
    e.text,built(home.id),'event-'+e.id,'看添出的木阁');
+ }
+ if(['山路上有客','山谷第一次交换了货物','茶棚里有一杯热茶','过客未曾留下交易'].includes(e.title)){
+  const tea=s.buildings.find(b=>b.kind==='tea-stop');
+  if(tea)return pick(when,e.title,e.text,built(tea.id),'event-'+e.id,'去茶棚看客');
  }
  if(e.title==='又添一位乡邻'){
   const newcomer=s.founders.find(f=>f.id>3&&e.text.includes(f.name));
@@ -101,6 +106,17 @@ export function getPioneerSpotlight(s:PioneerWorld):PioneerSpotlight{
  // forever. Rotate *observations*, not simulation events, and always link to
  // an actual built structure. There is no fake date-based construction.
  const candidates:PioneerSpotlight[]=[];
+ const guest=s.commerce.activeVisitor,tea=s.buildings.find(b=>b.kind==='tea-stop');
+ if(tea){
+  candidates.push(pick(current+' · 山谷有客',
+   guest?guest.name+'沿真乡路来茶棚了':'小茶棚，路上总有新面孔',
+   guest?guest.name+'自述来自'+guest.origin+'，是'+guest.occupation+
+    '。这位来客留在茶棚，只待几小时，不会被计入谷中常住。':
+    '已经有 '+s.commerce.totalArrivals+' 位真实旅人走进茶棚；其中 '+
+    s.commerce.totalExchanges+' 次有实际粮木交换，'+
+    s.commerce.totalHosted+' 次由村民出粮水招待。',
+   built(tea.id),'tea-'+tea.id+(guest?guest.id:''),'看山路茶棚'));
+ }
  const fishing=s.buildings.find(b=>b.kind==='fish-hut');
  if(fishing){
   const site=s.sites.find(site=>site.id==='fish-'+fishing.id);

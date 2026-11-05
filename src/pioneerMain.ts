@@ -4,6 +4,8 @@ import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage
 import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
 import {getPioneerSpotlight,type PioneerSpotlight} from './ui/pioneerSpotlight.ts';
 import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
+import {PIONEER_GUEST_POLICIES,setPioneerGuestPolicy,
+ type PioneerGuestPolicy} from './simulation/pioneerCommerce.ts';
 import {PIONEER_DIRECTIONS,pioneerMilestoneBoard,setPioneerDirection,
  type PioneerDirection} from './simulation/pioneerLivelihood.ts';
 import {pioneerCommonsNames} from './simulation/pioneerCommons.ts';
@@ -65,7 +67,7 @@ try{world=loadPioneerWorld(localStorage,Date.now(),slot);}catch{
 let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
 let selection:PioneerSelection|null=null;
-let lastLivelihoodMarkup='',lastMilestoneMarkup='';
+let lastLivelihoodMarkup='',lastMilestoneMarkup='',lastGuestMarkup='';
 let spotlight:PioneerSpotlight=getPioneerSpotlight(world);
 let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number;
  fromZoom:number;toZoom:number}|null=null;
@@ -185,6 +187,30 @@ function renderUI(){
  if(lastMilestoneMarkup!==milestones){
   page.innerHTML=milestones;lastMilestoneMarkup=milestones;
  }
+ const hasTea=world.buildings.some(b=>b.kind==='tea-stop');
+ const guestMarkup=PIONEER_GUEST_POLICIES.map(p=>
+  '<button type="button" data-guest-policy="'+p.id+'" title="'+safe(p.effect)+
+  '" '+(!hasTea?'disabled':'')+'><b>'+safe(p.label)+'</b><small>'+
+   safe(p.id==='exchange'?'换粮木':p.id==='hospitality'?'付粮水':'不过问')+
+   '</small></button>').join('');
+ const guestControls=$('pioneerGuestChoices');
+ if(lastGuestMarkup!==guestMarkup){
+  guestControls.innerHTML=guestMarkup;lastGuestMarkup=guestMarkup;
+ }
+ for(const btn of Array.from(guestControls.querySelectorAll<HTMLButtonElement>('[data-guest-policy]')))
+  btn.classList.toggle('active',btn.dataset.guestPolicy===world.commerce.guestPolicy);
+ const commerce=world.commerce,visitor=commerce.activeVisitor;
+ $('pioneerGuestLedger').innerHTML=hasTea?
+  '<b>真实过客 '+commerce.totalArrivals+' 位</b> · 物物交换 '+
+   commerce.totalExchanges+' 次 · 热茶招待 '+commerce.totalHosted+' 次'+
+   '<div>交换/招待净库存：口粮 '+amount(commerce.netFood)+
+   '，木料 '+amount(commerce.netWood)+'，水 '+amount(commerce.netWater)+'</div>'+
+   (visitor?'<div>正有 '+safe(visitor.name)+'（'+safe(visitor.origin)+'）在路上 · '+
+    safe(visitor.outcome==='pending'?'尚未决定接待':'本次 '+visitor.outcome)+'</div>':
+    commerce.visits.length?'<div>最近离谷：'+safe(commerce.visits.at(-1)!.name)+
+    ' · '+safe(commerce.visits.at(-1)!.origin)+'</div>':
+    '<div>茶棚已经造好，等待第一位走得进来的旅人。</div>'):
+  '还未建成茶棚。过客不会凭空出现；需真的落地并有可走乡路。';
  $('pioneerGrowth').textContent=world.founders.length+' 位居民 · '+
   world.buildings.length+' 处建成设施 · '+world.roads.length+' 条居民走出的路';
  const commons=world.commons,commonsJob=commons.project;
@@ -351,6 +377,13 @@ councilOpen.addEventListener('click',()=>{
 });
 councilPanel.addEventListener('toggle',()=>{
  councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
+});
+$('pioneerGuestChoices').addEventListener('click',event=>{
+ const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-guest-policy]');
+ if(!btn||btn.disabled)return;
+ if(setPioneerGuestPolicy(world,btn.dataset.guestPolicy as PioneerGuestPolicy)){
+  renderUI();persist();toast('待客方式已记入守望录。只有真正发生的交换才会改变库存。');
+ }
 });
 $('pioneerDirections').addEventListener('click',event=>{
  const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-livelihood]');

@@ -1,5 +1,6 @@
 import {DAY_MINUTES} from './calendar.ts';
 import {appendPioneerJournal} from './pioneerChronicle.ts';
+import {onPioneerTeaStopBuilt} from './pioneerCommerce.ts';
 import {VALLEY_RIVER} from './valleyGeography.ts';
 import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
 import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
@@ -8,7 +9,7 @@ import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type 
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
-import {pioneerParcelOpened} from './pioneerFrontier.ts';
+import {pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
 const hash=(n:number)=>{
@@ -28,7 +29,9 @@ const spec:Record<Exclude<PioneerBuildKind,'shelter'>,{wood:number;hours:number;
  'fish-hut':{wood:7,hours:12,width:2.85,depth:2.65,
   why:'田里的收成有季节，乡邻想借河水多添一门生计。先探安全岸边，再真实捕鱼。',label:'河岸渔棚'},
  granary:{wood:8,hours:12,width:2.65,depth:2.45,
-  why:'田里有余粮，露天存粮不方便。乡邻想建一处能多储十八份口粮的架高粮仓。',label:'架高粮仓'}
+  why:'田里有余粮，露天存粮不方便。乡邻想建一处能多储十八份口粮的架高粮仓。',label:'架高粮仓'},
+ 'tea-stop':{wood:9,hours:12,width:2.55,depth:2.38,
+  why:'村里有余粮、成形乡路和来往的需求，乡邻愿意用真木料与工时建一处临路茶棚。',label:'山路茶棚'}
 };
 const woodFor=(kind:PioneerBuildKind)=>kind==='shelter'?7:spec[kind].wood;
 const hoursFor=(kind:PioneerBuildKind)=>kind==='shelter'?9:spec[kind].hours;
@@ -43,8 +46,15 @@ function record(s:PioneerWorld,title:string,text:string,causeId:string|null=null
  appendPioneerJournal(s,title,text,causeId);
 }
 /** Enforce the existing real eave/SAT checks, plus every new walking trail. */
-export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>):
+export interface PioneerSurveyMetrics{
+ candidateParcels:number;legalGeometry:number;openedLand:number;
+ routeReached:number;resourceRoutesKept:number;
+}
+export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>,
+ metrics?:PioneerSurveyMetrics,allowUnopened=false):
  {parcel:VillageParcel;path:WalkPoint[]}|null{
+ if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
+  routeReached:0,resourceRoutesKept:0});
  const data=spec[kind];
  const taken=[...natural(),...s.buildings.map(b=>b.parcel)];
  const camp={id:'temporary-camp',kind:'protected' as const,
@@ -67,6 +77,8 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   {x:opened.x,z:opened.z}:
   kind==='fish-hut'?{x:3.6,z:-2.1}:
   kind==='granary'?{x:s.camp.x+3.3,z:s.camp.z+1.6}:
+  kind==='tea-stop'?(opened?{x:opened.x,z:opened.z}:
+   {x:s.camp.x-3.8,z:s.camp.z+2.1}):
   kind==='garden'?(s.policy==='food'?
   {x:s.camp.x-2.1,z:s.camp.z+5.0}:s.policy==='shelter'?
   {x:s.camp.x-5.4,z:s.camp.z+2.0}:
@@ -90,8 +102,11 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
     width:data.width,depth:data.depth,rotation,clearance:.30,
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
+   if(metrics)metrics.candidateParcels++;
    if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
-   if(!pioneerParcelOpened(s,parcel))continue;
+   if(metrics)metrics.legalGeometry++;
+   if(!pioneerParcelOpened(s,parcel)&&!allowUnopened)continue;
+   if(metrics&&pioneerParcelOpened(s,parcel))metrics.openedLand++;
    const proximity=distance({x,z},center);
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
@@ -116,13 +131,18 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // Mature villages have exhausted their central lanes. Inspect safe
  // cleared-ring candidates instead of rejecting growth after the first
  // 210 high-scoring *central* parcels have no walkable access.
- const candidates=kind==='cottage'&&s.founders.length>=9?420:210;
+ const candidates=(kind==='cottage'&&s.founders.length>=9)||kind==='tea-stop'?420:210;
  for(const candidate of choices.slice(0,candidates)){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
+  if(allowUnopened&&!pioneerParcelOpened(s,candidate.parcel)&&
+   !findPioneerWalk([s.camp.x,s.camp.z],
+    [candidate.parcel.x,candidate.parcel.z],taken))continue;
+  if(metrics)metrics.routeReached++;
   const blockers=[...taken,candidate.parcel];
   if(!critical.every(site=>findPioneerWalk(
    [s.camp.x,s.camp.z],[site.x,site.z],blockers)))continue;
+  if(metrics)metrics.resourceRoutesKept++;
   return {parcel:candidate.parcel,path};
  }
  return null;
@@ -149,13 +169,17 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
   return 'wood-yard';
  const cottages=s.buildings.filter(b=>b.kind==='cottage').length;
  const housing=pioneerHousingCapacity(s);
- if(cottages<5&&housing<=s.founders.length&&
+ if(cottages<5&&s.founders.length<12&&housing<=s.founders.length&&
   pioneerHasFacility(s,'garden')&&s.resources.food>=3)return 'cottage';
  // Real professions, not more identical cottages, keep a mature hamlet
  // changing. Suggested direction changes priority, never permanently locks.
  const stable=s.commons.stage>=2&&s.founders.length>=5&&gardens>=2;
  const river=stable&&!pioneerHasFacility(s,'fish-hut');
  const stores=stable&&!pioneerHasFacility(s,'granary');
+ const travelers=s.commons.stage>=3&&s.founders.length>=8&&s.roads.length>=7&&
+  (pioneerHasFacility(s,'granary')||pioneerHasFacility(s,'fish-hut'))&&
+  !pioneerHasFacility(s,'tea-stop');
+ if(s.livelihood.direction==='road'&&travelers)return 'tea-stop';
  if(s.livelihood.direction==='river'&&river)return 'fish-hut';
  if(s.livelihood.direction==='fields'&&stores)return 'granary';
  if(s.livelihood.direction==='craft'&&pioneerHasFacility(s,'wood-yard')&&
@@ -163,6 +187,7 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
   return null; // Give residents actual spare wood and six shifts before other expansion.
  if(river)return 'fish-hut';
  if(stores)return 'granary';
+ if(travelers)return 'tea-stop';
  return null;
 }
 export function schedulePioneerProject(s:PioneerWorld){
@@ -184,6 +209,16 @@ export function schedulePioneerProject(s:PioneerWorld){
   return true;
  }
  const proposal=surveyPioneerPlot(s,kind);
+ if(!proposal&&kind==='tea-stop'){
+  // This is a legal future build site, not free new land. First reserve a
+  // real clearing job for residents, whose eight hours must fully complete
+  // before any future construction or visitor can appear.
+  const future=surveyPioneerPlot(s,kind,undefined,true);
+  if(future&&requestPioneerExpansionClearing(s,future.parcel)){
+   s.nextSurveyAt=s.minutes+3*DAY_MINUTES;
+   return false;
+  }
+ }
  if(!proposal){
   // A full old village centre has no legal fourth-cottage plot. In this
   // case existing families can invest real lumber and labour in loft
@@ -273,12 +308,14 @@ export function completePioneerProject(s:PioneerWorld){
   s.sites.push({id:'fish-'+b.id,kind:'fish',x:dock[0],z:dock[1],
    stock:5.5,capacity:13,renewPerDay:3.5,totalGathered:0});
  }
+ if(kind==='tea-stop')onPioneerTeaStopBuilt(s);
  if(kind==='wood-yard')s.resources.wood=round(Math.min(48,s.resources.wood));
  if(kind==='shelter'){
   for(const resident of s.founders.slice(0,3))resident.homeBuildingId=b.id;
  }
  record(s,pioneerBuildingLabel(kind)+'落成',
-  (kind==='fish-hut'?'乡邻造出靠近真正河岸且可走到的渔棚，渔点有季节库存，仍需居民每日出工。':
+  (kind==='tea-stop'?'山路上出现有灶台、供客歇脚的真正茶棚。仍须村里有粮、行路实际可达，旅人才会来；来客不算常住人口。':
+   kind==='fish-hut'?'乡邻造出靠近真正河岸且可走到的渔棚，渔点有季节库存，仍需居民每日出工。':
    kind==='granary'?'乡邻架高屋底和储谷桶，粮库可以多存十八份口粮，但并不凭空产粮。':
    kind==='garden'?'阿禾开出田畦，粮食今后要靠四季耕作、采收而来。':
    kind==='cottage'?'一户新的住处终于空出来，是否有人落脚仍取决于粮食与生计。':

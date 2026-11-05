@@ -2,7 +2,7 @@ import {DAY_MINUTES} from './calendar.ts';
 import {appendPioneerJournal} from './pioneerChronicle.ts';
 import type {PioneerWorld,PioneerFounder} from './pioneerWorld.ts';
 
-export type PioneerDirection='autonomous'|'river'|'fields'|'craft';
+export type PioneerDirection='autonomous'|'river'|'fields'|'craft'|'road';
 export interface PioneerCraftProject{
  phase:'idle'|'building'|'complete';
  woodSpent:number;workHours:number;completedAt:number|null;
@@ -15,7 +15,8 @@ export const PIONEER_DIRECTIONS:{id:PioneerDirection;label:string;description:st
  {id:'autonomous',label:'顺着人心',description:'乡邻仍会自发尝试渔业、储粮与手艺，谁也不被强迫'},
  {id:'river',label:'靠河吃饭',description:'优先勘察岸边建渔棚，真实渔获进入全谷口粮'},
  {id:'fields',label:'田园有余',description:'优先修粮仓，扩大已有口粮储存而不免费增粮'},
- {id:'craft',label:'林间匠村',description:'让木匠花储木和工时试作锯木台，再改善真实采木效率'}
+ {id:'craft',label:'林间匠村',description:'让木匠花储木和工时试作锯木台，再改善真实采木效率'},
+ {id:'road',label:'山路有客',description:'先修茶棚与现成乡路，商旅有实际来往与有代价的招待、交换'}
 ];
 export const PIONEER_CRAFT_WOOD=4,PIONEER_CRAFT_HOURS=6;
 const round=(n:number)=>Math.round(n*1000)/1000;
@@ -29,7 +30,7 @@ export const createPioneerLivelihood=():PioneerLivelihood=>({
 });
 export function validPioneerLivelihood(s:PioneerWorld){
  const p=s.livelihood,c=p?.craft;
- if(!p||!['autonomous','river','fields','craft'].includes(p.direction)||
+ if(!p||!['autonomous','river','fields','craft','road'].includes(p.direction)||
   !Number.isFinite(p.chosenAt)||p.chosenAt<0||p.chosenAt>s.minutes||
   !c||!['idle','building','complete'].includes(c.phase)||
   !Number.isFinite(c.woodSpent)||!Number.isFinite(c.workHours)||
@@ -118,6 +119,11 @@ export function pioneerMilestoneBoard(s:PioneerWorld):PioneerMilestoneView[]{
   {id:'granary',label:'田园有余',done:counts('granary')>0,
    requirement:'人口增长与两处菜圃 → 投材建粮仓',
    progress:counts('granary')?'存粮上限 54 份':'存粮上限 36 份'},
+  {id:'tea',label:'山路有客',done:s.commerce.totalArrivals>0,
+   requirement:'稳定村心、九位乡邻、合法乡路 → 付材建茶棚 → 真实访客进出',
+   progress:s.buildings.some(b=>b.kind==='tea-stop')?
+    '来客 '+s.commerce.totalArrivals+' 位 · 真交换 '+s.commerce.totalExchanges+
+     ' 次 · 热茶招待 '+s.commerce.totalHosted+' 次':'尚无茶棚'},
   {id:'craft',label:'林间手艺',done:s.livelihood.craft.phase==='complete',
    requirement:'五位居民、木作棚 → 支付四份木料 → 实际锯作六小时',
    progress:s.livelihood.craft.phase==='idle'?'尚未开工':

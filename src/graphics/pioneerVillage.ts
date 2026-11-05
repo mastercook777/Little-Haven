@@ -12,6 +12,7 @@ import {buildPioneerForestArt} from './pioneerForestArt.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import type {PioneerSelection} from '../ui/pioneerInspection.ts';
 import {pioneerCropAppearance,pioneerVisibleWoodLogs} from '../simulation/pioneerVisibility.ts';
+import {pioneerVisitorPosition} from '../simulation/pioneerCommerce.ts';
 
 const material=(color:string,emissive?:string)=>new THREE.MeshStandardMaterial({
  color,roughness:.92,...(emissive?{emissive,emissiveIntensity:.35}:{})
@@ -411,6 +412,30 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   }
   return g;
  }
+ if(kind==='tea-stop'){
+  // Shrunk open eaves remain entirely inside the reserved legal 2.55×2.38m footprint.
+  g.scale.setScalar(.84);
+  box(g,0,.09,0,2.75,.14,2.38,material('#a89d83'));
+  if(phase==='foundation')return g;
+  for(const x of [-1.10,1.10])for(const z of [-.96,.96])
+   pole(g,x,.91,z,.082,1.70,wood);
+  box(g,0,1.74,0,2.48,.12,2.30,lightWood);
+  buildPioneerRoof(g,{halfWidth:1.42,halfDepth:1.23,
+   eaveY:1.81,ridgeY:2.29,thickness:.10},
+   material('#8b9272'),wood,lightWood,thatchBright);
+  if(phase!=='complete')return g;
+  box(g,-.36,.68,.22,1.36,.14,.63,lightWood);
+  for(const x of [-.80,.08])pole(g,x,.35,.22,.055,.56,wood);
+  box(g,-.36,.37,.71,1.10,.09,.25,wood);
+  for(let i=0;i<3;i++)orb(g,-.73+i*.35,.79,.10,.11,
+   material('#b5aa8c'),1,.58,1).name='roadside-tea-cup';
+  orb(g,-.31,.78,.36,.19,material('#8e968d'),1,.70,1);
+  pole(g,-.31,.94,.36,.06,.12,material('#b2ada0'));
+  box(g,.96,.74,-.41,.42,.73,.45,wood);
+  for(let k=0;k<3;k++)box(g,.96,.29+k*.18,-.29,.40,.15,.28,lightWood);
+  box(g,-.92,1.33,.96,.45,.29,.07,material('#ac8a68'));
+  return g;
+ }
  const cottage=kind==='cottage';
  const w=cottage?2.64:2.38,d=cottage?2.50:2.31,h=cottage?1.68:1.57;
  const plaster=material('#d4c5a7');
@@ -530,7 +555,8 @@ export interface PioneerGraphics{
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
    seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
-   fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number};
+   fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number;
+   roadsideVisitor:boolean;activeVisitorName:string|null};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -557,6 +583,17 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  let roadLayer=drawFootpaths(root,world.roads);
  let lastRoads=roadGeometrySignature(world.roads);
  const people=world.founders.map(f=>makeFigure(root,f));
+ // A visitor is not a permanent resident and cannot occupy a house.
+ const traveler=group(root);traveler.name='actual-roadside-visitor';
+ box(traveler,0,.83,0,.52,.90,.37,material('#9e9374'));
+ for(const x of [-.14,.14]){
+  box(traveler,x,.29,0,.16,.56,.18,material('#655c54'));
+  box(traveler,x*1.9,1.01,0,.12,.54,.14,material('#8c785f'));
+ }
+ orb(traveler,0,1.48,0,.30,material('#d2b18b'),1,1.08,.90);
+ orb(traveler,0,1.72,0,.40,material('#6b6253'),1,.26,1).name='traveler-broad-hat';
+ box(traveler,0,.87,-.34,.47,.68,.26,material('#8f765a')).name='traveler-trade-pack';
+ traveler.visible=false;
  const rainGeo=new THREE.BufferGeometry(),rainVertices=new Float32Array(270*6);
  const rainSeed=new Float32Array(270*3);
  for(let i=0;i<270;i++){
@@ -773,6 +810,15 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    if(f.activity!=='socialize'){visual.head.rotation.y=0;visual.arms[0].rotation.z=0;}
    visual.root.visible=true;
   });
+  const visiting=s.commerce.activeVisitor;
+  traveler.visible=!!visiting&&s.buildings.some(b=>b.id===visiting.teaStopId);
+  if(traveler.visible&&visiting){
+   const [x,z]=pioneerVisitorPosition(visiting,s.minutes);
+   const [ax,az]=pioneerVisitorPosition(visiting,Math.min(visiting.leaveAt,s.minutes+6));
+   traveler.position.set(x,.18+Math.abs(Math.sin(seconds*5))*.025,z);
+   const angle=Math.atan2(ax-x,az-z);
+   if(Number.isFinite(angle))traveler.rotation.y=angle;
+  }
   river.animate(seconds);
  }
  update(world,0);
@@ -802,7 +848,9 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    n+items.filter(p=>p.visible).length,0),
   sawbenches:constructionLayer.children.filter(g=>g.getObjectByName('actual-crafted-sawbench')).length,
   fishingActors:latestWorld.founders.filter(f=>f.activity==='fish').length,
-  loftDormers:constructionLayer.children.filter(g=>g.getObjectByName('paid-residential-loft')).length
+  loftDormers:constructionLayer.children.filter(g=>g.getObjectByName('paid-residential-loft')).length,
+  roadsideVisitor:traveler.visible,
+  activeVisitorName:latestWorld.commerce.activeVisitor?.name??null
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
