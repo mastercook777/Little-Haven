@@ -22,3 +22,10 @@
 
 ## 后续不在本轮
 矿冶/护卫/学舍、亲属与战乱事件树、长期货车搬运、手工动画美术精修、低端 Android 性能正式达标。
+
+
+## 2026-11-05 · 第一轮落地与验收
+
+- [PR #20](https://github.com/mastercook777/Little-Haven/pull/20) 已合入 `main`，合并提交 `adfaf01c5b54fafce8c2c76aebb5d940078ffd1a`。
+- [完整 CI #41948530936](https://github.com/mastercook777/Little-Haven/actions/runs/41948530936) 通过 108 项模拟、TypeScript、Pages 构建、桌面／390px 手机 Chromium。五年真实茶棚 12 笔交换对应 12 小时由常住村民花费的排他接客工时，主事人小满与秦氏等来访者有可溯源的相识记录。老 v0.5.1 匿名交易存档无虚构往事，熟路只缩短访客往来间隔，不免费发放物资。
+- 仍未实施独立货运、采矿与铁匠、学舍、外部战乱、家族多代和低端安卓人工 GPU 审计。
