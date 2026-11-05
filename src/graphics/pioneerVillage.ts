@@ -8,6 +8,9 @@ import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFound
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
 import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
 import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
+import {dressCharacter} from './characterKit.ts';
+import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
+ makePioneerSeasonalGrove,pioneerHouseVariant} from './pioneerHeritageArt.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import type {PioneerSelection} from '../ui/pioneerInspection.ts';
@@ -17,8 +20,8 @@ import {pioneerVisitorPosition} from '../simulation/pioneerCommerce.ts';
 const material=(color:string,emissive?:string)=>new THREE.MeshStandardMaterial({
  color,roughness:.92,...(emissive?{emissive,emissiveIntensity:.35}:{})
 });
-const wood=material('#86674b'),lightWood=material('#b38b64');
-const stone=material('#92998d'),bark=material('#6e6451');
+const wood=material('#745544'),lightWood=material('#a37b5b');
+const stone=material('#aba995'),bark=material('#6e6451');
 const thatch=material('#b7a26c'),thatchBright=material('#d3c28a');
 const cloth=material('#b3a68b'),grass=material('#8eae7d');
 const boxGeo=new THREE.BoxGeometry(1,1,1);
@@ -44,7 +47,10 @@ function orb(parent:THREE.Object3D,x:number,y:number,z:number,
 }
 function vegetation(root:THREE.Group){
  const trunk=material('#6d735c'),pine=material('#5b8771'),pineLight=material('#83a283');
- for(const [x,z,s] of VALLEY_PINES){
+ for(const [index,[x,z,s]] of VALLEY_PINES.entries()){
+  // Every fourth protected tree is a seasonal broadleaf, not a second tree
+  // layered over a pine. They remain exactly on the old protected locations.
+  if(index%4===2)continue;
   const g=group(root,x,.18,z);
   pole(g,0,.98*s,0,.12*s,2.0*s,trunk);
   for(let i=0;i<3;i++){
@@ -266,31 +272,31 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
  plinth.name='shelter-plinth';
  return g;
 }
-interface Figure{root:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;fishBasket:THREE.Group;rod:THREE.Group;}
+interface Figure{root:THREE.Group;upper:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;fishBasket:THREE.Group;rod:THREE.Group;}
 function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  const g=group(parent,0,.19,0);g.name='pioneer-'+founder.id;
  g.userData.founderId=founder.id;
+ // Classic village's continuous cloth/drape kit expects a torso pivot at
+ // 0.78m. The founding cast keep their names, equipment and walk targets;
+ // dressCharacter adds no simulation or citizen roster.
+ const upper=group(g,0,.78,0);upper.name='pioneer-costumed-upper-body';
  const outfit=material(founder.color),skin=material('#dbb898');
- const dark=material('#463f36');
- pole(g,0,.76,0,.26,.87,outfit);
- const head=orb(g,0,1.48,0,.26,skin);
- orb(g,0,1.65,-.04,.27,dark,1,.42,1);
+ const dark=material('#463f36'),wood=material('#86674b'),
+  lightWood=material('#b38b64'),stone=material('#92998d');
+ pole(upper,0,-.06,0,.235,.73,outfit);
+ const head=orb(upper,0,.70,0,.26,skin);
+ orb(upper,0,.88,-.06,.28,dark,1,.42,1);
  const arms:THREE.Mesh[]=[],legs:THREE.Mesh[]=[];
  for(const sign of [-1,1]){
-  const arm=box(g,sign*.34,.96,0,.17,.65,.18,outfit);
+  const arm=orb(upper,sign*.335,.19,0,.22,outfit,.68,1.4,.67);
   arms.push(arm);
-  const leg=box(g,sign*.14,.29,0,.18,.56,.20,dark);legs.push(leg);
+  const leg=orb(g,sign*.14,.30,0,.22,dark,.62,1.25,.65);legs.push(leg);
+  orb(g,sign*.14,.11,.10,.12,material('#5c5146'),1.10,.60,1.40);
  }
- if(founder.id===1){
-  const brim=orb(g,0,1.71,0,.36,material('#7e795a'),1,.18,1);
-  brim.name='woodcutter-hat';
- }else if(founder.id===2){
-  box(g,0,.77,.19,.44,.55,.08,cloth);
-  const band=box(g,0,1.65,.20,.28,.10,.12,material('#cfb392'));band.name='head-band';
- }else{
-  orb(g,0,1.60,-.22,.23,material('#564d3b'),.9,.70,.90);
- }
- const tool=group(g,0,0,0);tool.name='occupational-gear';
+ const garment=dressCharacter(upper,founder);
+ upper.userData.classicGarment=garment;
+ upper.userData.heritageCloth=true;
+  const tool=group(g,0,0,0);tool.name='occupational-gear';
  const ladle=box(tool,.33,1.17,.23,.055,.48,.07,wood);ladle.name='cooking-ladle';
  orb(tool,.33,.95,.23,.11,stone,1,.30,1);
  tool.visible=false;
@@ -318,7 +324,7 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  box(rod,0,.92,.23,.016,.50,.018,cloth);
  const reel=orb(rod,-.07,.22,0,.09,wood,.45,.80,1.3);
  reel.name='fisher-reel';rod.visible=false;
- return {root:g,arms,legs,head,tool,mealBowl,axe,cargo,fishBasket,rod};
+ return {root:g,upper,arms,legs,head,tool,mealBowl,axe,cargo,fishBasket,rod};
 }
 /** The facility models share eave limits with the space planner while
  * changing the actual silhouette, not merely swapping a material. */
@@ -403,12 +409,9 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   box(g,0,1.35,0,2.30,.20,2.09,stone);
   if(phase==='foundation')return g;
   for(const x of [-1.01,1.01])box(g,x,1.98,0,.16,1.22,1.92,lightWood);
-  box(g,0,2.03,-.94,2.05,1.19,.14,thatch);
-  box(g,0,2.48,.94,2.05,.29,.14,wood);
-  box(g,0,2.60,0,2.1,.15,2.0,thatchBright);
-  const roof=material('#8b8e75');
-  buildPioneerRoof(g,{halfWidth:1.23,halfDepth:1.14,eaveY:2.64,
-   ridgeY:3.12,thickness:.09},roof,wood,lightWood);
+  dressPioneerGranary(g);
+  makePioneerMountainRoof(g,{halfWidth:1.23,halfDepth:1.14,eaveY:2.64,
+   ridgeY:3.12,thickness:.09},'granary');
   if(phase==='complete'){
    for(let i=0;i<6;i++){
     const jar=orb(g,-.83+(i%3)*.83,1.60,-.58+Math.floor(i/3)*.82,
@@ -453,7 +456,7 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  if(cottage){
   // +Z is the functional front door. The original model only had a back
   // wall: add physically supported side/front walls and a usable opening.
-  const wall=plaster,paper=material('#e2d6ad'),door=material('#956c52');
+  const wall=plaster,paper=material('#e2d6ad');
   box(g,0,h*.48+.24,-d*.48,w-.25,h*.78,.13,wall);
   for(const x of [-w*.47,w*.47])
    box(g,x,h*.48+.24,0,.13,h*.78,d-.18,wall);
@@ -478,16 +481,7 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
     box(dormer,0,.08,.14,.47,.038,.035,lightWood);
     box(dormer,0,.34,0,.94,.10,.49,material('#697e7a')).rotation.z=.08;
    }
-   const doorMesh=box(g,0,.77,d*.51,.66,1.04,.075,door);
-   doorMesh.name='cottage-door';
-   orb(g,.22,.78,d*.56,.035,lightWood);
-   for(const x of [-.93,.93]){
-    box(g,x,1.04,d*.545,.38,.46,.045,wood);
-    box(g,x,1.04,d*.57,.32,.38,.035,paper);
-    for(const dx of [-.10,.10])box(g,x+dx,1.04,d*.60,.022,.42,.028,lightWood);
-    box(g,x,1.04,d*.60,.36,.026,.028,lightWood);
-   }
-   box(g,0,.25,d/2+.18,.98,.14,.26,stone);
+   dressPioneerCottage(g,w,d,h,p.id);
   }
  }else{
   // A real open-air woodworking bay: four timber posts, bracing, benches,
@@ -516,16 +510,20 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   box(bench,0,1.02,-.13,.074,.42,.08,stone).rotation.z=.34;
   for(let i=0;i<3;i++)box(bench,-.29+i*.29,.43,.53,.20,.16,.68,wood);
  }
- const roof=material(cottage?'#677a77':'#9c8668');
- buildPioneerRoof(g,{
+ const roofProfile={
   halfWidth:(w-.10)/2+.13,halfDepth:(d-.16)/2+.10,
   eaveY:h+.29,ridgeY:h+.29+(cottage?.52:.43),thickness:.095
- },roof,wood,lightWood,cottage?undefined:thatchBright,cottage?plaster:undefined);
+ };
+ if(cottage){
+  // One curved roof from the classic village kit, NOT an extra roof above
+  // the old wedge. Same saved SAT parcel and construction staging.
+  makePioneerMountainRoof(g,roofProfile,'cottage',pioneerHouseVariant(p.id),condition);
+ }else buildPioneerRoof(g,roofProfile,
+  material('#9c8668'),wood,lightWood,thatchBright);
  if(condition<78){
-  // Worn roofs reveal genuine repair history; repaired structures regain
-  // a clean silhouette after the simulation transaction finishes.
-  const patch=box(g,.30,h+.50,.33,.65,.035,.50,material('#c8b58a'));
-  patch.rotation.z=.31;
+  // Repairs still replace this worn stage with intact classic tiles.
+  // Do not lay a floating rectangular patch over a curved roof.
+  g.userData.needsRoofRepair=true;
  }
  return g;
 }
@@ -586,6 +584,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const river=buildRiverArt(root);vegetation(root);resourceLandmarks(root,world);
  const forest=buildPioneerForestArt(root,world);
  const camp=campVisual(root,world);
+ const heritageGrove=makePioneerSeasonalGrove(root,VALLEY_PINES.filter((_,i)=>i%4===2));
  const constructionLayer=group(root);constructionLayer.name='actual-settlement-registry';
  let roadLayer=drawFootpaths(root,world.roads);
  let lastRoads=roadGeometrySignature(world.roads);
@@ -710,6 +709,12 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   while(people.length<s.founders.length)people.push(makeFigure(root,s.founders[people.length]));
   const season=getPioneerCalendar(s).season;
   const weather=getPioneerWeather(s);
+  heritageGrove.update(season);
+  // Reused classic tiled roofs carry snow matching their actual curved
+  // geometry. Scene rebuilding on new building/repair keeps this in sync.
+  if(rebuilt||season!==lastSeason)constructionLayer.traverse(obj=>{
+   if(obj.userData.seasonalRoofSnow)obj.visible=season==='winter';
+  });
   // Crop geometry now reflects the *same field stock* used for food collection.
   for(const [gardenId,crops] of gardenCrops){
    const appearance=pioneerCropAppearance(s,gardenId);
@@ -784,6 +789,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    visual.arms[0].rotation.x=swing;visual.arms[1].rotation.x=-swing;
    visual.legs[0].rotation.x=-swing;visual.legs[1].rotation.x=swing;
    visual.root.scale.setScalar(i<3?1:.95);
+   visual.upper.rotation.z=moving?Math.sin(seconds*8+i)*.025:Math.sin(seconds*.75+i)*.01;
    visual.tool.visible=f.activity==='cook';
    visual.mealBowl.visible=f.activity==='eat'||f.activity==='eat-home'||f.activity==='host-guest';
    const forester=f.activity==='collect-wood'||f.activity==='clear-land';
