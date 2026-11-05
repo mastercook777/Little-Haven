@@ -18,6 +18,7 @@ import {createPioneerCommons,schedulePioneerCommons,reservePioneerCommonsMateria
 import {availablePioneerFields,pioneerFieldRenewMultiplier,pioneerHarvestMultiplier,
  pioneerWoodWorkingMultiplier,validatePioneerFacilityConfiguration} from './pioneerFacilities.ts';
 import {advancePioneerCommerce,createPioneerCommerce,validPioneerCommerce,
+ performPioneerGuestShift,
  type PioneerCommerce} from './pioneerCommerce.ts';
 import {createPioneerLivelihood,considerPioneerCraft,performPioneerCraftShift,
  pioneerFoodCapacity,pioneerCraftMultiplier,markPioneerFishing,validPioneerLivelihood,
@@ -40,7 +41,7 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land'|'fish'|'craft';
+export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land'|'fish'|'craft'|'host-guest';
 export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard'|'fish-hut'|'granary'|'tea-stop';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
@@ -215,6 +216,7 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  const workClearing=activity==='clear-land'?
   s.frontier.clearings.find(c=>c.phase==='clearing'):undefined;
  const targetBuilding=activity==='craft'?s.buildings.find(b=>b.kind==='wood-yard'):
+  activity==='host-guest'?s.buildings.find(b=>b.kind==='tea-stop'):
   activity==='build'||activity==='repair'?
   s.buildings.find(b=>b.id===task?.targetBuildingId):shelter;
  const jobRoute=(activity==='build'||activity==='repair')?
@@ -230,7 +232,7 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
     Math.sin(fieldBuilding.parcel.rotation)*(f.id%3-1)*.34)
   ]:site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
-  activity==='craft'&&targetBuilding?pioneerEntrance(targetBuilding.parcel):
+  (activity==='craft'||activity==='host-guest')&&targetBuilding?pioneerEntrance(targetBuilding.parcel):
   shelter?pioneerEntrance(shelter.parcel):
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
  const isSame=f.activity===activity&&f.target[0]===goal[0]&&f.target[1]===goal[1];
@@ -437,6 +439,19 @@ function step(s:PioneerWorld){
     livelihoodWorkers.add(artisan.id);
   }
  }
+ // A guest trade is never a noon freebie: one real resident spends a
+ // reachable, exclusive afternoon hour at the tea stop, forgoing other work.
+ const guestWorkers=new Set<number>();
+ const visitor=s.commerce.activeVisitor;
+ if(hour===13&&!crisis&&visitor?.outcome==='pending'&&
+  s.commerce.guestPolicy!=='quiet'&&s.minutes>=visitor.arrivalAt+3*60){
+  for(const resident of s.founders.slice(3)){
+   allocate(s,resident,'host-guest');
+   if(resident.activity!=='host-guest')continue;
+   if(performPioneerGuestShift(s,resident.id))guestWorkers.add(resident.id);
+   break;
+  }
+ }
  const seedWorkers=new Set<number>();
  if(hour===10&&!crisis){
   considerSeedTrial(s);
@@ -504,7 +519,8 @@ function step(s:PioneerWorld){
  }else if(building)work(s,lu);
  else allocate(s,lu,'tend-fire');
  for(const f of s.founders.slice(3)){
-  if(seedWorkers.has(f.id)||coFarmWorkers.has(f.id)||livelihoodWorkers.has(f.id))continue;
+  if(seedWorkers.has(f.id)||coFarmWorkers.has(f.id)||livelihoodWorkers.has(f.id)||
+   guestWorkers.has(f.id))continue;
   if(s.resources.food<foodTarget||crisis){
    if(!foodTask(f,.86))allocate(s,f,'rest');
   }else if(s.resources.water<s.founders.length*1.2){
@@ -598,6 +614,11 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    s.livelihood??=createPioneerLivelihood();
    if(!validPioneerLivelihood(s))return null;
    s.commerce??=createPioneerCommerce();
+   // Old v0.5.1 slots lack any evidence of a specific receptionist. Migrate
+   // to zero recorded hosting hours, never fabricate a historical tie.
+   if(s.commerce.contacts===undefined&&s.commerce.receptionHours===undefined){
+    s.commerce.contacts=[];s.commerce.receptionHours=0;
+   }
    if(!validPioneerCommerce(s))return null;
   if(!Array.isArray(s.roads)||s.roads.length>20||
    !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||
