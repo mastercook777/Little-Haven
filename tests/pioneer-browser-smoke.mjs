@@ -428,6 +428,8 @@ try{
    fish:s.sites.find(x=>x.kind==='fish')?.totalGathered??0,
    fishHaul:s.livelihood.fishTransport,
    rendered:v.renderedStructures,loftDormers:v.loftDormers,
+   heritageRoofs:v.heritageRoofs,heritageClothed:v.heritageClothed,
+   seasonalProtectedTrees:v.seasonalProtectedTrees,snowyHeritageRoofs:v.snowyHeritageRoofs,
    sawbenches:v.sawbenches,wood:s.resources.wood,food:s.resources.food};
  });
  if(mature.people<=9||mature.lofts.length<1||
@@ -435,6 +437,9 @@ try{
   !mature.built.includes('fish-hut')||!mature.built.includes('granary')||
   mature.fish<=0||mature.fishHaul.totalDelivered<=0||
   mature.fishHaul.haulHours<=0||mature.fishHaul.totalDelivered>mature.fish+.002||
+  mature.heritageClothed!==mature.people||mature.seasonalProtectedTrees<2||
+  mature.heritageRoofs<
+   mature.built.filter(kind=>kind==='cottage'||kind==='granary').length||
   mature.loftDormers<mature.lofts.length||
   mature.rendered<mature.built.length)
   throw Error('No mature paid/visible village growth after five real years: '+

@@ -29,7 +29,7 @@ const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,
 renderer.setPixelRatio(Math.min(innerWidth<760?1.35:2,devicePixelRatio||1));
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.16;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.23;
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2('#d5e0d6',.010);
 const camera=new THREE.OrthographicCamera(-24,24,16,-16,.1,250);
 const defaultEye=new THREE.Vector3(27.3,30,39);
@@ -41,15 +41,15 @@ orbit.dampingFactor=.065;orbit.minPolarAngle=.43;orbit.maxPolarAngle=1.26;
 orbit.minZoom=.72;orbit.maxZoom=2.3;orbit.rotateSpeed=.64;
 orbit.mouseButtons.LEFT=THREE.MOUSE.ROTATE;
 orbit.touches.ONE=THREE.TOUCH.ROTATE;orbit.touches.TWO=THREE.TOUCH.DOLLY_PAN;
-const hemi=new THREE.HemisphereLight('#e4eeed','#a3a58b',2.15);scene.add(hemi);
-const sun=new THREE.DirectionalLight('#fff0d7',2.70);
+const hemi=new THREE.HemisphereLight('#e5eff0','#a8a68a',2.40);scene.add(hemi);
+const sun=new THREE.DirectionalLight('#fff0d9',3.10);
 sun.position.set(-24,35,21);sun.castShadow=true;
 sun.shadow.mapSize.set(innerWidth<760?1024:2048,innerWidth<760?1024:2048);
 sun.shadow.camera.left=-27;sun.shadow.camera.right=27;
 sun.shadow.camera.top=22;sun.shadow.camera.bottom=-22;
 sun.shadow.camera.near=.1;sun.shadow.camera.far=110;sun.shadow.bias=-.00017;
 scene.add(sun,sun.target);
-const fill=new THREE.DirectionalLight('#c5d9cb',.55);
+const fill=new THREE.DirectionalLight('#b4c5cc',.60);
 fill.position.set(15,12,-18);scene.add(fill);
 function resize(){
  const w=innerWidth,h=innerHeight,span=w<760?33:28.5,aspect=w/h;
@@ -466,7 +466,7 @@ function lighting(){
  if(weather==='rain')tint.lerp(new THREE.Color('#83969a'),.53);
  if(weather==='fog')tint.lerp(new THREE.Color('#bac6bb'),.30);
  if(day<.30)tint.lerp(new THREE.Color('#4e5b67'),.60);
- scene.fog!.color.copy(tint);renderer.toneMappingExposure=.89+day*.28;
+ scene.fog!.color.copy(tint);renderer.toneMappingExposure=.92+day*.32;
  hemi.intensity=(.8+day*1.38)*(weather==='rain'?.82:1);
  sun.intensity=(.27+day*2.7)*(weather==='rain'?.38:1);
  sun.color.set(cal.season==='autumn'?'#f7cfaa':'#fff0db');

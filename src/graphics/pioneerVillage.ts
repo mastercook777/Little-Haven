@@ -561,7 +561,9 @@ export interface PioneerGraphics{
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
    seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
    fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number;
-   roadsideVisitor:boolean;activeVisitorName:string|null};
+   roadsideVisitor:boolean;activeVisitorName:string|null;
+   heritageRoofs:number;heritageClothed:number;seasonalProtectedTrees:number;
+   snowyHeritageRoofs:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -879,7 +881,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   fishingActors:latestWorld.founders.filter(f=>f.activity==='fish').length,
   loftDormers:constructionLayer.children.filter(g=>g.getObjectByName('paid-residential-loft')).length,
   roadsideVisitor:traveler.visible,
-  activeVisitorName:latestWorld.commerce.activeVisitor?.name??null
+  activeVisitorName:latestWorld.commerce.activeVisitor?.name??null,
+  heritageRoofs:constructionLayer.children.filter(g=>
+   !!g.getObjectByName('one-piece-upturned-roof')).length,
+  heritageClothed:people.filter(p=>p.upper.userData.heritageCloth===true).length,
+  seasonalProtectedTrees:heritageGrove.count,
+  snowyHeritageRoofs:constructionLayer.children.filter(g=>
+   !!g.getObjectByName('seasonally-frosted-authored-roof')).length
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}

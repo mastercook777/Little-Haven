@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type {Season} from '../simulation/calendar.ts';
 import {buildMountainRoof,MOUNTAIN_MATERIALS as M} from './villageBuildings.ts';
+import {batchStaticSubtree} from './batchStatic.ts';
 import type {PioneerRoofProfile} from './pioneerRoof.ts';
 
 /** Reuses the classic observation village's ONE-PIECE curved tiled-roof
@@ -82,6 +83,9 @@ export function dressPioneerCottage(parent:THREE.Object3D,
   part(lamp,0,-.31,0,.29,.045,.29,M.oldWood);
   part(lamp,0,.06,0,.28,.045,.28,M.redCloth);
  }
+ // Facade is static, but all generic box geometry and classic materials
+ // are shared across houses: NEVER dispose originals when merging.
+ batchStaticSubtree(facade,{disposeOriginals:false});
  return facade;
 }
 export function dressPioneerGranary(parent:THREE.Object3D){
@@ -94,6 +98,7 @@ export function dressPioneerGranary(parent:THREE.Object3D){
    part(facade,sx,1.79+k*.16,1.0,.24,.036,.035,M.brightWood);
  }
  part(facade,0,2.36,.95,2.06,.11,.13,M.oldWood);
+ batchStaticSubtree(facade,{disposeOriginals:false});
  return facade;
 }
 const treeBark=new THREE.MeshStandardMaterial({color:'#6b5949',roughness:1});
