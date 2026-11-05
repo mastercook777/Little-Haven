@@ -15,7 +15,7 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen хо
 6a. `docs/V051_VISITORS_TEA_STOP.md`: factual implementation/QA contract for saved nonresident visitors, a paid road tea hut, genuine road access, balanced barter and resident clearing before settlement growth.
 6b. `docs/V052_FAMILIAR_ROADS.md`: implemented v0.5.2 with real residents staffing tea-hour shifts and logged named returning visitors; merged in PR #20, full QA #41948530936. Old anonymous v0.5.1 visits never gain synthetic hosts.
 6c. `docs/V053_FISH_HAUL.md`: v0.5.3 river fish cargo escrow, a separate exclusive carrying hour, persistent delivery ledger and visible baskets; PR #21 merged with full green CI #41954573323. Wood, crops and multi-hour transport remain planned.
-6d. `docs/V054_PIONEER_HERITAGE_ART.md`: v0.5.4 graphics-only heritage asset reuse currently in development; collision-safe curved roof, pioneer fabric silhouettes, protected seasonal crowns and measured browser evidence. Do not mark complete before QA.
+6d. `docs/V054_PIONEER_HERITAGE_ART.md`: v0.5.4 pioneer heritage asset reuse merged in PR #22 with 115/115 tests and desktop/mobile Chromium CI #41963981991: reused classic curved roofs, fabrics, protected seasonal crowns and audited winter snow. Artistic multi-angle human review and low-end Android FPS remain open.
 7. `docs/V03_WORLD_FRAMEWORK.md`: planned calendar, season, weather and save contracts (**design only**).
 8. `docs/V03_VILLAGE_GROWTH.md`: planned building state, plots and growth contracts (**design only**).
 9. `docs/V03_PLAYER_AGENCY.md`: planned guardian interventions and replay safety (**design only**).
