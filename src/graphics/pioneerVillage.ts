@@ -481,12 +481,15 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
    if(loftReady){
     // A dormer reveals the paid interior bed without expanding the
     // original SAT/eave footprint or clipping into a neighbouring lane.
-    const dormer=group(g,0,2.11,.58);dormer.name='paid-residential-loft';
-    box(dormer,0,.06,0,.72,.49,.18,plaster);
-    box(dormer,0,.08,.107,.43,.30,.045,paper);
-    for(const x of [-.22,.22])box(dormer,x,.08,.13,.036,.37,.038,wood);
-    box(dormer,0,.08,.14,.47,.038,.035,lightWood);
-    box(dormer,0,.34,0,.94,.10,.49,material('#697e7a')).rotation.z=.08;
+    // Place this paid loft dormer on the sloped tile face rather than
+    // under the central roof ridge. Its width and eaves remain INSIDE the
+    // original residence parcel, even when the loft is added many years on.
+    const dormer=group(g,.68,2.17,.52);dormer.name='paid-residential-loft';
+    box(dormer,0,.13,0,.66,.39,.18,plaster);
+    box(dormer,0,.15,.108,.40,.26,.045,paper);
+    for(const x of [-.19,.19])box(dormer,x,.14,.13,.035,.33,.038,wood);
+    box(dormer,0,.14,.14,.44,.036,.035,lightWood);
+    box(dormer,0,.38,0,.78,.095,.43,material('#586970')).rotation.z=-.12;
    }
    dressPioneerCottage(g,w,d,h,p.id);
   }
