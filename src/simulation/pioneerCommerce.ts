@@ -177,15 +177,16 @@ function arrive(s:PioneerWorld,teaStopId:string,route:WalkPoint[]){
   id:'visitor-'+(s.seed>>>0)+'-'+serial,serial,name:data[0],origin:data[1],
   occupation:data[2],arrivalAt:s.minutes,leaveAt:s.minutes+6*60,
   settledAt:null,outcome:'pending',foodDelta:0,woodDelta:0,waterDelta:0,
-  teaStopId,route:route.map(p=>[round(p[0]),round(p[1])])
+  hostResidentId:null,teaStopId,route:route.map(p=>[round(p[0]),round(p[1])])
  };
  c.activeVisitor=visitor;c.totalArrivals=serial;
  appendPioneerJournal(s,'山路上有客',visitor.name+'自述来自'+visitor.origin+
   '，做'+visitor.occupation+'，沿有路的山道走到茶棚。来客并不算谷中常住人口。',visitor.id);
 }
-function transact(s:PioneerWorld,v:PioneerVisitor){
+function transact(s:PioneerWorld,v:PioneerVisitor,hostResidentId:number|null){
  if(v.outcome!=='pending')return;
  const c=s.commerce,policy=c.guestPolicy;let description='';
+ v.hostResidentId=hostResidentId;
  if(policy==='hospitality'&&s.resources.food>=1.2&&s.resources.water>=.5){
   s.resources.food=round(s.resources.food-1.2);
   s.resources.water=round(s.resources.water-.5);
@@ -210,6 +211,29 @@ function transact(s:PioneerWorld,v:PioneerVisitor){
    '现有粮水和货物不足，'+v.name+'在茶棚短暂停步，没有虚构交换或招待。';
  }
  v.settledAt=s.minutes;
+ if(hostResidentId!==null){
+  const host=s.founders.find(f=>f.id===hostResidentId)!;
+  c.receptionHours++;
+  if(v.outcome==='exchange'||v.outcome==='hosted'){
+   const key=v.name+'|'+v.origin+'|'+host.id;
+   let contact=c.contacts.find(x=>x.key===key);
+   if(!contact){
+    if(c.contacts.length>=64)
+     c.contacts.sort((a,b)=>a.lastMetAt-b.lastMetAt).shift();
+    contact={key,name:v.name,origin:v.origin,hostResidentId:host.id,
+     meetings:0,firstMetAt:s.minutes,lastMetAt:s.minutes,recentVisitorIds:[]};
+    c.contacts.push(contact);
+   }
+   contact.meetings++;contact.lastMetAt=s.minutes;
+   contact.recentVisitorIds.push(v.id);
+   if(contact.recentVisitorIds.length>6)contact.recentVisitorIds.shift();
+   if(contact.meetings===2)
+    appendPioneerJournal(s,'山路上认出了故人',
+     host.name+'第二次在茶棚与'+v.name+'（'+v.origin+'）完成真实往来。'+
+     '山路上开始有人认识这处茶棚；来客能更快找到路，但待客仍占劳动。',
+     v.id);
+  }
+ }
  c.netFood=round(c.netFood+v.foodDelta);
  c.netWood=round(c.netWood+v.woodDelta);
  c.netWater=round(c.netWater+v.waterDelta);
@@ -219,13 +243,17 @@ function transact(s:PioneerWorld,v:PioneerVisitor){
 }
 function leave(s:PioneerWorld,v:PioneerVisitor){
  const c=s.commerce;
- c.visits.push({id:v.id,name:v.name,origin:v.origin,
+ c.visits.push({id:v.id,name:v.name,origin:v.origin,hostResidentId:v.hostResidentId,
   arrivedAt:v.arrivalAt,leftAt:s.minutes,
   outcome:v.outcome==='pending'?'passing':v.outcome,
   foodDelta:v.foodDelta,woodDelta:v.woodDelta,waterDelta:v.waterDelta});
  if(c.visits.length>12)c.visits.shift();
  c.activeVisitor=null;
- c.nextVisitorAt=s.minutes+(12+Math.floor(chance(s.seed+v.serial*371)*5))*DAY_MINUTES;
+ // An actual repeated host/guest relationship makes the route familiar.
+ // Quiet villages do not receive the saved-route frequency benefit.
+ const familiar=c.guestPolicy!=='quiet'&&c.contacts.some(x=>x.meetings>=2);
+ c.nextVisitorAt=s.minutes+((familiar?10:12)+
+  Math.floor(chance(s.seed+v.serial*371)*5))*DAY_MINUTES;
  // Only a few meaningful farewells enter the short journal. Every arrival
  // and exact exchange survives in the bounded visit register and totals.
  if(v.serial<=2||v.serial%6===0)
@@ -233,13 +261,34 @@ function leave(s:PioneerWorld,v:PioneerVisitor){
    (v.outcome==='exchange'?'此番货物已入村里台账。':
     v.outcome==='hosted'?'乡邻付出热茶招待。':'没有发生货物交换。'),v.id);
 }
+/** Settles this exact visitor once after a real resident reaches the
+ * tea stop during an exclusive afternoon job. No ghost transactions. */
+export function performPioneerGuestShift(s:PioneerWorld,residentId:number){
+ const v=s.commerce.activeVisitor;
+ if(!v||v.outcome!=='pending'||s.commerce.guestPolicy==='quiet'||
+  s.minutes<v.arrivalAt+3*60||s.minutes>=v.leaveAt||
+  !s.founders.some(f=>f.id===residentId&&f.activity==='host-guest'))return false;
+ transact(s,v,residentId);
+ return true;
+}
+export function pioneerFamiliarRoadDays(s:PioneerWorld){
+ return s.commerce.guestPolicy!=='quiet'&&
+  s.commerce.contacts.some(c=>c.meetings>=2)?2:0;
+}
+export function pioneerResidentContacts(s:PioneerWorld,residentId:number){
+ return s.commerce.contacts.filter(c=>c.hostResidentId===residentId)
+  .sort((a,b)=>b.lastMetAt-a.lastMetAt).slice(0,5);
+}
 /** One called per authoritative simulation hour; invisible world ticks
  * still advance visits, and a visitor can never transact twice. */
 export function advancePioneerCommerce(s:PioneerWorld){
  const c=s.commerce;
  if(c.activeVisitor){
   const v=c.activeVisitor;
-  if(v.outcome==='pending'&&s.minutes>=v.arrivalAt+2*60)transact(s,v);
+  // Trades cannot settle until a resident actually arrives and spends a
+  // separate shift, except quiet passing (which spends no guest supplies).
+  if(v.outcome==='pending'&&c.guestPolicy==='quiet'&&
+   s.minutes>=v.arrivalAt+3*60)transact(s,v,null);
   if(s.minutes>=v.leaveAt)leave(s,v);
   return;
  }
