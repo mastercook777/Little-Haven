@@ -124,6 +124,10 @@ export function pioneerMilestoneBoard(s:PioneerWorld):PioneerMilestoneView[]{
    progress:s.buildings.some(b=>b.kind==='tea-stop')?
     '来客 '+s.commerce.totalArrivals+' 位 · 真交换 '+s.commerce.totalExchanges+
      ' 次 · 热茶招待 '+s.commerce.totalHosted+' 次':'尚无茶棚'},
+  {id:'familiar',label:'山路故人',done:s.commerce.contacts.some(c=>c.meetings>=2),
+   requirement:'同一位旅客被同一常住居民沿真实乡路接待两次，每次占用一小时劳动',
+   progress:s.commerce.contacts.filter(c=>c.meetings>=2).length+
+    ' 段熟路 · 实际主事 '+s.commerce.receptionHours+' 小时 · 熟路让往返加快 2 日'},
   {id:'craft',label:'林间手艺',done:s.livelihood.craft.phase==='complete',
    requirement:'五位居民、木作棚 → 支付四份木料 → 实际锯作六小时',
    progress:s.livelihood.craft.phase==='idle'?'尚未开工':
