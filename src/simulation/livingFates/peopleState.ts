@@ -160,9 +160,8 @@ export function settleLivingFatesHour(s:PioneerWorld){
    // Keep a bounded set of *first* shared-work milestones, preserving the
    // durable relationship hours for every pair and reserving memory space for
    // actual field-fate stories (which have stronger causal significance).
-   const storedWorkMilestones=Object.values(lives.majorMemories)
-    .filter(m=>m.kind==='shared-work').length;
-   if(working&&edge.sharedWorkHours===24&&storedWorkMilestones<24){
+   if(working&&edge.sharedWorkHours===24&&
+    Object.values(lives.majorMemories).filter(m=>m.kind==='shared-work').length<24){
     const memoryId='co-work-'+id+'-24';
     if(!lives.majorMemories[memoryId]){
      lives.majorMemories[memoryId]={id:memoryId,minute:s.minutes,
