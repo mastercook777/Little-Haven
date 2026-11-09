@@ -1,4 +1,5 @@
 import type {PioneerWorld} from '../simulation/pioneerWorld.ts';
+import {pioneerCottageArchetype,pioneerCottageOrdinal} from './pioneerArchetypes.ts';
 import {pioneerDeciduousLocations} from '../simulation/pioneerNaturalAnchors.ts';
 import {distanceToCreekSpline} from '../simulation/creekCorridor.ts';
 import {pioneerIslandFraction} from '../simulation/pioneerGeography.ts';
@@ -40,12 +41,16 @@ export function pioneerWeatherPlacement(s:PioneerWorld):WeatherArtPlacement{
 export function pioneerRoofDrips(s:PioneerWorld):readonly (readonly [number,number,number])[]{
  const positions:[number,number,number][]=[];
  const profiles:Record<string,readonly [number,number,number]>={
-  cottage:[1.40,1.27,1.97],granary:[1.23,1.14,2.64],
+  granary:[1.23,1.14,2.64],
   'wood-yard':[1.29,1.18,1.86],'fish-hut':[1.34,1.11,1.85],
   'tea-stop':[1.19,1.03,1.52]
  };
  for(const built of s.buildings){
-  const profile=profiles[built.kind];
+  const profile=built.kind==='cottage'?(()=>{
+   const roof=pioneerCottageArchetype(
+    pioneerCottageOrdinal(s.buildings,built.id)).roof;
+   return [roof.halfWidth,roof.halfDepth,roof.eaveY] as const;
+  })():profiles[built.kind];
   if(!profile)continue;
   const [halfWidth,halfDepth,eaveY]=profile,p=built.parcel;
   const cos=Math.cos(p.rotation),sin=Math.sin(p.rotation);

@@ -42,8 +42,8 @@ export function pioneerHouseVariant(id:string){return seedVariant(id);}
 /** The facade replaces the old single-block door and square unframed
  * windows; all details stay under the existing protected roof outline. */
 export function dressPioneerCottage(parent:THREE.Object3D,
- w:number,d:number,h:number,id:string){
- const v=seedVariant(id),front=d*.505;
+ w:number,d:number,h:number,id:string,frontInset=0){
+ const v=seedVariant(id),front=d*.505-frontInset;
  const facade=new THREE.Group();facade.name='classic-inspired-mountain-cottage-facade';
  parent.add(facade);
  // A carved double-leaf door sits inside the front wall opening.
@@ -56,7 +56,7 @@ export function dressPioneerCottage(parent:THREE.Object3D,
  }
  part(facade,0,1.34,front+.018,.81,.11,.16,M.oldWood,'doorway-timber-lintel');
  for(const side of [-1,1]){
-  const x=side*(w*.35),windowFront=d*.535;
+  const x=side*(w*.35),windowFront=d*.535-frontInset;
   // Opaque sill, paper panes, multiple visible timber lattice subdivisions.
   part(facade,x,1.05,windowFront,.46,.51,.080,M.oldWood,'mountain-lattice-frame');
   part(facade,x,1.05,windowFront+.052,.36,.40,.024,M.paper,'mountain-paper-window');
