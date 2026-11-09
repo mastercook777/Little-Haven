@@ -1,9 +1,10 @@
 import {DAY_MINUTES} from './calendar.ts';
 import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {onPioneerTeaStopBuilt} from './pioneerCommerce.ts';
-import {VALLEY_RIVER} from './valleyGeography.ts';
+import {distanceToCreekSpline} from './creekCorridor.ts';
 import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
-import {nearestRoad,reservedParcels,type VillageParcel} from './villagePlanning.ts';
+import {nearestRoad,type VillageParcel} from './villagePlanning.ts';
+import {pioneerNaturalParcels} from './pioneerNaturalAnchors.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
@@ -18,7 +19,7 @@ const hash=(n:number)=>{
  return ((k^(k>>>16))>>>0)/4294967296;
 };
 const distance=(a:{x:number;z:number},b:{x:number;z:number})=>Math.hypot(a.x-b.x,a.z-b.z);
-const natural=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
+const natural=(s:PioneerWorld)=>pioneerNaturalParcels(s);
 const spec:Record<Exclude<PioneerBuildKind,'shelter'>,{wood:number;hours:number;width:number;depth:number;why:string;label:string}>={
  garden:{wood:3,hours:6,width:2.75,depth:2.65,
   why:'野果时有时无，乡邻想亲手开垦一处稳定的菜畦。',label:'菜圃'},
@@ -56,21 +57,13 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
   routeReached:0,resourceRoutesKept:0});
  const data=spec[kind];
- const taken=[...natural(),...s.buildings.map(b=>b.parcel)];
+ const taken=[...natural(s),...s.buildings.map(b=>b.parcel)];
  const camp={id:'temporary-camp',kind:'protected' as const,
   x:s.camp.x,z:s.camp.z,width:1.25,depth:1.25,rotation:0,
   clearance:.24,accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
  const occupied=[...taken,camp];
  const field=s.sites.find(site=>site.kind==='field');
- const riverDist=(x:number,z:number)=>{
-  let best=Infinity;
-  for(let k=1;k<VALLEY_RIVER.length;k++){
-   const a=VALLEY_RIVER[k-1],b=VALLEY_RIVER[k],dx=b[0]-a[0],dz=b[1]-a[1];
-   const t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));
-   best=Math.min(best,Math.hypot(x-a[0]-t*dx,z-a[1]-t*dz));
-  }
-  return best;
- };
+ const riverDist=distanceToCreekSpline;
  const opened=s.frontier.clearings.find(c=>c.phase==='cleared'&&
   distance(c,s.camp)>7.2);
  const center=kind==='cottage'&&s.founders.length>=9&&opened?

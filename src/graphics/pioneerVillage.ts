@@ -3,8 +3,8 @@ import {buildCarvedTerrain} from './carvedTerrain.ts';
 import {buildRiverArt} from './riverArt.ts';
 import {createWeatherArt} from './weatherArt.ts';
 import {createPioneerSeasonalVfx} from './pioneerSeasonalVfx.ts';
-import {PIONEER_DECIDUOUS_TREES,pioneerWeatherPlacement,pioneerRoofDrips} from './pioneerAtmospherePlacement.ts';
-import {VALLEY_PINES,VALLEY_BAMBOO} from '../simulation/valleyGeography.ts';
+import {pioneerWeatherPlacement,pioneerRoofDrips} from './pioneerAtmospherePlacement.ts';
+import {getPioneerNaturalAnchors,pioneerDeciduousLocations} from '../simulation/pioneerNaturalAnchors.ts';
 import {PIONEER_VALLEY} from '../simulation/pioneerGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
@@ -47,9 +47,10 @@ function orb(parent:THREE.Object3D,x:number,y:number,z:number,
  const mesh=new THREE.Mesh(headGeo,m);mesh.position.set(x,y,z);
  mesh.scale.set(r*sx,r*sy,r*sz);mesh.castShadow=true;parent.add(mesh);return mesh;
 }
-function vegetation(root:THREE.Group){
+function vegetation(root:THREE.Group,world:PioneerWorld){
  const trunk=material('#6d735c'),pine=material('#5b8771'),pineLight=material('#83a283');
- for(const [index,[x,z,s]] of VALLEY_PINES.entries()){
+ for(const anchor of getPioneerNaturalAnchors(world).filter(a=>a.kind==='pine')){
+  const {index,x,z,size:s}=anchor;
   // Every fourth protected tree is a seasonal broadleaf, not a second tree
   // layered over a pine. They remain exactly on the old protected locations.
   if(index%4===2)continue;
@@ -61,7 +62,7 @@ function vegetation(root:THREE.Group){
    cone.position.y=(1.30+i*.69)*s;cone.castShadow=true;g.add(cone);
   }
  }
- for(const [x,z,s] of VALLEY_BAMBOO){
+ for(const {x,z,size:s} of getPioneerNaturalAnchors(world).filter(a=>a.kind==='bamboo')){
   const g=group(root,x,.17,z);
   for(let i=0;i<5;i++){
    const a=i*2.399,ox=Math.cos(a)*.26*s,oz=Math.sin(a)*.26*s;
@@ -597,14 +598,14 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  cliff.rotation.x=Math.PI/2;cliff.position.y=-.09;
  cliff.receiveShadow=true;root.add(cliff);
  root.add(buildCarvedTerrain(edge,grass));
- const river=buildRiverArt(root);vegetation(root);resourceLandmarks(root,world);
+ const river=buildRiverArt(root);vegetation(root,world);resourceLandmarks(root,world);
  const forest=buildPioneerForestArt(root,world);
  const camp=campVisual(root,world);
- const heritageGrove=makePioneerSeasonalGrove(root,PIONEER_DECIDUOUS_TREES);
+ const heritageGrove=makePioneerSeasonalGrove(root,pioneerDeciduousLocations(world));
  const mobile=typeof window!=='undefined'&&window.innerWidth<760;
  const reducedMotion=typeof window!=='undefined'&&
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches===true;
- const seasonalVfx=createPioneerSeasonalVfx(root,PIONEER_DECIDUOUS_TREES,mobile,reducedMotion);
+ const seasonalVfx=createPioneerSeasonalVfx(root,pioneerDeciduousLocations(world),mobile,reducedMotion);
  const weatherArt=createWeatherArt(root,mobile,reducedMotion,pioneerWeatherPlacement(world));
  const constructionLayer=group(root);constructionLayer.name='actual-settlement-registry';
  let roadLayer=drawFootpaths(root,world.roads);

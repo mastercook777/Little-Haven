@@ -1,5 +1,6 @@
 import type {PioneerWorld} from '../simulation/pioneerWorld.ts';
-import {VALLEY_PINES,VALLEY_RIVER} from '../simulation/valleyGeography.ts';
+import {pioneerDeciduousLocations} from '../simulation/pioneerNaturalAnchors.ts';
+import {distanceToCreekSpline} from '../simulation/creekCorridor.ts';
 import {pioneerIslandFraction} from '../simulation/pioneerGeography.ts';
 import type {WeatherArtPlacement} from './weatherArt.ts';
 
@@ -7,23 +8,14 @@ function hash(n:number){
  let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  return ((k^(k>>>13))>>>0)/4294967296;
 }
-export const PIONEER_DECIDUOUS_TREES=VALLEY_PINES.filter((_,i)=>i%4===2);
-function riverDistance(x:number,z:number){
- let distance=Infinity;
- for(let j=1;j<VALLEY_RIVER.length;j++){
-  const [ax,az]=VALLEY_RIVER[j-1],[bx,bz]=VALLEY_RIVER[j];
-  const vx=bx-ax,vz=bz-az;
-  const t=Math.max(0,Math.min(1,((x-ax)*vx+(z-az)*vz)/(vx*vx+vz*vz)));
-  distance=Math.min(distance,Math.hypot(x-ax-t*vx,z-az-t*vz));
- }
- return distance;
-}
+export const PIONEER_DECIDUOUS_TREES=pioneerDeciduousLocations();
+const riverDistance=distanceToCreekSpline;
 /** Real land-only, stable contacts: the founders' camp and protected canopy
  * footprints. Do not use the classic mode's hardcoded tavern coordinates. */
 export function pioneerWeatherPlacement(s:PioneerWorld):WeatherArtPlacement{
  const centers:[number,number,number][]=[
   [s.camp.x,s.camp.z,2.6],
-  ...PIONEER_DECIDUOUS_TREES.map(([x,z,size])=>[x,z,2.1*size] as [number,number,number])
+  ...pioneerDeciduousLocations(s).map(([x,z,size])=>[x,z,2.1*size] as [number,number,number])
  ];
  const splashSites:[number,number][]=[];
  for(let i=0;splashSites.length<22&&i<180;i++){

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type {PioneerWorld,PioneerResourceSite} from '../simulation/pioneerWorld.ts';
 import {pioneerIslandFraction} from '../simulation/pioneerGeography.ts';
+import {isSafePioneerWildPlant} from '../simulation/pioneerNaturalAnchors.ts';
 
 /** The resource site's inventory remains aggregated. These few instanced
  * silhouettes and an event-driven falling tree show its state without
@@ -92,14 +93,16 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
    const visible=Math.max(1,Math.round(1+site.stock/site.capacity*9));
    for(let n=0;n<visible;n++){
     const [x,z]=activeTreePosition(site,n);
-    if(nearBuilding(w,x,z))continue;
+    if(!isSafePioneerWildPlant(w,x,z,.34)||nearBuilding(w,x,z))continue;
     conifer(patch,x,z,(.56+(n%3)*.13)*(site.stock/site.capacity<.35?.80:1));
     standing++;
    }
    const stumpCount=Math.min(4,Math.floor(site.totalGathered/7));
    for(let n=0;n<stumpCount;n++){
     const [x,z]=activeTreePosition(site,11+n);
-    if(!nearBuilding(w,x,z)){stump(patch,x,z);stumps++;}
+    if(isSafePioneerWildPlant(w,x,z,.20)&&!nearBuilding(w,x,z)){
+     stump(patch,x,z);stumps++;
+    }
    }
   }
   // Western buffer is visibly undergrown before it is made usable.
@@ -110,7 +113,7 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
    const z=-9.1+hash(w.seed*11+n*47)*18.2;
    if(pioneerIslandFraction(x,z,2.15,2.1)>.93)continue;
    if(Math.hypot(x-w.camp.x,z-w.camp.z)<4.8)continue;
-   if(nearBuilding(w,x,z))continue;
+   if(!isSafePioneerWildPlant(w,x,z,.28)||nearBuilding(w,x,z))continue;
    const clearing=w.frontier.clearings.find(c=>
     Math.hypot(x-c.x,z-c.z)<c.radius+.36);
    if(clearing?.phase==='cleared')continue;
@@ -131,8 +134,9 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
    for(let n=0;n<pieces;n++){
     const theta=hash(w.seed+n*87+plot.id.length*23)*Math.PI*2;
     const r=hash(n*19+plot.startedAt)*plot.radius*.65;
-    if(plot.phase==='cleared')
-     stump(g,Math.cos(theta)*r,Math.sin(theta)*r);
+    const px=plot.x+Math.cos(theta)*r,pz=plot.z+Math.sin(theta)*r;
+    if(!isSafePioneerWildPlant(w,px,pz,.19))continue;
+    if(plot.phase==='cleared')stump(g,Math.cos(theta)*r,Math.sin(theta)*r);
     else bush(g,Math.cos(theta)*r,Math.sin(theta)*r,.72);
    }
   }
@@ -142,9 +146,10 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
    // Stump persists; a newly fallen tree is animated only during its saved
    // event window. Reloading a years-old save never replays old felling.
    const g=group(layer,last.x,last.z);g.userData.siteId=last.siteId;
-   stump(g,0,0);
-   falling=felled(g,0,0);
-   falling.userData.fallDirection=[last.dx,last.dz];
+   if(isSafePioneerWildPlant(w,last.x,last.z,.18)){
+    stump(g,0,0);falling=felled(g,0,0);
+    falling.userData.fallDirection=[last.dx,last.dz];
+   }
   }
  }
  function update(w:PioneerWorld,_seconds:number){
