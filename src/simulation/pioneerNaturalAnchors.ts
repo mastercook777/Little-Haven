@@ -119,7 +119,7 @@ export function auditPioneerNaturalScene(world:{
 export function isSafePioneerWildPlant(world:{
  naturalAnchors?:PioneerNaturalAnchor[];
  buildings?:readonly {parcel:VillageParcel}[];roads?:readonly PioneerRoad[];
- intent?:{parcel?:VillageParcel}|null;camp?:{x:number;z:number};
+ intent?:{parcel?:VillageParcel|null}|null;camp?:{x:number;z:number};
  frontier?:{clearings:readonly {x:number;z:number;radius:number;phase:string}[]};
 },x:number,z:number,radius:number,nearCamp=0):boolean{
  if(!plainSpot(x,z,radius))return false;
