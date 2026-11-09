@@ -78,8 +78,16 @@ export type PioneerGardenStyle='P1-open-rows'|'P2-raised-terrace'|'P3-woven-boun
 export const PIONEER_GARDEN_STYLES:readonly PioneerGardenStyle[]=[
  'P1-open-rows','P2-raised-terrace','P3-woven-boundary'
 ];
-export function pioneerGardenStyle(parcelId:string):PioneerGardenStyle{
- let hash=0;for(let i=0;i<parcelId.length;i++)
-  hash=(Math.imul(hash,31)+parcelId.charCodeAt(i))|0;
- return PIONEER_GARDEN_STYLES[(hash>>>0)%PIONEER_GARDEN_STYLES.length];
+/** Real plots have immutable build dates/IDs. Cycling that history avoids
+ * the actual year-five problem where three adjacent fields all hash to P2.
+ * Never reshuffle existing gardens when a new one is completed. */
+export function pioneerGardenOrdinal(
+ buildings:readonly {kind:string;id:string;completedAt:number}[],id:string){
+ const gardens=buildings.filter(b=>b.kind==='garden').sort((a,b)=>
+  a.completedAt-b.completedAt||a.id.localeCompare(b.id));
+ return Math.max(0,gardens.findIndex(b=>b.id===id));
+}
+export function pioneerGardenStyle(ordinal:number):PioneerGardenStyle{
+ return PIONEER_GARDEN_STYLES[Math.abs(Math.trunc(ordinal))%
+  PIONEER_GARDEN_STYLES.length];
 }

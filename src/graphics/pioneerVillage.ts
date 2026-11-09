@@ -12,7 +12,7 @@ import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint}
 import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import {dressCharacter} from './characterKit.ts';
 import {pioneerCottageArchetype,pioneerCottageOrdinal} from './pioneerArchetypes.ts';
-import {pioneerFacilityArchetype,pioneerGardenStyle} from './pioneerFacilityArchetypes.ts';
+import {pioneerFacilityArchetype,pioneerGardenStyle,pioneerGardenOrdinal} from './pioneerFacilityArchetypes.ts';
 import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
  makePioneerSeasonalGrove,pioneerHouseVariant} from './pioneerHeritageArt.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
@@ -348,7 +348,7 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
  if(kind==='garden'){
-  const gardenStyle=pioneerGardenStyle(p.id);
+  const gardenStyle=pioneerGardenStyle(pioneerVariant);
   g.userData.facilityArchetype=gardenStyle;
   box(g,0,.025,0,2.22,.065,2.15,material('#947c55'));
   if(phase==='foundation')return g;
@@ -771,7 +771,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
      s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
     const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
      trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined,
-      built.kind==='cottage'?pioneerCottageOrdinal(s.buildings,built.id):0);
+      built.kind==='cottage'?pioneerCottageOrdinal(s.buildings,built.id):
+       built.kind==='garden'?pioneerGardenOrdinal(s.buildings,built.id):0);
     if(built.kind==='garden'){
      const crops:THREE.Mesh[]=[];
      plot.traverse(child=>{
@@ -803,7 +804,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     }else facilityVisual(constructionLayer,s.intent.parcel,s.intent.kind??'shelter',
       s.intent.phase,Math.min(1,progress/s.intent.workRequired),
        100,undefined,false,false,
-       s.buildings.filter(b=>b.kind==='cottage').length);
+       (s.intent.kind==='garden'?s.buildings.filter(b=>b.kind==='garden').length:
+        s.buildings.filter(b=>b.kind==='cottage').length));
    }
    renderedStructures=constructionLayer.children.length;
     weatherArt.setRoofDrips(pioneerRoofDrips(s));
@@ -1000,7 +1002,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     .map(b=>pioneerFacilityArchetype(
      b.kind as 'wood-yard'|'fish-hut'|'granary'|'tea-stop',b.parcel.id).id),
    gardenStyles:latestWorld.buildings.filter(b=>b.kind==='garden')
-    .map(b=>pioneerGardenStyle(b.parcel.id))
+    .map(b=>pioneerGardenStyle(pioneerGardenOrdinal(latestWorld.buildings,b.id)))
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}

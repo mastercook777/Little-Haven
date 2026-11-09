@@ -475,7 +475,8 @@ try{
  if(mature.facilityArchetypes.length!==mature.built.filter(k=>facilityKinds.has(k)).length||
   mature.gardenStyles.length!==mature.built.filter(k=>k==='garden').length||
   mature.facilityArchetypes.some(id=>!id||!/^(W[123]|F[12]|G[12]|T[12])-/.test(id))||
-  mature.gardenStyles.some(id=>!id||!/^P[123]-/.test(id)))
+  mature.gardenStyles.some(id=>!id||!/^P[123]-/.test(id))||
+  (mature.gardenStyles.length>=3&&new Set(mature.gardenStyles).size<3))
   throw Error('Authentic production facilities have missing roof/style registrations: '+
    JSON.stringify({roofs:mature.facilityArchetypes,gardens:mature.gardenStyles}));
  await screenshot(page,'05e-v056c-workshops-fishing-granary-tea-and-garden-variation');

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import {
  PIONEER_FACILITY_ARCHETYPES,pioneerFacilityArchetype,
  pioneerFacilityRoofDripProfile,pioneerFacilityEnvelopeSafe,
- PIONEER_GARDEN_STYLES,pioneerGardenStyle,type PioneerFacilityKind
+ PIONEER_GARDEN_STYLES,pioneerGardenStyle,pioneerGardenOrdinal,type PioneerFacilityKind
 } from '../src/graphics/pioneerFacilityArchetypes.ts';
 import {buildPioneerFacilityVisual} from '../src/graphics/pioneerVillage.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
@@ -95,23 +95,30 @@ test('v0.5.6C: work/food/tea detail is never placed on just a foundation',()=>{
  }
 });
 
-test('v0.5.6C: three gardens vary bed/fence arrangements without changing 28 authentic crop nodes',()=>{
+test('v0.5.6C: paid garden chronology guarantees three different visible beds at year five',()=>{
  const found=new Set<string>();
- for(let i=0;i<160;i++){
+ for(let i=0;i<3;i++){
   const parcel=makeParcel('garden-'+i,'garden');
-  const style=pioneerGardenStyle(parcel.id);
+  const style=pioneerGardenStyle(i);
   found.add(style);
   const model=buildPioneerFacilityVisual(
-   new THREE.Group(),parcel,'garden','complete',1);
+   new THREE.Group(),parcel,'garden','complete',1,100,undefined,false,false,i);
   assert.equal(model.userData.facilityArchetype,style);
   assert.equal(meshes(model,'real-garden-crop').length,28);
   if(style==='P2-raised-terrace')
    assert.equal(model.getObjectByName('real-garden-beds')?.rotation.y,Math.PI/2);
   if(style==='P3-woven-boundary')
    assert.ok(model.getObjectByName('woven-garden-boundary'));
-  if(found.size===PIONEER_GARDEN_STYLES.length)break;
  }
  assert.deepEqual([...found].sort(),[...PIONEER_GARDEN_STYLES].sort());
+ const records=[{kind:'garden',id:'old-a',completedAt:100},
+  {kind:'garden',id:'old-b',completedAt:300},
+  {kind:'garden',id:'old-c',completedAt:600},
+  {kind:'cottage',id:'other',completedAt:150}];
+ assert.equal(pioneerGardenOrdinal([...records].reverse(),'old-b'),1);
+ assert.equal(pioneerGardenOrdinal([...records].reverse(),'old-c'),2);
+ assert.equal(pioneerGardenStyle(pioneerGardenOrdinal(records,'old-b')),
+  pioneerGardenStyle(pioneerGardenOrdinal([...records].reverse(),'old-b')));
 });
 
 test('v0.5.6C: mature autonomous village has genuine paid facility profiles and rain eaves exactly match',()=>{
@@ -120,6 +127,11 @@ test('v0.5.6C: mature autonomous village has genuine paid facility profiles and 
  const facilities=s.buildings.filter(b=>
   b.kind==='wood-yard'||b.kind==='fish-hut'||b.kind==='granary'||b.kind==='tea-stop');
  assert.equal(facilities.length,4,'real five-year economy still builds all four facility kinds');
+ const gardens=s.buildings.filter(b=>b.kind==='garden');
+ assert.ok(gardens.length>=3,'five-year simulation should have real three gardens');
+ assert.deepEqual(gardens.slice(0,3).map(b=>
+  pioneerGardenStyle(pioneerGardenOrdinal(s.buildings,b.id))),
+  [...PIONEER_GARDEN_STYLES],'three completed fields must show three different silhouettes');
  const drip=pioneerRoofDrips(s);
  assert.equal(drip.length,s.buildings.filter(b=>
   b.kind!=='shelter'&&b.kind!=='garden').length*5);
