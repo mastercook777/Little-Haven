@@ -17,6 +17,7 @@ An observation-first **wuxia micro-world idle game**. The player is an unseen хо
 6c. `docs/V053_FISH_HAUL.md`: v0.5.3 river fish cargo escrow, a separate exclusive carrying hour, persistent delivery ledger and visible baskets; PR #21 merged with full green CI #41954573323. Wood, crops and multi-hour transport remain planned.
 6d. `docs/V054_PIONEER_HERITAGE_ART.md`: v0.5.4 pioneer heritage asset reuse merged in PR #22 with 115/115 tests and desktop/mobile Chromium CI #41963981991: reused classic curved roofs, fabrics, protected seasonal crowns and audited winter snow. Artistic multi-angle human review and low-end Android FPS remain open.
 6e. `docs/V055_PIONEER_SEASONS_WEATHER.md`: v0.5.5 seasons/rain shared with classic renderer, real protected-tree leaf/petal/snow sites, actual paid-building roof drips; PR #23 merged with 120/120 tests and desktop/mobile Chromium CI #42004577737. Android GPU and manual visual close-up still open.
+6f. `docs/V056_PIONEER_ARCHETYPES_ECOLOGY.md`: **design-only** v0.5.6 target for pioneer building archetypes, actual rendered creek/shore vegetation exclusion, stable protected parcel anchors and save migration, neighborhood layouts and screenshot/QA gates. No implementation or verification has shipped.
 7. `docs/V03_WORLD_FRAMEWORK.md`: planned calendar, season, weather and save contracts (**design only**).
 8. `docs/V03_VILLAGE_GROWTH.md`: planned building state, plots and growth contracts (**design only**).
 9. `docs/V03_PLAYER_AGENCY.md`: planned guardian interventions and replay safety (**design only**).
