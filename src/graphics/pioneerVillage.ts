@@ -922,10 +922,10 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    rainPuddles:weatherArt.mode()==='rain'?weatherArt.puddleCount:0,
    roofDrips:weatherArt.mode()==='rain'?weatherArt.roofDripCount():0,
    ...seasonalVfx.signatures(),
-   cottageArchetypes:s.buildings.filter(b=>b.kind==='cottage').map(b=>
-    pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).id),
-   uniqueCottageArchetypes:new Set(s.buildings.filter(b=>b.kind==='cottage').map(b=>
-    pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).id)).size
+   cottageArchetypes:latestWorld.buildings.filter(b=>b.kind==='cottage').map(b=>
+    pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id),
+   uniqueCottageArchetypes:new Set(latestWorld.buildings.filter(b=>b.kind==='cottage').map(b=>
+    pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id)).size
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
