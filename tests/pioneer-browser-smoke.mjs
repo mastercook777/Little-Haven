@@ -465,7 +465,7 @@ try{
   mature.rendered<mature.built.length)
   throw Error('No mature paid/visible village growth after five real years: '+
    JSON.stringify(mature));
- if(mature.built.filter(x=>x==='cottage').length>=4&&
+ if(mature.built.filter(x=>x==='cottage').length>=3&&
   (mature.uniqueCottageArchetypes<3||
    new Set(mature.cottageArchetypes).size<3))
   throw Error('Mature village repeats identical house silhouettes: '+
