@@ -11,6 +11,7 @@ import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFound
 import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
 import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import {dressCharacter} from './characterKit.ts';
+import {pioneerCottageArchetype,pioneerCottageOrdinal} from './pioneerArchetypes.ts';
 import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
  makePioneerSeasonalGrove,pioneerHouseVariant} from './pioneerHeritageArt.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
@@ -340,7 +341,8 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  * changing the actual silhouette, not merely swapping a material. */
 function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind,
  phase:'foundation'|'frame'|'complete',progress:number,condition=100,
- seedMark?:'working'|'resolved'|'abandoned',craftReady=false,loftReady=false){
+ seedMark?:'working'|'resolved'|'abandoned',craftReady=false,loftReady=false,
+ pioneerVariant=0){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
@@ -457,7 +459,13 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   return g;
  }
  const cottage=kind==='cottage';
- const w=cottage?2.64:2.38,d=cottage?2.50:2.31,h=cottage?1.68:1.57;
+ const design=cottage?pioneerCottageArchetype(pioneerVariant):null;
+ const w=design?.bodyWidth??2.38,d=design?.bodyDepth??2.31,h=design?.wallHeight??1.57;
+ const roofProfile=design?.roof??{
+  halfWidth:(w-.10)/2+.13,halfDepth:(d-.16)/2+.10,
+  eaveY:h+.29,ridgeY:h+.72,thickness:.095
+ };
+ const frontInset=design?.recessedFront??0,wallFront=d*.475-frontInset;
  const plaster=material('#d4c5a7');
  box(g,0,.12,0,w+.06,.19,d+.03,material('#aba18c'));
  if(phase==='foundation')return g;
@@ -473,13 +481,13 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   for(const sign of [-1,1]){
    const panelWidth=(w-.73)*.5;
    const x=sign*(.37+panelWidth*.5);
-   box(g,x,h*.47+.24,d*.475,panelWidth,h*.75,.13,wall);
+   box(g,x,h*.47+.24,wallFront,panelWidth,h*.75,.13,wall);
   }
   // Full timber wall plate takes the load from the roof into the posts.
   // Avoid the prototype's floating 20cm gap between cottage walls and eaves.
   for(const z of [-d*.46,d*.46])box(g,0,h+.16,z,w*.91,.14,.14,wood);
   for(const x of [-w*.45,w*.45])box(g,x,h+.16,0,.14,.14,d*.9,wood);
-  box(g,0,h-.07,d*.475,.86,.29,.14,lightWood); // lintel above door
+  box(g,0,h-.07,wallFront,.86,.29,.14,lightWood); // lintel above door
   if(phase==='complete'){
    if(loftReady){
     // A dormer reveals the paid interior bed without expanding the
@@ -487,14 +495,32 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
     // Place this paid loft dormer on the sloped tile face rather than
     // under the central roof ridge. Its width and eaves remain INSIDE the
     // original residence parcel, even when the loft is added many years on.
-    const dormer=group(g,.68,2.17,.52);dormer.name='paid-residential-loft';
+    const roofY=roofProfile.ridgeY-
+     (roofProfile.ridgeY-roofProfile.eaveY)*(.68/roofProfile.halfWidth);
+    const dormer=group(g,.68,roofY-.12,.52);dormer.name='paid-residential-loft';
     box(dormer,0,.13,0,.66,.39,.18,plaster);
     box(dormer,0,.15,.108,.40,.26,.045,paper);
     for(const x of [-.19,.19])box(dormer,x,.14,.13,.035,.33,.038,wood);
     box(dormer,0,.14,.14,.44,.036,.035,lightWood);
     box(dormer,0,.38,0,.78,.095,.43,material('#586970')).rotation.z=-.12;
    }
-   dressPioneerCottage(g,w,d,h,p.id);
+   dressPioneerCottage(g,w,d,h,p.id,frontInset);
+   if(design?.porch){
+    // Inset porch, beneath the ONE main tiled roof.
+    for(const x of [-w*.41,w*.41])pole(g,x,(h+.11)*.5,d*.465,.060,h+.11,wood);
+    box(g,0,h+.10,d*.465,w*.91,.11,.12,lightWood);
+    box(g,-w*.24,.38,d*.47,.42,.12,.19,wood)
+     .name='occupied-cottage-porch-bench';
+   }
+   if(design?.sideBay){
+    // Lean-to work bay under an existing overhang, inside the legal parcel.
+    const wing=group(g,w*.40,0,-d*.15);
+    wing.name='real-cottage-side-workbay';
+    box(wing,0,.64,0,.43,1.16,1.15,plaster);
+    const canopy=box(wing,.03,1.32,0,.58,.12,1.25,lightWood);
+    canopy.rotation.z=-.17;
+    for(const z of [-.43,.43])pole(wing,.20,.57,z,.044,1.14,wood);
+   }
   }
  }else{
   // A real open-air woodworking bay: four timber posts, bracing, benches,
@@ -523,14 +549,10 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   box(bench,0,1.02,-.13,.074,.42,.08,stone).rotation.z=.34;
   for(let i=0;i<3;i++)box(bench,-.29+i*.29,.43,.53,.20,.16,.68,wood);
  }
- const roofProfile={
-  halfWidth:(w-.10)/2+.13,halfDepth:(d-.16)/2+.10,
-  eaveY:h+.29,ridgeY:h+.29+(cottage?.52:.43),thickness:.095
- };
  if(cottage){
   // One curved roof from the classic village kit, NOT an extra roof above
   // the old wedge. Same saved SAT parcel and construction staging.
-  makePioneerMountainRoof(g,roofProfile,'cottage',pioneerHouseVariant(p.id),condition);
+  makePioneerMountainRoof(g,roofProfile,'cottage',pioneerHouseVariant(p.id)+pioneerVariant,condition);
  }else buildPioneerRoof(g,roofProfile,
   material('#9c8668'),wood,lightWood,thatchBright);
  if(condition<78){
@@ -578,7 +600,8 @@ export interface PioneerGraphics{
    heritageRoofs:number;heritageClothed:number;seasonalProtectedTrees:number;
    snowyHeritageRoofs:number;weatherMode:string;rainStreaks:number;rainSplashes:number;
  rainPuddles:number;roofDrips:number;fallingLeaves:number;fallenLeaves:number;
- springPetals:number;winterSnowPatches:number};
+ springPetals:number;winterSnowPatches:number;
+ cottageArchetypes:string[];uniqueCottageArchetypes:number};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -678,7 +701,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     const trial=built.kind==='garden'?
      s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
     const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
-     trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined);
+     trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined,
+      built.kind==='cottage'?pioneerCottageOrdinal(s.buildings,built.id):0);
     if(built.kind==='garden'){
      const crops:THREE.Mesh[]=[];
      plot.traverse(child=>{
@@ -708,7 +732,9 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
       pole(g,x,.9,z,.04,1.72,lightWood);
      box(g,0,1.68,0,p.width*.88,.07,.12,lightWood);
     }else facilityVisual(constructionLayer,s.intent.parcel,s.intent.kind??'shelter',
-      s.intent.phase,Math.min(1,progress/s.intent.workRequired));
+      s.intent.phase,Math.min(1,progress/s.intent.workRequired),
+       100,undefined,false,false,
+       s.buildings.filter(b=>b.kind==='cottage').length);
    }
    renderedStructures=constructionLayer.children.length;
     weatherArt.setRoofDrips(pioneerRoofDrips(s));
@@ -895,7 +921,11 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    rainSplashes:weatherArt.mode()==='rain'?weatherArt.splashCount:0,
    rainPuddles:weatherArt.mode()==='rain'?weatherArt.puddleCount:0,
    roofDrips:weatherArt.mode()==='rain'?weatherArt.roofDripCount():0,
-   ...seasonalVfx.signatures()
+   ...seasonalVfx.signatures(),
+   cottageArchetypes:s.buildings.filter(b=>b.kind==='cottage').map(b=>
+    pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).id),
+   uniqueCottageArchetypes:new Set(s.buildings.filter(b=>b.kind==='cottage').map(b=>
+    pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).id)).size
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}

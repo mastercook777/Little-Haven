@@ -450,6 +450,7 @@ try{
    rendered:v.renderedStructures,loftDormers:v.loftDormers,
    heritageRoofs:v.heritageRoofs,heritageClothed:v.heritageClothed,
    seasonalProtectedTrees:v.seasonalProtectedTrees,snowyHeritageRoofs:v.snowyHeritageRoofs,
+   cottageArchetypes:v.cottageArchetypes,uniqueCottageArchetypes:v.uniqueCottageArchetypes,
    sawbenches:v.sawbenches,wood:s.resources.wood,food:s.resources.food};
  });
  if(mature.people<=9||mature.lofts.length<1||
@@ -464,6 +465,12 @@ try{
   mature.rendered<mature.built.length)
   throw Error('No mature paid/visible village growth after five real years: '+
    JSON.stringify(mature));
+ if(mature.built.filter(x=>x==='cottage').length>=4&&
+  (mature.uniqueCottageArchetypes<3||
+   new Set(mature.cottageArchetypes).size<3))
+  throw Error('Mature village repeats identical house silhouettes: '+
+   JSON.stringify(mature.cottageArchetypes));
+ await screenshot(page,'05d-v056b-four-distinct-family-homes');
  await screenshot(page,'05d-four-year-life-and-paid-lofts');
  // The screenshot has rendered a complete five-year scene. Capture truthful
  // GPU metrics here, not the stale frame before d.advance().
