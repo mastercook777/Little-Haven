@@ -1,6 +1,6 @@
 # v0.5.6B「家家有形」· 开荒住宅的四种真实轮廓
 
-> 实施说明。以 [v0.5.6「村居百态」总规格](V056_PIONEER_ARCHETYPES_ECOLOGY.md) 为规则；此阶段只解决住宅 4 种形制和相应檐滴，不宣称全部生产建筑、选址/河岸生态升级完成。合并/CI 结果应在 PR 合入后更新。
+> 实施说明。以 [v0.5.6「村居百态」总规格](V056_PIONEER_ARCHETYPES_ECOLOGY.md) 为规则；此阶段只解决住宅 4 种形制和相应檐滴，不宣称全部生产建筑、选址/河岸生态升级完成。已在 [PR #26](https://github.com/mastercook777/Little-Haven/pull/26) 合入 main；[CI #42583727922](https://github.com/mastercook777/Little-Haven/actions/runs/42583727922) 129/129 原生测试、TypeScript、Pages 构建与经典/开荒桌面和手机 Chromium 全绿。
 
 ## 目标和模型
 
@@ -27,3 +27,8 @@
 - `tests/pioneer-browser-smoke.mjs` 在自然发展五年、4+ 栋真实 cottage 后强制确认 3+ 种形制，截四形制同框并保留全年季节/雨雪/鱼物流/访客/旧经典版/手机截图。
 - 当前 v0.5.5 成熟村庄软件 WebGL 基线约 1066 draw calls。增加构件须披露新渲染开销，继续静态合批和共享材质；Android 真机性能仍无法仅由 PC 浏览器验证。
 - 尚未覆盖（保持 P2/P3 计划）：渔棚/茶棚/粮仓多形制、完整住宅组团选址、修缮留下的可累积外观痕迹、风格化河岸生态分带和独立物流工作点。
+
+## 验收实测（2026-11-09）
+
+- 实际五年后仍是 12 位常住居民、11 座设施、3 间已付费改造木阁山居、3/3 山居的不同独立形制分别为 **C1-gabled、C2-broad、C3-porch**。**C4-side-bay 已实现但该测试种子没有第四间住宅；不可冒充五年实测有四间不同的房屋。**
+- 山居屋顶 Box3、雪层、真正木阁、房屋 ID/保存地块、独立鱼运与茶棚招待、旧存档恢复以及真实四季雨天均通过。第五年 renderer 约 **1033 draw calls / 74,696 triangles / 258 geometries**，P0 1029 calls，低端 Android 真机帧率未测。
