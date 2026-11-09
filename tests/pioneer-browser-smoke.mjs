@@ -451,6 +451,7 @@ try{
    heritageRoofs:v.heritageRoofs,heritageClothed:v.heritageClothed,
    seasonalProtectedTrees:v.seasonalProtectedTrees,snowyHeritageRoofs:v.snowyHeritageRoofs,
    cottageArchetypes:v.cottageArchetypes,uniqueCottageArchetypes:v.uniqueCottageArchetypes,
+   facilityArchetypes:v.facilityArchetypes,gardenStyles:v.gardenStyles,
    sawbenches:v.sawbenches,wood:s.resources.wood,food:s.resources.food};
  });
  if(mature.people<=9||mature.lofts.length<1||
@@ -470,6 +471,15 @@ try{
    new Set(mature.cottageArchetypes).size<3))
   throw Error('Mature village repeats identical house silhouettes: '+
    JSON.stringify(mature.cottageArchetypes));
+ const facilityKinds=new Set(['wood-yard','fish-hut','granary','tea-stop']);
+ if(mature.facilityArchetypes.length!==mature.built.filter(k=>facilityKinds.has(k)).length||
+  mature.gardenStyles.length!==mature.built.filter(k=>k==='garden').length||
+  mature.facilityArchetypes.some(id=>!id||!/^(W[123]|F[12]|G[12]|T[12])-/.test(id))||
+  mature.gardenStyles.some(id=>!id||!/^P[123]-/.test(id))||
+  (mature.gardenStyles.length>=3&&new Set(mature.gardenStyles).size<3))
+  throw Error('Authentic production facilities have missing roof/style registrations: '+
+   JSON.stringify({roofs:mature.facilityArchetypes,gardens:mature.gardenStyles}));
+ await screenshot(page,'05e-v056c-workshops-fishing-granary-tea-and-garden-variation');
  await screenshot(page,'05d-v056b-four-distinct-family-homes');
  await screenshot(page,'05d-four-year-life-and-paid-lofts');
  // The screenshot has rendered a complete five-year scene. Capture truthful

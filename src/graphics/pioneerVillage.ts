@@ -12,6 +12,7 @@ import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint}
 import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import {dressCharacter} from './characterKit.ts';
 import {pioneerCottageArchetype,pioneerCottageOrdinal} from './pioneerArchetypes.ts';
+import {pioneerFacilityArchetype,pioneerGardenStyle,pioneerGardenOrdinal} from './pioneerFacilityArchetypes.ts';
 import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
  makePioneerSeasonalGrove,pioneerHouseVariant} from './pioneerHeritageArt.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
@@ -347,14 +348,20 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
  if(kind==='garden'){
+  const gardenStyle=pioneerGardenStyle(pioneerVariant);
+  g.userData.facilityArchetype=gardenStyle;
   box(g,0,.025,0,2.22,.065,2.15,material('#947c55'));
   if(phase==='foundation')return g;
+  const bed=group(g);bed.name='real-garden-beds';
+  if(gardenStyle==='P2-raised-terrace')bed.rotation.y=Math.PI/2;
   for(let row=0;row<4;row++){
    const z=-.73+row*.49;
-   box(g,0,.11,z,2.08,.14,.32,material('#785e45'));
+   box(bed,0,gardenStyle==='P2-raised-terrace'?.17:.11,z,2.08,
+    gardenStyle==='P2-raised-terrace'?.25:.14,.32,material('#785e45'));
    for(let n=0;n<7;n++){
     const x=-.91+n*.30;
-    const sprout=orb(g,x,.27+(phase==='complete'?.10:0),z,.10,
+    const sprout=orb(bed,x,.27+(phase==='complete'?.10:0)+
+     (gardenStyle==='P2-raised-terrace'?.11:0),z,.10,
      material(row%2?'#75a46d':'#91af6b'),.78,
      phase==='complete'?1.65:.8,.68);
     sprout.rotation.y=n;
@@ -379,24 +386,44 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
      v.name='actual-seed-trial-bed';
     }
    }
-   for(const x of [-1.14,1.14])for(const z of [-1.11,1.11])
-    pole(g,x,.36,z,.045,.50,wood);
-   for(const z of [-1.11,1.11])box(g,0,.52,z,2.40,.07,.08,lightWood);
-   box(g,1.15,.37,0,.07,.06,2.3,lightWood);
+   if(gardenStyle==='P3-woven-boundary'){
+    const weave=group(g);weave.name='woven-garden-boundary';
+    for(const x of [-1.12,1.12]){
+     for(const z of [-.84,-.28,.28,.84])pole(weave,x,.41,z,.042,.63,wood);
+     for(const y of [.32,.54])box(weave,x,y,0,.045,.035,2.03,lightWood);
+    }
+   }else{
+    for(const x of [-1.14,1.14])for(const z of [-1.11,1.11])
+     pole(g,x,.36,z,.045,.50,wood);
+    for(const z of [-1.11,1.11])box(g,0,.52,z,2.40,.07,.08,lightWood);
+    box(g,1.15,.37,0,.07,.06,2.3,lightWood);
+   }
   }
   return g;
  }
  if(kind==='fish-hut'){
+  const design=pioneerFacilityArchetype('fish-hut',p.id);
+  g.userData.facilityArchetype=design.id;
   // Real shore fishing bay: lower piling, shaded rack, net poles, baskets.
   box(g,0,.11,0,2.52,.16,2.23,material('#a8a08b'));
   if(phase==='foundation')return g;
+  const postHeight=design.roof.eaveY-.16;
   for(const x of [-1.07,1.07])for(const z of [-.86,.86])
-   pole(g,x,.94,z,.085,1.76,wood);
-  box(g,0,1.79,0,2.48,.13,2.20,lightWood);
+   pole(g,x,.13+postHeight/2,z,.085,postHeight,wood);
+  box(g,0,design.roof.eaveY-.06,0,2.43,.13,2.14,lightWood);
   const roof=material('#ad9a70');
-  buildPioneerRoof(g,{halfWidth:1.34,halfDepth:1.11,eaveY:1.85,
-   ridgeY:2.30,thickness:.10},roof,wood,lightWood,thatchBright);
+  buildPioneerRoof(g,design.roof,roof,wood,lightWood,thatchBright);
   if(phase!=='complete')return g;
+  if(design.style==='raised-net-landing'){
+   const dock=group(g);dock.name='raised-fish-hut-landing';
+   for(const x of [-1.00,-.50,0,.50,1.00])
+    box(dock,x,.34,.39,.42,.10,1.30,lightWood);
+   for(const x of [-1.08,1.08]){
+    pole(dock,x,.71,.78,.045,.68,wood);
+    pole(dock,x,1.36,-.74,.043,1.24,wood);
+   }
+   box(dock,0,1.69,-.74,2.13,.08,.09,wood).name='drying-net-timber-crossbar';
+  }
   for(const x of [-.84,-.28,.28,.84])pole(g,x,.48,-.63,.022,.58,lightWood);
   for(const z of [-.75,-.39,-.03,.33]){
    const net=box(g,0,.56,z,1.82,.025,.022,material('#bcae86'));
@@ -415,6 +442,8 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   return g;
  }
  if(kind==='granary'){
+  const design=pioneerFacilityArchetype('granary',p.id);
+  g.userData.facilityArchetype=design.id;
   // Raised storage house; long-use grain jars are bound to actual supplies.
   for(const x of [-.94,.94])for(const z of [-.83,.83])
    pole(g,x,.75,z,.11,1.44,wood);
@@ -422,9 +451,16 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   if(phase==='foundation')return g;
   for(const x of [-1.01,1.01])box(g,x,1.98,0,.16,1.22,1.92,lightWood);
   dressPioneerGranary(g);
-  makePioneerMountainRoof(g,{halfWidth:1.23,halfDepth:1.14,eaveY:2.64,
-   ridgeY:3.12,thickness:.09},'granary');
+  makePioneerMountainRoof(g,design.roof,'granary');
   if(phase==='complete'){
+   if(design.style==='ventilated-store'){
+    const gallery=group(g);gallery.name='granary-ventilated-gallery';
+    for(const z of [-.67,-.23,.21,.65])
+     box(gallery,1.02,2.04,z,.067,.56,.072,wood);
+    for(const x of [-.67,.67])
+     pole(gallery,x,.59,-1.02,.050,1.05,wood);
+    box(gallery,0,.97,-1.02,1.55,.08,.13,lightWood);
+   }
    for(let i=0;i<6;i++){
     const jar=orb(g,-.83+(i%3)*.83,1.60,-.58+Math.floor(i/3)*.82,
      .24,material('#b69b72'),1,.72,1);
@@ -435,17 +471,30 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   return g;
  }
  if(kind==='tea-stop'){
+  const design=pioneerFacilityArchetype('tea-stop',p.id);
+  g.userData.facilityArchetype=design.id;
   // Shrunk open eaves remain entirely inside the reserved legal 2.55×2.38m footprint.
-  g.scale.setScalar(.84);
+  g.scale.setScalar(design.scale);
   box(g,0,.09,0,2.75,.14,2.38,material('#a89d83'));
   if(phase==='foundation')return g;
+  const postHeight=design.roof.eaveY-.11;
   for(const x of [-1.10,1.10])for(const z of [-.96,.96])
-   pole(g,x,.91,z,.082,1.70,wood);
-  box(g,0,1.74,0,2.48,.12,2.30,lightWood);
-  buildPioneerRoof(g,{halfWidth:1.42,halfDepth:1.23,
-   eaveY:1.81,ridgeY:2.29,thickness:.10},
+   pole(g,x,.08+postHeight/2,z,.082,postHeight,wood);
+  box(g,0,design.roof.eaveY-.07,0,2.40,.12,2.23,lightWood);
+  buildPioneerRoof(g,design.roof,
    material('#8b9272'),wood,lightWood,thatchBright);
   if(phase!=='complete')return g;
+  if(design.style==='lantern-tea-pavilion'){
+   const pavilion=group(g);pavilion.name='tea-stop-tall-lantern-bay';
+   for(const z of [-.72,-.24,.24,.72])
+    box(pavilion,1.02,.82,z,.045,1.00,.055,lightWood);
+   for(const y of [.43,1.16])
+    box(pavilion,1.02,y,0,.058,.045,1.83,wood);
+   const hanging=box(pavilion,-1.00,1.62,1.03,.36,.57,.055,
+    material('#b68b61'));
+   hanging.name='pavilion-road-tea-hanging-sign';
+   box(pavilion,-1.00,1.70,1.08,.19,.29,.025,material('#e3ceb0'));
+  }
   box(g,-.36,.68,.22,1.36,.14,.63,lightWood);
   for(const x of [-.80,.08])pole(g,x,.35,.22,.055,.56,wood);
   box(g,-.36,.37,.71,1.10,.09,.25,wood);
@@ -460,8 +509,15 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  }
  const cottage=kind==='cottage';
  const design=cottage?pioneerCottageArchetype(pioneerVariant):null;
- const w=design?.bodyWidth??2.38,d=design?.bodyDepth??2.31,h=design?.wallHeight??1.57;
- const roofProfile=design?.roof??{
+ const workDesign=kind==='wood-yard'?pioneerFacilityArchetype('wood-yard',p.id):null;
+ if(workDesign)g.userData.facilityArchetype=workDesign.id;
+ const workshopBody=workDesign?.style==='slatted-bay'?
+  {w:2.55,d:2.21,h:1.42}:
+  workDesign?.style==='high-workshop'?{w:2.16,d:2.40,h:1.81}:
+  {w:2.38,d:2.31,h:1.57};
+ const w=design?.bodyWidth??workshopBody.w,d=design?.bodyDepth??workshopBody.d,
+  h=design?.wallHeight??workshopBody.h;
+ const roofProfile=design?.roof??workDesign?.roof??{
   halfWidth:(w-.10)/2+.13,halfDepth:(d-.16)/2+.10,
   eaveY:h+.29,ridgeY:h+.72,thickness:.095
  };
@@ -532,6 +588,16 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   box(g,0,.82,-.45,1.78,.12,.72,lightWood);
   for(let n=0;n<5;n++)box(g,-.58+n*.28,.34,0,.19,.18,1.65,n%2?wood:lightWood);
   if(phase==='complete'){
+   if(workDesign?.style==='slatted-bay'){
+    const slats=group(g);slats.name='wood-yard-open-slat-wall';
+    for(let i=-4;i<=4;i++)box(slats,i*.25,.92,-.91,.09,1.17,.10,wood);
+    box(slats,0,1.55,-.91,2.30,.10,.12,lightWood);
+   }else if(workDesign?.style==='high-workshop'){
+    const loft=group(g);loft.name='wood-yard-high-loft-storage';
+    for(const x of [-.84,.84])pole(loft,x,1.21,-.76,.051,1.00,lightWood);
+    box(loft,0,1.66,-.72,1.79,.11,.90,lightWood);
+    for(let i=0;i<4;i++)box(loft,-.54+i*.34,1.88,-.75,.25,.12,.46,wood);
+   }
    const workbench=box(g,.56,1.05,.28,.67,.12,.50,lightWood);
    workbench.name='wood-yard-workbench';
    const saw=box(g,.65,1.14,.28,.05,.06,.35,stone);saw.rotation.z=.45;
@@ -562,6 +628,8 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  }
  return g;
 }
+/** Test-facing model factory: returns the exact same mesh tree as gameplay. */
+export {facilityVisual as buildPioneerFacilityVisual};
 function drawFootpaths(parent:THREE.Group,roads:readonly PioneerRoad[]){
  const root=group(parent);root.name='resident-made-paths';
  const pathMat=material('#bdad87'),dirtMat=material('#ae9475');
@@ -601,7 +669,8 @@ export interface PioneerGraphics{
    snowyHeritageRoofs:number;weatherMode:string;rainStreaks:number;rainSplashes:number;
  rainPuddles:number;roofDrips:number;fallingLeaves:number;fallenLeaves:number;
  springPetals:number;winterSnowPatches:number;
- cottageArchetypes:string[];uniqueCottageArchetypes:number};
+ cottageArchetypes:string[];uniqueCottageArchetypes:number;
+ facilityArchetypes:string[];gardenStyles:string[]};
 }
 export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):PioneerGraphics{
  const root=group(scene);root.name='pioneer-valley-no-prebuilt-village';
@@ -702,7 +771,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
      s.livingFates.seedTrials.filter(t=>t.gardenId===built.id).at(-1):undefined;
     const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
      trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined,
-      built.kind==='cottage'?pioneerCottageOrdinal(s.buildings,built.id):0);
+      built.kind==='cottage'?pioneerCottageOrdinal(s.buildings,built.id):
+       built.kind==='garden'?pioneerGardenOrdinal(s.buildings,built.id):0);
     if(built.kind==='garden'){
      const crops:THREE.Mesh[]=[];
      plot.traverse(child=>{
@@ -734,7 +804,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     }else facilityVisual(constructionLayer,s.intent.parcel,s.intent.kind??'shelter',
       s.intent.phase,Math.min(1,progress/s.intent.workRequired),
        100,undefined,false,false,
-       s.buildings.filter(b=>b.kind==='cottage').length);
+       (s.intent.kind==='garden'?s.buildings.filter(b=>b.kind==='garden').length:
+        s.buildings.filter(b=>b.kind==='cottage').length));
    }
    renderedStructures=constructionLayer.children.length;
     weatherArt.setRoofDrips(pioneerRoofDrips(s));
@@ -925,7 +996,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    cottageArchetypes:latestWorld.buildings.filter(b=>b.kind==='cottage').map(b=>
     pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id),
    uniqueCottageArchetypes:new Set(latestWorld.buildings.filter(b=>b.kind==='cottage').map(b=>
-    pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id)).size
+    pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id)).size,
+   facilityArchetypes:latestWorld.buildings.filter(b=>
+    b.kind==='wood-yard'||b.kind==='fish-hut'||b.kind==='granary'||b.kind==='tea-stop')
+    .map(b=>pioneerFacilityArchetype(
+     b.kind as 'wood-yard'|'fish-hut'|'granary'|'tea-stop',b.parcel.id).id),
+   gardenStyles:latestWorld.buildings.filter(b=>b.kind==='garden')
+    .map(b=>pioneerGardenStyle(pioneerGardenOrdinal(latestWorld.buildings,b.id)))
  })};
 }
 function hashFloat(n:number){let k=(n+339)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);return ((k^(k>>>13))>>>0)/4294967296;}
