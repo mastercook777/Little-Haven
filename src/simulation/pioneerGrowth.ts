@@ -3,7 +3,8 @@ import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {onPioneerTeaStopBuilt} from './pioneerCommerce.ts';
 import {distanceToCreekSpline} from './creekCorridor.ts';
 import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
-import {nearestRoad,type VillageParcel} from './villagePlanning.ts';
+import type {VillageParcel} from './villagePlanning.ts';
+import {pioneerNeighborhoodScore} from './pioneerNeighborhood.ts';
 import {pioneerNaturalParcels} from './pioneerNaturalAnchors.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
@@ -90,11 +91,13 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   if(distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>13.3)continue;
   if(kind==='fish-hut'&&(riverDist(x,z)<2.9||riverDist(x,z)>5.7))continue;
   for(const rotation of [0,Math.PI/2]){
-   const road=nearestRoad(x,z);
    const parcel:VillageParcel={id:projectId,
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
     width:data.width,depth:data.depth,rotation,clearance:.30,
-    accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
+    accessX:x,accessZ:z,builtAt:s.minutes};
+   // An actual front entrance, never a phantom classic v0.3 track.
+   const entry=pioneerEntrance(parcel);
+   parcel.accessX=entry[0];parcel.accessZ=entry[1];
    if(metrics)metrics.candidateParcels++;
    if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
    if(metrics)metrics.legalGeometry++;
@@ -104,9 +107,11 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
     s.policy==='food'?Math.hypot(x-(s.camp.x-4),z-(s.camp.z+4))*.12:0;
+   const neighborhood=pioneerNeighborhoodScore(s,kind,parcel);
    const score=proximity*.57+distance({x,z},s.camp)*.11+
     (kind==='fish-hut'?Math.abs(riverDist(x,z)-3.35)*1.8:0)+
-    road.distance*.12+policy+hash(s.seed+i*719+j*991+salt*533+rotation*80)*.81;
+    neighborhood.total*.85+policy+
+    hash(s.seed+i*719+j*991+salt*533+rotation*80)*.81;
    choices.push({parcel,score});
   }
  }
