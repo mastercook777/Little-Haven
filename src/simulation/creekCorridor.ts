@@ -40,7 +40,13 @@ export function creekTangentAt(parameter:number):GroundPoint{
  * river waypoint polyline. 100 chord segments give sub-.01 m sampling error. */
 const SAMPLES=100;
 const creekSamples=Array.from({length:SAMPLES+1},(_,i)=>creekPointAt(i/SAMPLES));
+// A* and building surveys repeat the same 0.001-unit coordinates thousands
+// of times. Bound caching keeps precise shared-spline checks inexpensive.
+const distanceCache=new Map<string,number>();
+const MAX_CACHED_DISTANCES=30000;
 export function distanceToCreekSpline(x:number,z:number):number{
+ const key=Math.round(x*1000)+':'+Math.round(z*1000);
+ const cached=distanceCache.get(key);if(cached!==undefined)return cached;
  let nearest=Infinity;
  for(let i=0;i<SAMPLES;i++){
   const [ax,az]=creekSamples[i],[bx,bz]=creekSamples[i+1];
@@ -48,6 +54,8 @@ export function distanceToCreekSpline(x:number,z:number):number{
   const t=den?clamp(((x-ax)*vx+(z-az)*vz)/den,0,1):0;
   nearest=Math.min(nearest,Math.hypot(x-ax-t*vx,z-az-t*vz));
  }
+ if(distanceCache.size>=MAX_CACHED_DISTANCES)distanceCache.clear();
+ distanceCache.set(key,nearest);
  return nearest;
 }
 export function creekSurfaceHalfWidthAt(_parameter:number){return CREEK_WATER_HALF_WIDTH;}

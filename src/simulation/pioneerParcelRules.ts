@@ -18,6 +18,10 @@ export function validatePioneerParcel(parcel:VillageParcel,
   return {ok:false,reason:'outside-island'};
  // Rendered water is a curved ribbon, not a raw waypoint line.
  // Center, corners and edge midpoints prevent roofs dipping into water.
+ const centerClearance=distanceToCreekSpline(parcel.x,parcel.z);
+ const halfDiagonal=Math.hypot(parcel.width/2+parcel.clearance,
+  parcel.depth/2+parcel.clearance);
+ if(centerClearance<CREEK_WATER_HALF_WIDTH+halfDiagonal+.07){
  const roofCorners=parcelCorners(parcel);
  const edgeSamples=[...roofCorners,[parcel.x,parcel.z] as const,
   ...roofCorners.map(([x,z],i)=>{
@@ -26,6 +30,7 @@ export function validatePioneerParcel(parcel:VillageParcel,
   })];
  if(edgeSamples.some(([x,z])=>distanceToCreekSpline(x,z)<CREEK_WATER_HALF_WIDTH+.07))
   return {ok:false,reason:'river-bank'};
+ }
  if(occupied.some(other=>other.id!==parcel.id&&parcelOverlaps(parcel,other)))
   return {ok:false,reason:'existing-building'};
  // Pathfinding already reserves .13 units beyond each building's SAT
