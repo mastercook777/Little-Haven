@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type {Season} from '../simulation/calendar.ts';
-import {VALLEY_RIVER} from '../simulation/valleyGeography.ts';
+import {creekPointAt,creekTangentAt,distanceToCreekSpline,
+ CREEK_WATER_HALF_WIDTH,CREEK_BANK_HALF_WIDTH} from '../simulation/creekCorridor.ts';
 export {VALLEY_RIVER as RIVER_WAYPOINTS} from '../simulation/valleyGeography.ts';
 
 /**
@@ -28,20 +29,15 @@ const flowMat=new THREE.MeshBasicMaterial({color:'#d0e9dc',transparent:true,opac
 const stoneMat=new THREE.MeshStandardMaterial({color:'#a1aa9e',roughness:1});
 const stoneDarkMat=new THREE.MeshStandardMaterial({color:'#747d73',roughness:1});
 const stemMat=new THREE.MeshStandardMaterial({color:'#5b8070',roughness:1});
-const curve=new THREE.CatmullRomCurve3(VALLEY_RIVER.map(([x,z])=>new THREE.Vector3(x,0,z)),false,'centripetal',.45);
+// Water, terrain and settlement planting now consume the same numerical spline.
+const curve={
+ getPoint(u:number){const [x,z]=creekPointAt(u);return new THREE.Vector3(x,0,z);},
+ getTangent(u:number){const [x,z]=creekTangentAt(u);return new THREE.Vector3(x,0,z);}
+};
 const rand=(n:number)=>{let k=(n+17)>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;};
 const safeU=(u:number)=>Math.max(0,Math.min(1,u));
 /** The terrain channel and water geometry share exactly this spline. */
-export function creekDistance(x:number,z:number):number{
- let nearest=Infinity;
- const pt=new THREE.Vector3();
- for(let i=0;i<=100;i++){
-  curve.getPoint(i/100,pt);
-  const d=Math.hypot(x-pt.x,z-pt.z);
-  if(d<nearest)nearest=d;
- }
- return nearest;
-}
+export const creekDistance=distanceToCreekSpline;
 function riverSample(u:number,offset:number,y:number){
  const p=curve.getPoint(safeU(u)),t=curve.getTangent(safeU(u)).normalize();
  // normal lies perpendicular to the bank-to-bank section in XZ.
@@ -66,15 +62,15 @@ function addWater(parent:THREE.Group){
  // Dark stony stream-bed is wide enough that the creek looks *cut into* grass.
  const bed=strip(-2.38,2.38,.045,.045,bedMat);bed.name='river-bed';parent.add(bed);
  const banks=[
-  strip(-2.42,-1.56,.169,.078,bankMat),
-  strip(1.56,2.42,.078,.169,bankMat),
+  strip(-CREEK_BANK_HALF_WIDTH,-1.56,.169,.078,bankMat),
+  strip(1.56,CREEK_BANK_HALF_WIDTH,.078,.169,bankMat),
   strip(-1.72,-1.48,.083,.10,edgeMat),
   strip(1.48,1.72,.10,.083,edgeMat),
   strip(-1.48,-1.30,.102,.108,shallowMat),
   strip(1.30,1.48,.108,.102,shallowMat)
  ];
  for(const b of banks){b.name='river-shore';parent.add(b);}
- const surface=strip(-1.38,1.38,CENTER_Y,CENTER_Y,waterMat);
+ const surface=strip(-CREEK_WATER_HALF_WIDTH,CREEK_WATER_HALF_WIDTH,CENTER_Y,CENTER_Y,waterMat);
  surface.name='river-water';surface.userData.waterway='creek';
  parent.add(surface);
  return surface;

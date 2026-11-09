@@ -5,10 +5,13 @@ import {createLivingFates,pioneerCultivationMultiplier,settleLivingFatesHour,val
 import {activeSeedTrial,considerSeedTrial,dueSeedTrial,performSeedTrialShift,
  pioneerFieldLegacyMultiplier} from './livingFates/seedTrial.ts';
 import {getWeatherForMinutes} from './weather.ts';
-import {nearestRoad,reservedParcels,validateVillageParcel,
+import {nearestRoad,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
 import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
+import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
+ resolvePioneerNaturalAnchors,validatePioneerNaturalAnchors,
+ type PioneerNaturalAnchor} from './pioneerNaturalAnchors.ts';
 import {agePioneerBuildings,completePioneerProject,considerPioneerMigration,
  pioneerHasFacility,pioneerHousingCapacity,pioneerBuildingLabel,
  registerPioneerTrip,schedulePioneerProject} from './pioneerGrowth.ts';
@@ -73,6 +76,8 @@ export interface PioneerBuilding{
 }
 export interface PioneerWorld{
  schemaVersion:4;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
+ /** Persist once on legacy import; planting must not jump beneath buildings. */
+ naturalAnchors?:PioneerNaturalAnchor[];
  camp:{x:number;z:number};founders:PioneerFounder[];
  resources:{wood:number;food:number;water:number};
  sites:PioneerResourceSite[];intent:PioneerIntent|null;buildings:PioneerBuilding[];
@@ -82,7 +87,7 @@ export interface PioneerWorld{
  livelihood:PioneerLivelihood;commerce:PioneerCommerce;
  foodStats?:{day:number;collected:number;consumed:number;previousCollected:number;previousConsumed:number};
 }
-const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
+const landscape=(s?:PioneerWorld)=>pioneerNaturalParcels(s);
 const parcel=(id:string,x:number,z:number,width:number,depth:number,rotation=0):VillageParcel=>{
  const road=nearestRoad(x,z);
  return {id,kind:'protected',x:round(x),z:round(z),width,depth,rotation,
@@ -146,7 +151,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
   ];
  const s:PioneerWorld={
   schemaVersion:4,mode:'pioneer',seed,minutes:8*60+20,lastSavedAt:now,camp,
-  founders,
+  founders,naturalAnchors:PIONEER_BASE_NATURAL_ANCHORS.map(a=>({...a})),
   resources:{wood:1,food:5,water:5},sites:resourceSites(seed,camp),
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
   roads:[],nextResidentId:4,nextSurveyAt:0,lastArrivalAt:0,commons:createPioneerCommons(),
@@ -161,10 +166,10 @@ export function getPioneerCalendar(s:PioneerWorld){return getCalendarFromMinutes
 export function getPioneerWeather(s:PioneerWorld){return getWeatherForMinutes(s.minutes,s.seed);}
 function campParcel(s:PioneerWorld){return parcel('temporary-camp',s.camp.x,s.camp.z,1.25,1.25);}
 export function validatePioneerSite(s:PioneerWorld,p:VillageParcel){
- return validatePioneerParcel(p,[...landscape(),campParcel(s),...s.buildings.map(b=>b.parcel)],s.roads);
+ return validatePioneerParcel(p,[...landscape(s),campParcel(s),...s.buildings.map(b=>b.parcel)],s.roads);
 }
 export function planPioneerShelter(s:PioneerWorld):VillageParcel|null{
- const occupied=[...landscape(),campParcel(s),...s.buildings.map(b=>b.parcel)];
+ const occupied=[...landscape(s),campParcel(s),...s.buildings.map(b=>b.parcel)];
  const campRoad=nearestRoad(s.camp.x,s.camp.z);
  const alternatives:{parcel:VillageParcel;score:number}[]=[];
  // A survey considers the eaves/porch and keeps the same natural approach path
@@ -196,7 +201,7 @@ function requestShelter(s:PioneerWorld){
  if(s.buildings.some(b=>b.kind==='shelter')||s.intent)return;
  const id='need-'+s.nextEventId;
  const location=planPioneerShelter(s);
- const walk=location?pioneerBuildingPath(s.camp,location,[...landscape(),...s.buildings.map(b=>b.parcel)]):null;
+ const walk=location?pioneerBuildingPath(s.camp,location,[...landscape(s),...s.buildings.map(b=>b.parcel)]):null;
  s.intent={id,kind:'shelter',path:walk??undefined,reason:'三人露宿山野，夜雨与寒风需要遮蔽。',createdAt:s.minutes,
   requestedBy:s.founders.map(f=>f.id),parcel:location,
   phase:location?'materials':'survey',woodRequired:SHELTER_WOOD,woodCommitted:0,
@@ -243,7 +248,7 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  if(isSame&&f.commute?.length)return;
  const from:WalkPoint=activity==='haul-fish'&&site?
   [site.x,site.z]:home?pioneerEntrance(home.parcel):[s.camp.x,s.camp.z];
- const obstacles=[...landscape(),...s.buildings.map(b=>b.parcel)].filter(p=>
+ const obstacles=[...landscape(s),...s.buildings.map(b=>b.parcel)].filter(p=>
   p.id!==home?.parcel.id&&p.id!==task?.parcel?.id&&
   p.id!==shelter?.parcel.id&&p.id!==fieldBuilding?.parcel.id&&
   p.id!==(activity==='haul-fish'?targetBuilding?.parcel.id:undefined));
@@ -358,7 +363,7 @@ function step(s:PioneerWorld){
   intent.parcel=planPioneerShelter(s);
   if(intent.parcel){
    intent.path=pioneerBuildingPath(s.camp,intent.parcel,
-    [...landscape(),...s.buildings.map(b=>b.parcel)])??undefined;
+    [...landscape(s),...s.buildings.map(b=>b.parcel)])??undefined;
    intent.phase='materials';intent.pauseReason='木料尚未备齐';
    log(s,'找到安全屋址','梁伯重新勘地，找到了不挡河岸、林地与山路的合法屋址。',intent.id);
   }
@@ -619,6 +624,16 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   if(!validatePioneerCommons(s.commons))return null;
   // Legacy v0.4.1/v0.4.2 saves have none of these forestry fields.
   // Never retroactively grant clearing hours, timber or fallen trees.
+  // Legacy v4: preserve every real building, road and construction intent;
+  // choose alternate *tree* sites once and persist their legal positions.
+  s.roads??=[];
+  if(s.naturalAnchors===undefined)
+   s.naturalAnchors=resolvePioneerNaturalAnchors(
+    [...s.buildings.map(b=>b.parcel),...(s.intent?.parcel?[s.intent.parcel]:[])],
+    s.roads);
+  if(!validatePioneerNaturalAnchors(s.naturalAnchors,
+   [...s.buildings.map(b=>b.parcel),...(s.intent?.parcel?[s.intent.parcel]:[])],
+   s.roads))return null;
   s.frontier??=createPioneerFrontier();
   if(!validatePioneerFrontier(s.frontier,s))return null;
   s.roads??=[];s.nextResidentId??=Math.max(...s.founders.map(f=>f.id))+1;
@@ -650,7 +665,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    !Number.isInteger(s.nextResidentId)||s.nextResidentId<4||
    !Number.isFinite(s.nextSurveyAt)||!Number.isFinite(s.lastArrivalAt))return null;
   const ids=new Set<string>();
-  const occupied=[...landscape(),campParcel(s)];
+  const occupied=[...landscape(s),campParcel(s)];
   for(const b of s.buildings){
    if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary','tea-stop'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
     (b.loftAddedAt!==undefined&&(b.kind!=='cottage'||!Number.isFinite(b.loftAddedAt)||

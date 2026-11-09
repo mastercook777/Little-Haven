@@ -2,7 +2,8 @@ import type {PioneerWorld,PioneerFounder,PioneerResourceSite} from './pioneerWor
 import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {findPioneerWalk,pioneerWalkable,type WalkPoint} from './pioneerPaths.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
-import {reservedParcels,type VillageParcel} from './villagePlanning.ts';
+import type {VillageParcel} from './villagePlanning.ts';
+import {pioneerNaturalParcels,isSafePioneerWildPlant} from './pioneerNaturalAnchors.ts';
 import {DAY_MINUTES} from './calendar.ts';
 
 export interface PioneerFelling {
@@ -25,7 +26,7 @@ const hash=(n:number)=>{
  k=Math.imul(k^(k>>>13),0xc2b2ae35);
  return ((k^(k>>>16))>>>0)/4294967296;
 };
-const landscape=()=>reservedParcels(null).filter(p=>p.id.startsWith('pine-')||p.id.startsWith('bamboo-'));
+const landscape=(s:PioneerWorld)=>pioneerNaturalParcels(s);
 const dist=(a:{x:number;z:number},b:{x:number;z:number})=>Math.hypot(a.x-b.x,a.z-b.z);
 const record=(s:PioneerWorld,title:string,text:string,causeId:string)=>{
  appendPioneerJournal(s,title,text,causeId);
@@ -65,7 +66,7 @@ export function recordPioneerFelling(s:PioneerWorld,site:PioneerResourceSite,
   site.id);
 }
 function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
- const blockers=[...landscape(),...s.buildings.map(b=>b.parcel)];
+ const blockers=[...landscape(s),...s.buildings.map(b=>b.parcel)];
  const origin:WalkPoint=[s.camp.x,s.camp.z];
  const candidates:{x:number;z:number;score:number}[]=[];
  // Search the whole safe buffer ring rather than nine speculative
@@ -124,7 +125,7 @@ export function schedulePioneerClearing(s:PioneerWorld){
 export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
  if(pioneerParcelOpened(s,p))return false;
  const f=s.frontier;
- const occupied=[...landscape(),...s.buildings.map(b=>b.parcel)];
+ const occupied=[...landscape(s),...s.buildings.map(b=>b.parcel)];
  if(!validatePioneerParcel(p,occupied,s.roads).ok||
   !findPioneerWalk([s.camp.x,s.camp.z],[p.x,p.z],occupied))return false;
  const active=f.clearings.find(c=>c.phase==='clearing');
@@ -155,7 +156,7 @@ export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
  return true;
 }
 export function pioneerClearingReachable(s:PioneerWorld,p:PioneerClearing):boolean{
- const occupied=[...landscape(),...s.buildings.map(b=>b.parcel)];
+ const occupied=[...landscape(s),...s.buildings.map(b=>b.parcel)];
  return !!findPioneerWalk([s.camp.x,s.camp.z],[p.x,p.z],occupied);
 }
 export function performPioneerClearing(s:PioneerWorld,p:PioneerClearing,effort:number){

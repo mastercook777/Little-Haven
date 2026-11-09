@@ -1,4 +1,4 @@
-import {VALLEY_RIVER,type GroundPoint} from './valleyGeography.ts';
+import {distanceToCreekSpline} from './creekCorridor.ts';
 import {PIONEER_VALLEY,pioneerIslandFraction} from './pioneerGeography.ts';
 import {parcelCorners,type VillageParcel} from './villagePlanning.ts';
 
@@ -16,13 +16,7 @@ const iz=(z:number)=>Math.max(0,Math.min(NZ-1,Math.round((z-MIN_Z)/GRID)));
 const index=(x:number,z:number)=>z*NX+x;
 const coords=(node:number):WalkPoint=>[round(MIN_X+(node%NX)*GRID),round(MIN_Z+Math.floor(node/NX)*GRID)];
 const span=(a:WalkPoint,b:WalkPoint)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-const nearestToSegment=(p:WalkPoint,a:GroundPoint,b:GroundPoint)=>{
- const vx=b[0]-a[0],vz=b[1]-a[1],d=vx*vx+vz*vz;
- const t=d?Math.max(0,Math.min(1,((p[0]-a[0])*vx+(p[1]-a[1])*vz)/d)):0;
- return Math.hypot(p[0]-a[0]-vx*t,p[1]-a[1]-vz*t);
-};
-const riverClear=(p:WalkPoint)=>VALLEY_RIVER.reduce((v,a,i)=>
- i===0?v:Math.min(v,nearestToSegment(p,VALLEY_RIVER[i-1],a)),Infinity);
+const riverClear=(p:WalkPoint)=>distanceToCreekSpline(p[0],p[1]);
 const insideParcel=(point:WalkPoint,p:VillageParcel,extra=0)=>{
  const dx=point[0]-p.x,dz=point[1]-p.z,cs=Math.cos(p.rotation),sn=Math.sin(p.rotation);
  const x=dx*cs+dz*sn,z=-dx*sn+dz*cs;
