@@ -14,7 +14,7 @@ const relocatedPines:Record<number,readonly [number,number]>={
  3:[1.8,9.2],5:[11.7,5.7],6:[.2,-8.8]
 };
 const relocatedBamboo:Record<number,readonly [number,number]>={
- 5:[3.5,7.7],9:[9.8,-7.6]
+ 5:[3.5,7.7],6:[11.9,2.3],9:[9.8,-7.6]
 };
 const base:PioneerNaturalAnchor[]=[
  ...VALLEY_PINES.map(([x,z,size],index)=>({

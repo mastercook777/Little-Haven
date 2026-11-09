@@ -19,8 +19,15 @@ const squared=(a:GroundPoint,b:GroundPoint)=>
 export function creekPointAt(parameter:number):GroundPoint{
  const points=VALLEY_RIVER,len=points.length;
  const p=(len-1)*clamp(parameter,0,1),i=Math.min(len-2,Math.floor(p)),t=p-i;
- const p0=points[Math.max(0,i-1)],p1=points[i],p2=points[i+1],
-  p3=points[Math.min(len-1,i+2)];
+ // Three.js extrapolates endpoints instead of repeating them.
+ const p0=i===0?
+  [2*points[0][0]-points[1][0],2*points[0][1]-points[1][1]] as GroundPoint:
+  points[i-1];
+ const p1=points[i],p2=points[i+1];
+ const p3=i+2>=len?
+  [2*points[len-1][0]-points[len-2][0],
+   2*points[len-1][1]-points[len-2][1]] as GroundPoint:
+  points[i+2];
  let d0=Math.pow(squared(p0,p1),.25),
   d1=Math.pow(squared(p1,p2),.25),
   d2=Math.pow(squared(p2,p3),.25);
