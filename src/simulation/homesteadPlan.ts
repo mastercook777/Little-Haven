@@ -81,6 +81,6 @@ export function pioneerV6YardWalkable(p:VillageParcel,worldX:number,worldZ:numbe
 export function pioneerV6CourtyardPoint(p:VillageParcel):readonly [number,number]|null{
  const plan=pioneerV6HomesteadPlan(p);if(!plan)return null;
  const z=plan.yard.z,cs=Math.cos(p.rotation),sn=Math.sin(p.rotation);
- return [Math.round((p.x+z*sn)*1000)/1000,
+ return [Math.round((p.x-z*sn)*1000)/1000,
   Math.round((p.z+z*cs)*1000)/1000];
 }
