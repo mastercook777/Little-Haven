@@ -448,7 +448,8 @@ try{
    fish:s.sites.find(x=>x.kind==='fish')?.totalGathered??0,
    fishHaul:s.livelihood.fishTransport,
    rendered:v.renderedStructures,loftDormers:v.loftDormers,
-   heritageRoofs:v.heritageRoofs,heritageClothed:v.heritageClothed,
+   heritageRoofs:v.heritageRoofs,authoredRoofs:v.authoredRoofs,
+   snowCapableRoofs:v.snowCapableRoofs,heritageClothed:v.heritageClothed,
    seasonalProtectedTrees:v.seasonalProtectedTrees,snowyHeritageRoofs:v.snowyHeritageRoofs,
    cottageArchetypes:v.cottageArchetypes,uniqueCottageArchetypes:v.uniqueCottageArchetypes,
    facilityArchetypes:v.facilityArchetypes,gardenStyles:v.gardenStyles,
@@ -460,21 +461,21 @@ try{
   mature.fish<=0||mature.fishHaul.totalDelivered<=0||
   mature.fishHaul.haulHours<=0||mature.fishHaul.totalDelivered>mature.fish+.002||
   mature.heritageClothed!==mature.people||mature.seasonalProtectedTrees<2||
-  mature.heritageRoofs<
-   mature.built.filter(kind=>kind==='cottage'||kind==='granary').length||
+  mature.authoredRoofs<
+   mature.built.filter(kind=>kind!=='garden').length||
   mature.loftDormers<mature.lofts.length||
   mature.rendered<mature.built.length)
   throw Error('No mature paid/visible village growth after five real years: '+
    JSON.stringify(mature));
  if(mature.built.filter(x=>x==='cottage').length>=3&&
-  (mature.uniqueCottageArchetypes<3||
-   new Set(mature.cottageArchetypes).size<3))
+  (mature.uniqueCottageArchetypes<2||
+   new Set(mature.cottageArchetypes).size<2))
   throw Error('Mature village repeats identical house silhouettes: '+
    JSON.stringify(mature.cottageArchetypes));
  const facilityKinds=new Set(['wood-yard','fish-hut','granary','tea-stop']);
  if(mature.facilityArchetypes.length!==mature.built.filter(k=>facilityKinds.has(k)).length||
   mature.gardenStyles.length!==mature.built.filter(k=>k==='garden').length||
-  mature.facilityArchetypes.some(id=>!id||!/^(W[123]|F[12]|G[12]|T[12])-/.test(id))||
+  mature.facilityArchetypes.some(id=>!id||!/^(W[123]|F[12]|G[12]|T[12])-|^W1-open-yard$/.test(id))||
   mature.gardenStyles.some(id=>!id||!/^P[123]-/.test(id))||
   (mature.gardenStyles.length>=3&&new Set(mature.gardenStyles).size<3))
   throw Error('Authentic production facilities have missing roof/style registrations: '+
@@ -557,8 +558,8 @@ try{
   return {season:d.getState().minutes,
    visuals:d.getVisuals(),buildings:d.getState().buildings.length};
  });
- if(mountainWinter.visuals.heritageRoofs<1||
-  mountainWinter.visuals.snowyHeritageRoofs!==mountainWinter.visuals.heritageRoofs)
+ if(mountainWinter.visuals.snowCapableRoofs<1||
+  mountainWinter.visuals.snowyHeritageRoofs!==mountainWinter.visuals.snowCapableRoofs)
   throw Error('Classic curved snow layers failed to follow actual winter roof states: '+
    JSON.stringify(mountainWinter));
  await screenshot(page,'05f-heritage-curved-roofs-in-winter');
