@@ -67,7 +67,9 @@ test('v0.5.6B: actual mature valley gains different roofs, keeps all paid beds a
  // Each cottage has five attached roof drips following the family eave
  // height, rather than inheriting v0.5.5's hard-coded 1.97 y.
  for(const b of cottages){
-  const expectedY=pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).roof.eaveY+.18;
+  const expectedY=(b.parcel.homesteadStyle?
+   pioneerV6Roof(b.parcel.homesteadStyle):
+   pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).roof).eaveY+.18;
   assert.ok(runoff.some(([,y])=>Math.abs(y-expectedY)<.002));
  }
  const restored=importPioneerWorld(JSON.stringify(s));
