@@ -9,7 +9,7 @@
     "build:pages": "tsc --noEmit && vite build --mode pages",
     "preview": "vite preview --host 0.0.0.0",
     "check": "tsc --noEmit",
-    "test:sim": "node --experimental-strip-types --test tests/simulation.test.mts tests/pioneer.test.mts tests/living-fates.test.mts tests/seed-trial.test.mts tests/pioneer-spotlight.test.mts tests/pioneer-livelihood.test.mts tests/pioneer-commerce.test.mts tests/pioneer-familiar-roads.test.mts tests/pioneer-fish-logistics.test.mts tests/pioneer-heritage-art.test.mts tests/pioneer-season-weather.test.mts tests/pioneer-ecology.test.mts tests/pioneer-archetypes.test.mts tests/pioneer-facility-archetypes.test.mts",
+    "test:sim": "node --experimental-strip-types --test tests/simulation.test.mts tests/pioneer.test.mts tests/living-fates.test.mts tests/seed-trial.test.mts tests/pioneer-spotlight.test.mts tests/pioneer-livelihood.test.mts tests/pioneer-commerce.test.mts tests/pioneer-familiar-roads.test.mts tests/pioneer-fish-logistics.test.mts tests/pioneer-heritage-art.test.mts tests/pioneer-season-weather.test.mts tests/pioneer-ecology.test.mts tests/pioneer-archetypes.test.mts tests/pioneer-facility-archetypes.test.mts tests/pioneer-v06-homestead.test.mts",
     "test:browser": "node tests/browser-smoke.mjs && node tests/pioneer-browser-smoke.mjs"
   },
   "dependencies": {
