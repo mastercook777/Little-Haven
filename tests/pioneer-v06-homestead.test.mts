@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import {DAY_MINUTES} from '../src/simulation/calendar.ts';
 import {PIONEER_SLOT_KEYS,PIONEER_VERSION,createPioneerWorld,advancePioneerWorld,
  importPioneerWorld,savePioneerWorld,loadPioneerWorld} from '../src/simulation/pioneerWorld.ts';
-import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits} from '../src/simulation/homesteadPlan.ts';
+import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
+import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
@@ -33,6 +34,16 @@ test('v0.6 paid full-lot residential shapes and open workspace have actual gate 
   const plan=pioneerV6HomesteadPlan(p)!;
   assert.equal(plan.styleId,lot.styleId);
   assert.ok(plan.gate.opening>=1.0);
+  const actualYard=pioneerV6CourtyardPoint(p)!;
+  const gateApproach=pioneerEntrance(p);
+  assert.ok(pioneerV6YardWalkable(p,actualYard[0],actualYard[1]),
+   lot.styleId+' must have a real traversable yard');
+  assert.equal(pioneerV6YardWalkable(p,p.x,p.z),false,
+   'the occupied house/shop core is never an open pedestrian shortcut');
+  assert.ok(pioneerWalkable(actualYard,[p],true));
+  assert.ok(!pioneerWalkable([p.x,p.z],[p],true));
+  assert.ok(roadSegmentsSafe([gateApproach,actualYard],[p]),
+   'the public A* endpoint must connect through the actual unobstructed gate');
   const roof=pioneerV6Roof(lot.styleId);
   assert.ok(roof.halfWidth*2<lot.width);
   assert.ok(plan.building.z-roof.halfDepth>-lot.depth/2);
