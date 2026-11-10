@@ -206,7 +206,8 @@ export function schedulePioneerProject(s:PioneerWorld){
   return true;
  }
  const proposal=surveyPioneerPlot(s,kind);
- if(!proposal&&kind==='tea-stop'){
+ if(!proposal&&(kind==='tea-stop'||kind==='cottage')){
+  // An honest larger courtyard needs newly opened land after the inner ring fills.
   // This is a legal future build site, not free new land. First reserve a
   // real clearing job for residents, whose eight hours must fully complete
   // before any future construction or visitor can appear.
