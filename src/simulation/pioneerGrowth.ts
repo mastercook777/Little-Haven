@@ -10,7 +10,7 @@ import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type 
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
-import {pioneerV6LotFor} from './homesteadPlan.ts';
+import {pioneerV6LotFor,PIONEER_V6_LOTS} from './homesteadPlan.ts';
 import {pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
@@ -58,8 +58,12 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
   routeReached:0,resourceRoutesKept:0});
  const data=spec[kind];
- const v6=kind==='cottage'?pioneerV6LotFor('cottage',s.buildings.filter(b=>b.kind==='cottage').length):
+ const preferred=kind==='cottage'?pioneerV6LotFor('cottage',s.buildings.filter(b=>b.kind==='cottage').length):
   kind==='wood-yard'?pioneerV6LotFor('wood-yard'):null;
+ // H3's full wing and H2's yard are not compulsory forms. When real safe
+ // ground is scarce, a household can explicitly settle for the smaller H1.
+ const designs=kind==='cottage'&&preferred?.styleId!=='H1-thatch'?
+  [preferred!,PIONEER_V6_LOTS['H1-thatch']]:[preferred];
  const taken=[...natural(s),...s.buildings.map(b=>b.parcel)];
  const camp={id:'temporary-camp',kind:'protected' as const,
   x:s.camp.x,z:s.camp.z,width:1.25,depth:1.25,rotation:0,
@@ -92,12 +96,12 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   const x=round(s.camp.x+i*.72+offsetX),z=round(s.camp.z+j*.72+offsetZ);
   if(distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>13.3)continue;
   if(kind==='fish-hut'&&(riverDist(x,z)<2.9||riverDist(x,z)>5.7))continue;
-  for(const rotation of [0,Math.PI/2]){
+  for(const v6 of designs)for(const rotation of [0,Math.PI/2]){
    const road=nearestRoad(x,z);
    const parcel:VillageParcel={id:projectId,
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
     width:v6?.width??data.width,depth:v6?.depth??data.depth,rotation,clearance:.30,
-     ...(v6?{homesteadStyle:v6.styleId}:{}),
+    ...(v6?{homesteadStyle:v6.styleId}:{}),
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
    if(metrics)metrics.candidateParcels++;
    if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
@@ -129,7 +133,14 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // cleared-ring candidates instead of rejecting growth after the first
  // 210 high-scoring *central* parcels have no walkable access.
  const candidates=(kind==='cottage'&&s.founders.length>=9)||kind==='tea-stop'?420:210;
- for(const candidate of choices.slice(0,candidates)){
+ // Never let dozens of unwalkable H3 plots prevent checking smaller paid
+ // footprints. Both groups still pass *identical* river, SAT, road and
+ // critical-resource A* checks before a house is ever scheduled.
+ const ranked=preferred&&designs.length>1?
+  [...choices.filter(c=>c.parcel.homesteadStyle===preferred.styleId).slice(0,Math.min(120,candidates)),
+   ...choices.filter(c=>c.parcel.homesteadStyle!==preferred.styleId).slice(0,Math.min(200,candidates))]:
+  choices.slice(0,candidates);
+ for(const candidate of ranked){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
   if(allowUnopened&&!pioneerParcelOpened(s,candidate.parcel)&&
@@ -249,8 +260,7 @@ export function schedulePioneerProject(s:PioneerWorld){
  }
  const id='pioneer-need-'+s.nextEventId;
  const data=spec[kind];
- const v6=kind==='cottage'?pioneerV6LotFor('cottage',s.buildings.filter(b=>b.kind==='cottage').length):
-  kind==='wood-yard'?pioneerV6LotFor('wood-yard'):null;
+ const v6=proposal.parcel.homesteadStyle?PIONEER_V6_LOTS[proposal.parcel.homesteadStyle]:null;
  const wood=v6?.wood??data.wood,hours=v6?.hours??data.hours;
  s.intent={id,kind,reason:data.why,createdAt:s.minutes,
   requestedBy:s.founders.filter(f=>f.homeBuildingId).map(f=>f.id),
