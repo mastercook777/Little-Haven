@@ -499,7 +499,7 @@ function step(s:PioneerWorld){
  // Inventory limits inside transact() still prohibit free food or gifts.
  if(hour===13&&visitor?.outcome==='pending'&&
   s.commerce.guestPolicy!=='quiet'&&s.minutes>=visitor.arrivalAt+3*60){
-  for(const resident of s.founders.slice(3)){
+  for(const resident of [...s.founders.slice(3),...s.founders.slice(0,3)]){
    allocate(s,resident,'host-guest');
    if(resident.activity!=='host-guest')continue;
    if(performPioneerGuestShift(s,resident.id))guestWorkers.add(resident.id);
@@ -526,7 +526,7 @@ function step(s:PioneerWorld){
   if(field.length&&gather(s,f,'field',amount, 'farm'))return true;
   return gather(s,f,'forage',amount,'forage');
  };
- if(seedWorkers.has(liang.id)||coFarmWorkers.has(liang.id)||livelihoodWorkers.has(liang.id)){
+ if(guestWorkers.has(liang.id)||seedWorkers.has(liang.id)||coFarmWorkers.has(liang.id)||livelihoodWorkers.has(liang.id)){
   // This resident spent the hour at the trial plot instead of collecting.
  }else if(crisis&&!needWood){
   if(!foodTask(liang,.86))allocate(s,liang,'rest');
@@ -536,7 +536,7 @@ function step(s:PioneerWorld){
  else allocate(s,liang,'tend-fire');
  const foodTarget=Math.max(s.founders.length*2.65,
   s.policy==='food'?18:s.policy==='shelter'?5.5:9.5);
- if(seedWorkers.has(he.id)||coFarmWorkers.has(he.id)||livelihoodWorkers.has(he.id)){
+ if(guestWorkers.has(he.id)||seedWorkers.has(he.id)||coFarmWorkers.has(he.id)||livelihoodWorkers.has(he.id)){
   // Trial work replaces the ordinary farm shift.
  }else if(s.resources.food<foodTarget||!building||crisis){
   if(!foodTask(he,weather==='rain'?.63:.94))allocate(s,he,'rest');
@@ -551,7 +551,7 @@ function step(s:PioneerWorld){
  const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
   !crisis&&s.resources.food>=s.founders.length*.72&&
   s.resources.water>=Math.max(waterTarget,s.founders.length*.55);
- if(seedWorkers.has(lu.id)||coFarmWorkers.has(lu.id)||livelihoodWorkers.has(lu.id)){
+ if(guestWorkers.has(lu.id)||seedWorkers.has(lu.id)||coFarmWorkers.has(lu.id)||livelihoodWorkers.has(lu.id)){
   // Seed trial work is exclusive of fetching water or clearing land.
  }else if(clearingShift&&clearing){
   // Clearing consumes Lu's assigned hour instead of crediting two jobs.
