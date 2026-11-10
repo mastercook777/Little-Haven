@@ -58,6 +58,8 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
   routeReached:0,resourceRoutesKept:0});
  const data=spec[kind];
+ const v6=kind==='cottage'?pioneerV6LotFor('cottage',s.buildings.filter(b=>b.kind==='cottage').length):
+  kind==='wood-yard'?pioneerV6LotFor('wood-yard'):null;
  const taken=[...natural(s),...s.buildings.map(b=>b.parcel)];
  const camp={id:'temporary-camp',kind:'protected' as const,
   x:s.camp.x,z:s.camp.z,width:1.25,depth:1.25,rotation:0,
@@ -246,11 +248,14 @@ export function schedulePioneerProject(s:PioneerWorld){
  }
  const id='pioneer-need-'+s.nextEventId;
  const data=spec[kind];
+ const v6=kind==='cottage'?pioneerV6LotFor('cottage',s.buildings.filter(b=>b.kind==='cottage').length):
+  kind==='wood-yard'?pioneerV6LotFor('wood-yard'):null;
+ const wood=v6?.wood??data.wood,hours=v6?.hours??data.hours;
  s.intent={id,kind,reason:data.why,createdAt:s.minutes,
   requestedBy:s.founders.filter(f=>f.homeBuildingId).map(f=>f.id),
   parcel:proposal.parcel,path:proposal.path,phase:'materials',
-  woodRequired:data.wood,woodCommitted:0,workDone:0,
-  workRequired:data.hours,pauseReason:'需要 '+data.wood+' 份木料和 '+data.hours+' 工时'};
+  woodRequired:wood,woodCommitted:0,workDone:0,
+  workRequired:hours,pauseReason:'需要 '+wood+' 份木料和 '+hours+' 工时'};
  record(s,'乡邻谋划'+data.label,data.why+' 梁伯勘定了从营地到新工地的可走线路。',id);
  return true;
 }
