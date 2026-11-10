@@ -8,6 +8,7 @@ import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWa
 import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
+import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {parcelOverlaps} from '../src/simulation/villagePlanning.ts';
 import {pioneerNaturalParcels} from '../src/simulation/pioneerNaturalAnchors.ts';
@@ -86,6 +87,21 @@ test('v0.6 rotated full lot faces its saved A* entrance, not the opposite wall',
  const root=new THREE.Group();
  const g=makeV6Homestead(root,p,'complete')!;
  assert.equal(g.rotation.y,-p.rotation);
+});
+
+test('v0.6 forest clearing and tree felling leave actual visible traces by year three',()=>{
+ const s=createPioneerWorld(42,1000);
+ advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ const grove=buildPioneerForestArt(new THREE.Group(),s).signatures();
+ const cleared=s.frontier.clearings.filter(c=>c.phase==='cleared');
+ assert.ok(cleared.length>=1&&grove.cleared>=1&&grove.stumps>=1,
+  'simulated clearing and durable cut marks are missing: '+
+  JSON.stringify({land:s.frontier.clearings,grove,food:s.resources.food,
+   water:s.resources.water,wood:s.resources.wood,
+   people:s.founders.length,forest:s.sites.filter(x=>x.kind==='forest')
+    .map(x=>({stock:x.stock,harvested:x.totalGathered})),
+   nearby:s.buildings.map(b=>({kind:b.kind,id:b.id,at:[b.parcel.x,b.parcel.z]})),
+   recent:s.journal.slice(-12).map(e=>e.title)}));
 });
 
 test('v0.6 genuine five-year growth pays for complete lots without occupying the river, roots or prior roads',()=>{
