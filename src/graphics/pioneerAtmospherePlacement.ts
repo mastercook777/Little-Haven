@@ -1,5 +1,7 @@
 import type {PioneerWorld} from '../simulation/pioneerWorld.ts';
 import {pioneerCottageArchetype,pioneerCottageOrdinal} from './pioneerArchetypes.ts';
+import {pioneerV6HomesteadPlan} from '../simulation/homesteadPlan.ts';
+import {pioneerV6Roof} from './homesteadScene.ts';
 import {pioneerFacilityRoofDripProfile} from './pioneerFacilityArchetypes.ts';
 import {pioneerDeciduousLocations} from '../simulation/pioneerNaturalAnchors.ts';
 import {distanceToCreekSpline} from '../simulation/creekCorridor.ts';
