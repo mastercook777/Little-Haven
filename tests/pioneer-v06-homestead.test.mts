@@ -65,6 +65,22 @@ test('v0.6 paid full-lot residential shapes and open workspace have actual gate 
  }
 });
 
+test('v0.6 rotated full lot faces its saved A* entrance, not the opposite wall',()=>{
+ const lot=PIONEER_V6_LOTS['H2-farmyard'];
+ const p={id:'rotated-homestead',kind:'dwelling' as const,x:0,z:0,
+  width:lot.width,depth:lot.depth,clearance:.3,rotation:Math.PI/2,
+  accessX:-lot.depth/2-.82,accessZ:0,builtAt:0,homesteadStyle:lot.styleId};
+ const target=pioneerV6CourtyardPoint(p)!;
+ const front=pioneerEntrance(p);
+ assert.ok(front[0]<target[0]&&target[0]<p.x,
+  'saved road and courtyard must be on the same rotated front side');
+ assert.ok(pioneerV6YardWalkable(p,target[0],target[1]));
+ assert.ok(roadSegmentsSafe([front,target],[p]));
+ const root=new THREE.Group();
+ const g=makeV6Homestead(root,p,'complete')!;
+ assert.equal(g.rotation.y,-p.rotation);
+});
+
 test('v0.6 genuine five-year growth pays for complete lots without occupying the river, roots or prior roads',()=>{
  const s=createPioneerWorld(42,1000);
  advancePioneerWorld(s,(48*5*DAY_MINUTES-s.minutes)/3);
