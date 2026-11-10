@@ -1,7 +1,6 @@
 import {distanceToCreekSpline} from './creekCorridor.ts';
 import {PIONEER_VALLEY,pioneerIslandFraction} from './pioneerGeography.ts';
 import {parcelCorners,type VillageParcel} from './villagePlanning.ts';
-import {pioneerV6YardWalkable} from './homesteadPlan.ts';
 
 /** The dirt trails in pioneer mode are actual saved walkable connections. No
  * decorative legacy village roads are required for traversal or rendering. */
@@ -27,11 +26,7 @@ export function pioneerWalkable(p:WalkPoint,occupied:readonly VillageParcel[],al
  const [x,z]=p;
  if(pioneerIslandFraction(x,z,PIONEER_VALLEY.walkMarginX,PIONEER_VALLEY.walkMarginZ)>.96)return false;
  if(!allowRiver&&riverClear(p)<2.47)return false;
- // New paid yards are not solid 5x5 blocks to people: keep the timber
- // building and low walls as obstacles, but open the actual front gate and
- // courtyard corridor. Building-to-building SAT still reserves the whole lot.
- return !occupied.some(parcel=>insideParcel(p,parcel,.13)&&
-  !pioneerV6YardWalkable(parcel,x,z));
+ return !occupied.some(parcel=>insideParcel(p,parcel,.13));
 }
 export function roadSegmentsSafe(points:readonly WalkPoint[],occupied:readonly VillageParcel[]){
  if(points.length<2)return false;
