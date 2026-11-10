@@ -527,8 +527,15 @@ const debugging={
   renderUI();return changed;},
  reset:(seed=world.seed)=>{replaceWorld(createPioneerWorld(seed));persist();return true;},
  getVisuals:()=>valley.signatures(),
+ getCameraSnapshot:()=>({
+  eye:camera.position.toArray(),target:orbit.target.toArray(),
+  zoom:camera.zoom,left:camera.left,right:camera.right,
+  top:camera.top,bottom:camera.bottom
+ }),
  getRendererInfo:()=>({calls:renderer.info.render.calls,
-  triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries})
+  triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,
+  textures:renderer.info.memory.textures,dpr:renderer.getPixelRatio(),
+  shadows:renderer.shadowMap.enabled,canvasPixels:[canvas.width,canvas.height]})
 };
 (window as typeof window&{__PIONEER_DEBUG__?:typeof debugging}).__PIONEER_DEBUG__=debugging;
 requestAnimationFrame(tick);
