@@ -34,3 +34,34 @@ jobs:
             artifacts/browser-smoke/
             artifacts/pioneer-browser-smoke/
           if-no-files-found: ignore
+
+  v060-visual-evidence:
+    # Visual screenshots are an independent review gate, not proof of beauty.
+    if: github.event_name == 'pull_request'
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture same-seed same-camera baseline and candidate
+        run: |
+          ln -s "$GITHUB_WORKSPACE/node_modules" .baseline/node_modules
+          node tests/v060-visual-evidence.mjs --project=.baseline --label=baseline --port=5194
+          node tests/v060-visual-evidence.mjs --project=. --label=phase-a --port=5195
+      - name: Upload v0.6 visual audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v060-same-camera-before-after
+          path: artifacts/evidence/v060/
+          if-no-files-found: warn
