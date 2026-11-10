@@ -45,7 +45,11 @@ export function pioneerRoofDrips(s:PioneerWorld):readonly (readonly [number,numb
  const positions:[number,number,number][]=[];
  // Same roof profile and tea pavilion scale as the built mesh.
  for(const built of s.buildings){
-  const profile=built.kind==='cottage'?(()=>{
+  const v6=pioneerV6HomesteadPlan(built.parcel);
+  const profile=v6?(()=>{
+   const roof=pioneerV6Roof(v6.styleId);
+   return [roof.halfWidth,roof.halfDepth,roof.eaveY] as const;
+  })():built.kind==='cottage'?(()=>{
    const roof=pioneerCottageArchetype(
     pioneerCottageOrdinal(s.buildings,built.id)).roof;
    return [roof.halfWidth,roof.halfDepth,roof.eaveY] as const;
@@ -57,11 +61,12 @@ export function pioneerRoofDrips(s:PioneerWorld):readonly (readonly [number,numb
   const [halfWidth,halfDepth,eaveY]=profile,p=built.parcel;
   const cos=Math.cos(p.rotation),sin=Math.sin(p.rotation);
   for(let i=0;i<5;i++){
-   const lx=(i-2)*halfWidth*.38,lz=halfDepth*.96;
-   // Full-lot geometry and SAT use -Y rotation; keep eave drops on
-   // the visible side of the roof rather than the opposite frontage.
-   positions.push([p.x+lx*cos+(v6?-lz*sin:lz*sin),eaveY+.18,
-    p.z+(v6?lx*sin:-lx*sin)+lz*cos]);
+   const lx=(i-2)*halfWidth*.38;
+   // Paid compound roof is offset to the rear of its entire plot.
+   // Use the same signed rotation as the rendered building group.
+   const lz=halfDepth*.96+(v6?.building.z??0);
+   positions.push([p.x+lx*cos-lz*sin,eaveY+.18,
+    p.z+lx*sin+lz*cos]);
   }
  }
  return positions;
