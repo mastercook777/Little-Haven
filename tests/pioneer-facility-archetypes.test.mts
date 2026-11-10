@@ -11,6 +11,7 @@ import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {createPioneerWorld,advancePioneerWorld,importPioneerWorld}
  from '../src/simulation/pioneerWorld.ts';
 import {DAY_MINUTES} from '../src/simulation/calendar.ts';
+import {pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import type {VillageParcel} from '../src/simulation/villagePlanning.ts';
 
 const kindSizes:Record<PioneerFacilityKind,[number,number]>={
