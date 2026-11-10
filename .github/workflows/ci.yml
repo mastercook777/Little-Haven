@@ -36,9 +36,10 @@ jobs:
           if-no-files-found: ignore
 
   v060-visual-evidence:
-    # Visual screenshots are an independent review gate, not proof of beauty.
+    # Independent visual evidence runs after fast compile/simulation checks;
+    # full browser smoke still gates merge but must not hide failing screenshots.
     if: github.event_name == 'pull_request'
-    needs: test-and-build
+    needs: v060-fast-checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
