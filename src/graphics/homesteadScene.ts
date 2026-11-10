@@ -36,7 +36,7 @@ export function makeV6Homestead(
  parent:THREE.Object3D,parcel:VillageParcel,phase:'foundation'|'frame'|'complete',
  condition=100,craftReady=false,loftReady=false):THREE.Group|null{
  const plan=pioneerV6HomesteadPlan(parcel);if(!plan)return null;
- const g=group(parent,parcel.x,.18,parcel.z,'v06-'+plan.styleId+'-'+phase);
+ const g=group(parent,parcel.x,plan.padY,parcel.z,'v06-'+plan.styleId+'-'+phase);
  g.rotation.y=parcel.rotation;g.userData.buildingId=parcel.id;
  g.userData.homesteadStyle=plan.styleId;
  const b=plan.building,yard=plan.yard,gate=plan.gate;
@@ -93,6 +93,11 @@ export function makeV6Homestead(
   // A household entrance across real stone tread / earth courtyard.
   const front=b.z+b.depth/2;
   part(g,0,.062,(front+gate.z)/2,.92,.068,gate.z-front,earth,'household-footpath');
+  // The actual saved route ends outside the full SAT; bridge its last meter
+  // to the visible gate without painting a fake settlement-wide road.
+  const outside=parcel.depth/2+parcel.clearance+.52;
+  part(g,0,.045,(gate.z+outside)/2,.90,.05,outside-gate.z,
+   earth,'household-gate-to-real-road');
   for(let i=0;i<3;i++)part(g,0,.087+i*.021,front+.16+i*.22,1.06-i*.04,.07,.20,slab);
   const sideX=yard.width/2-.08,wallY=.23;
   // Low wall on three sides, with 1.10-unit clear gate at +Z.
