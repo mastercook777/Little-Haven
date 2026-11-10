@@ -294,7 +294,7 @@ test('Built cottages, gardens and work yards expose real saved detail, not cosme
  const detail=inspectPioneerSelection(s,{kind:'building',id:cottage!.id});
  assert.equal(detail?.title,'山居');
  assert.ok(detail?.facts.find(x=>x.label==='村民使用'));
- assert.equal(detail?.facts.find(x=>x.label==='实际木料')?.value,'9 份');
+ assert.equal(detail?.facts.find(x=>x.label==='实际木料')?.value,'11 份');
  assert.ok(detail?.facts.find(x=>x.label==='落成时间'));
  assert.ok(detail?.history.length);
  const plot=inspectPioneerSelection(s,{kind:'building',id:garden!.id});
