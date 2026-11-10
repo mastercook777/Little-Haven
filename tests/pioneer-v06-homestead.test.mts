@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {DAY_MINUTES} from '../src/simulation/calendar.ts';
 import {PIONEER_SLOT_KEYS,PIONEER_VERSION,createPioneerWorld,advancePioneerWorld,
- importPioneerWorld,savePioneerWorld,loadPioneerWorld} from '../src/simulation/pioneerWorld.ts';
+ importPioneerWorld,savePioneerWorld,loadPioneerWorld,setPioneerPolicy} from '../src/simulation/pioneerWorld.ts';
+import {setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
 import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
 import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
@@ -102,6 +103,23 @@ test('v0.6 forest clearing and tree felling leave actual visible traces by year 
     .map(x=>({stock:x.stock,harvested:x.totalGathered})),
    nearby:s.buildings.map(b=>({kind:b.kind,id:b.id,at:[b.parcel.x,b.parcel.z]})),
    recent:s.journal.slice(-12).map(e=>e.title)}));
+});
+
+test('v0.6 shelter and river vote retain reachable clearing and actual cut traces',()=>{
+ const s=createPioneerWorld(42,1000);
+ assert.equal(setPioneerPolicy(s,'shelter'),true);
+ for(let step=0;!s.buildings.length&&step<1000;step++)advancePioneerWorld(s,60/3);
+ assert.ok(s.buildings.length>0);
+ assert.equal(setPioneerDirection(s,'river'),true);
+ advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ const grove=buildPioneerForestArt(new THREE.Group(),s).signatures();
+ assert.ok(s.frontier.clearings.some(c=>c.phase==='cleared')&&grove.stumps>0,
+  'a 3-year river-policy hamlet cannot leave old clearing inaccessible: '+
+  JSON.stringify({clearings:s.frontier.clearings,grove,water:s.resources.water,
+   food:s.resources.food,wood:s.resources.wood,
+   forest:s.sites.filter(x=>x.kind==='forest').map(x=>({stock:x.stock,totalGathered:x.totalGathered})),
+   people:s.founders.length,houses:s.buildings.map(b=>({
+    kind:b.kind,at:[b.parcel.x,b.parcel.z],size:[b.parcel.width,b.parcel.depth]}))}));
 });
 
 test('v0.6 genuine five-year growth pays for complete lots without occupying the river, roots or prior roads',()=>{
