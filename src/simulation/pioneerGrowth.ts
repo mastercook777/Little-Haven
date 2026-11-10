@@ -167,7 +167,10 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
  // inviting the 5th/9th mouth. Otherwise migration requires extra fields,
  // while the construction planner waits forever for those migrants.
  const capacity=pioneerHousingCapacity(s);
- if(gardens>0&&gardens<Math.ceil(capacity/4))return 'garden';
+ // The village has a hard twelve-person population cap. Spare paid beds
+ // do not constitute actual food demand: never block river and tea work
+ // behind a fourth garden reserved only for an impossible 13th resident.
+ if(gardens>0&&gardens<Math.ceil(Math.min(12,capacity)/4))return 'garden';
  if(gardens>0&&gardens<Math.ceil(s.founders.length/4)&&
   s.resources.food<Math.max(18,s.founders.length*3.5))return 'garden';
  if(!pioneerHasFacility(s,'cottage')&&
@@ -217,8 +220,9 @@ export function schedulePioneerProject(s:PioneerWorld){
   return true;
  }
  const proposal=surveyPioneerPlot(s,kind);
- if(!proposal&&(kind==='tea-stop'||kind==='cottage')){
-  // An honest larger courtyard needs newly opened land after the inner ring fills.
+ if(!proposal){
+  // All genuine village needs (including gardens) may require safe new
+  // land beyond the already occupied first ring.
   // This is a legal future build site, not free new land. First reserve a
   // real clearing job for residents, whose eight hours must fully complete
   // before any future construction or visitor can appear.
