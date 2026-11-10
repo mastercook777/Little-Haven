@@ -539,9 +539,14 @@ function step(s:PioneerWorld){
  else allocate(s,he,'shelter');
  const waterTarget=s.policy==='food'?8:s.policy==='shelter'?2.8:4.3;
  const clearing=s.frontier.clearings.find(c=>c.phase==='clearing');
+ // A clearing takes ONE resident hour, not a full day's village water
+ // reserve. Requiring 0.65 water * every resident before a single shift
+ // stranded the default 12-person river-policy valley at 0/8 clearing hours.
+ // Basic rations and urgent timber still take precedence; water consumption
+ // is paid separately by every founder in the authoritative hourly tick.
  const clearingShift=!!clearing&&hour===14&&!crisis&&
-  s.resources.food>=Math.max(3,s.founders.length*1.1)&&
-  s.resources.water>=Math.max(waterTarget,s.founders.length*.65)&&
+  s.resources.food>=Math.max(3,s.founders.length*.80)&&
+  s.resources.water>=Math.max(1.4,Math.min(2.8,s.founders.length*.20))&&
   !needWood;
  const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
   !crisis&&s.resources.food>=s.founders.length*.72&&
