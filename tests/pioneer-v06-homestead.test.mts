@@ -105,8 +105,10 @@ test('v0.6 forest clearing and tree felling leave actual visible traces by year 
    recent:s.journal.slice(-12).map(e=>e.title)}));
 });
 
-test('v0.6 shelter and river vote retain reachable clearing and actual cut traces',()=>{
- const s=createPioneerWorld(42,1000);
+test('v0.6 browser default seed and shelter/river vote retain reachable clearing',()=>{
+ // The browser starts with slot-1 seed 20261103 + 193, not the
+ // separate seed=42 maturity benchmark. Cover the actual player startup.
+ const s=createPioneerWorld(20261103+193,1000);
  assert.equal(setPioneerPolicy(s,'shelter'),true);
  for(let step=0;!s.buildings.length&&step<1000;step++)advancePioneerWorld(s,60/3);
  assert.ok(s.buildings.length>0);
