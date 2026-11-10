@@ -9,6 +9,7 @@ import {nearestRoad,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
 import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
+import {pioneerV6CourtyardPoint} from './homesteadPlan.ts';
 import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
  resolvePioneerNaturalAnchors,validatePioneerNaturalAnchors,
  type PioneerNaturalAnchor} from './pioneerNaturalAnchors.ts';
@@ -239,8 +240,10 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
     Math.sin(fieldBuilding.parcel.rotation)*(f.id%3-1)*.34)
   ]:site?[site.x,site.z]:
   (activity==='build'||activity==='repair')&&task?.parcel?pioneerEntrance(task.parcel):
-  (activity==='craft'||activity==='host-guest')&&targetBuilding?pioneerEntrance(targetBuilding.parcel):
-  shelter?pioneerEntrance(shelter.parcel):
+  (activity==='craft'||activity==='host-guest')&&targetBuilding?
+   (activity==='craft'?(pioneerV6CourtyardPoint(targetBuilding.parcel)??pioneerEntrance(targetBuilding.parcel)):
+    pioneerEntrance(targetBuilding.parcel)):
+  shelter?(pioneerV6CourtyardPoint(shelter.parcel)??pioneerEntrance(shelter.parcel)):
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
  if(activity==='haul-fish')goal=targetBuilding?pioneerEntrance(targetBuilding.parcel):
   [s.camp.x,s.camp.z];
@@ -266,6 +269,11 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
    const viaCommons:WalkPoint[]=[
     ...homeRoad.points.slice().reverse(),...builtRoad.points.slice(1)
    ];
+   // The paid W1 work apron is beyond the public roadside endpoint.
+   // Recheck that final doorway segment against the physical gate mask.
+   const last=viaCommons.at(-1);
+   if(last&&Math.hypot(last[0]-goal[0],last[1]-goal[1])>.04)
+    viaCommons.push(goal);
    if(roadSegmentsSafe(viaCommons,obstacles))commute=viaCommons;
   }
  }
