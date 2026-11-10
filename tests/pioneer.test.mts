@@ -23,7 +23,7 @@ import {advancePioneerWorld,advancePioneerToSeason,createPioneerWorld,
 test('Pioneer starts with zero permanent buildings, exactly three founders, no ghost inn',()=>{
  for(const seed of [7,42,20261103,20261347]){
   const s=createPioneerWorld(seed,1000);
-  assert.equal(s.schemaVersion,4);assert.equal(s.mode,'pioneer');
+  assert.equal(s.schemaVersion,6);assert.equal(s.mode,'pioneer');
   assert.equal(s.founders.length,3);assert.equal(s.buildings.length,0);
   assert.equal(s.intent,null);
   assert.deepEqual(s.founders.map(x=>x.name),['梁伯','陆娘','阿禾']);
@@ -114,7 +114,7 @@ test('Season skip matches the authoritative hourly advancement',()=>{
  assert.ok(a.buildings.length>=1);
 });
 
-test('Pioneer imports only v4 and validates reserved geometry and resources',()=>{
+test('Pioneer imports only v0.6 and validates reserved geometry and resources',()=>{
  const s=createPioneerWorld(42,1000);
  advancePioneerWorld(s,14*60);
  assert.deepEqual(importPioneerWorld(JSON.stringify(s)),s);
