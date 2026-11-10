@@ -138,11 +138,18 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
    ground.scale.set(plot.radius*fraction,plot.radius*fraction,1);
    g.add(ground);
    const pieces=plot.phase==='cleared'?3:6-Math.floor(plot.workDone/2);
+   // The general wild-plant mask rightly forbids growth on every cleared
+   // parcel. But this plot's *own paid cut stumps* must be allowed inside
+   // that very parcel; retain all house, road, creek and other plot checks.
+   const plotSafety=plot.phase==='cleared'?{
+    ...w,frontier:{...w.frontier,
+     clearings:w.frontier.clearings.filter(other=>other.id!==plot.id)}
+   }:w;
    for(let n=0;n<pieces;n++){
     const theta=hash(w.seed+n*87+plot.id.length*23)*Math.PI*2;
     const r=hash(n*19+plot.startedAt)*plot.radius*.65;
     const px=plot.x+Math.cos(theta)*r,pz=plot.z+Math.sin(theta)*r;
-    if(!isSafePioneerWildPlant(w,px,pz,.19))continue;
+    if(!isSafePioneerWildPlant(plotSafety,px,pz,.19))continue;
     if(plot.phase==='cleared'){
      stump(g,Math.cos(theta)*r,Math.sin(theta)*r);
      stumps++; // a paid clearing is an actual persistent cut trace
