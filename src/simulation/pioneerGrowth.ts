@@ -10,6 +10,7 @@ import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type 
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
+import {pioneerV6LotFor} from './homesteadPlan.ts';
 import {pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
@@ -93,7 +94,8 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
    const road=nearestRoad(x,z);
    const parcel:VillageParcel={id:projectId,
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
-    width:data.width,depth:data.depth,rotation,clearance:.30,
+    width:v6?.width??data.width,depth:v6?.depth??data.depth,rotation,clearance:.30,
+     ...(v6?{homesteadStyle:v6.styleId}:{}),
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
    if(metrics)metrics.candidateParcels++;
    if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
