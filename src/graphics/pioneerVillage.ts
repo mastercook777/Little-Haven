@@ -666,7 +666,7 @@ export interface PioneerGraphics{
    seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
    fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number;
    roadsideVisitor:boolean;activeVisitorName:string|null;
-   heritageRoofs:number;heritageClothed:number;seasonalProtectedTrees:number;
+   heritageRoofs:number;authoredRoofs:number;snowCapableRoofs:number;heritageClothed:number;seasonalProtectedTrees:number;
    snowyHeritageRoofs:number;weatherMode:string;rainStreaks:number;rainSplashes:number;
  rainPuddles:number;roofDrips:number;fallingLeaves:number;fallenLeaves:number;
  springPetals:number;winterSnowPatches:number;
@@ -984,6 +984,11 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   activeVisitorName:latestWorld.commerce.activeVisitor?.name??null,
   heritageRoofs:constructionLayer.children.filter(g=>
    !!g.getObjectByName('one-piece-upturned-roof')).length,
+  authoredRoofs:constructionLayer.children.filter(g=>
+   !!g.getObjectByName('one-piece-upturned-roof')||
+   !!g.getObjectByName('pioneer-roof-assembly')).length,
+  snowCapableRoofs:latestWorld.buildings.filter(b=>
+   b.kind==='cottage'||b.kind==='granary').length,
   heritageClothed:people.filter(p=>p.upper.userData.heritageCloth===true).length,
   seasonalProtectedTrees:heritageGrove.count,
   snowyHeritageRoofs:constructionLayer.children.filter(g=>
@@ -995,13 +1000,12 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    roofDrips:weatherArt.mode()==='rain'?weatherArt.roofDripCount():0,
    ...seasonalVfx.signatures(),
    cottageArchetypes:latestWorld.buildings.filter(b=>b.kind==='cottage').map(b=>
-    pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id),
+    b.parcel.homesteadStyle??pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id),
    uniqueCottageArchetypes:new Set(latestWorld.buildings.filter(b=>b.kind==='cottage').map(b=>
-    pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id)).size,
+    b.parcel.homesteadStyle??pioneerCottageArchetype(pioneerCottageOrdinal(latestWorld.buildings,b.id)).id)).size,
    facilityArchetypes:latestWorld.buildings.filter(b=>
     b.kind==='wood-yard'||b.kind==='fish-hut'||b.kind==='granary'||b.kind==='tea-stop')
-    .map(b=>pioneerFacilityArchetype(
-     b.kind as 'wood-yard'|'fish-hut'|'granary'|'tea-stop',b.parcel.id).id),
+    .map(b=>b.parcel.homesteadStyle??pioneerFacilityArchetype(b.kind as 'wood-yard'|'fish-hut'|'granary'|'tea-stop',b.parcel.id).id),
    gardenStyles:latestWorld.buildings.filter(b=>b.kind==='garden')
     .map(b=>pioneerGardenStyle(pioneerGardenOrdinal(latestWorld.buildings,b.id)))
  })};
