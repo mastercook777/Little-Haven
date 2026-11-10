@@ -138,7 +138,9 @@ test('v0.5.6C: mature autonomous village has genuine paid facility profiles and 
   b.kind!=='shelter'&&b.kind!=='garden').length*5);
  for(const f of facilities){
   const kind=f.kind as PioneerFacilityKind;
-  const [, ,height]=pioneerFacilityRoofDripProfile(kind,f.parcel.id);
+  const height=f.parcel.homesteadStyle?
+   pioneerV6Roof(f.parcel.homesteadStyle).eaveY:
+   pioneerFacilityRoofDripProfile(kind,f.parcel.id)[2];
   // The real mesh is y=.18 + scaled eave. The 5 emitter streams must
   // follow that mesh (not a stale constant baked before the archetype).
   const worldHeight=height+.18;
