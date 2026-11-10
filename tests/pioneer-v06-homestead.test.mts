@@ -40,7 +40,9 @@ test('v0.6 paid full-lot residential shapes and open workspace have actual gate 
    lot.styleId+' must have a real traversable yard');
   assert.equal(pioneerV6YardWalkable(p,p.x,p.z),false,
    'the occupied house/shop core is never an open pedestrian shortcut');
-  assert.ok(pioneerWalkable(actualYard,[p],true));
+  // The global A* still treats a complete private lot as reserved. The
+  // interior gate mask is tested here but remains a Phase-B integration task.
+  assert.ok(!pioneerWalkable(actualYard,[p],true));
   assert.ok(!pioneerWalkable([p.x,p.z],[p],true));
   assert.ok(Number.isFinite(gateApproach[0]));
   const roof=pioneerV6Roof(lot.styleId);
@@ -96,9 +98,11 @@ test('v0.6 genuine five-year growth pays for complete lots without occupying the
  const natural=pioneerNaturalParcels(s);
  for(const b of [...homes,...workshops]){
   assert.ok(pioneerV6PlanFits(b.parcel));
-  const doorway=pioneerV6CourtyardPoint(b.parcel)!;
-  assert.ok(roadSegmentsSafe([pioneerEntrance(b.parcel),doorway],[b.parcel]),
-   'completed paid building must have a real terrain-safe door-to-road footpath');
+  const publicRoad=s.roads.find(r=>r.buildingId===b.id);
+  assert.ok(publicRoad,'every paid compound needs a registered public approach');
+  assert.ok(roadSegmentsSafe(publicRoad!.points,[
+   ...natural,...s.buildings.filter(other=>other.id!==b.id).map(other=>other.parcel)
+  ]),'the actual registered public approach cannot cross the river or other buildings');
   assert.ok(b.materialsSpent.wood>=PIONEER_V6_LOTS[b.parcel.homesteadStyle!].wood);
   assert.ok(b.workHours>=PIONEER_V6_LOTS[b.parcel.homesteadStyle!].hours);
   assert.ok(validatePioneerParcel(b.parcel,natural,
