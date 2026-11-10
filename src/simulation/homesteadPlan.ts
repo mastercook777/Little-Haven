@@ -47,7 +47,7 @@ export function pioneerV6HomesteadPlan(parcel:VillageParcel):PioneerHomesteadPla
   building:{x:0,z:centerZ,width,depth},
   yard:{x:0,z:(gateZ+yardStart)/2,width:parcel.width-.34,depth:gateZ-yardStart},
   gate:{x:0,z:gateZ,opening:1.10},
-  padY:.22
+  padY:.18
  };
 }
 export function pioneerV6PlanFits(parcel:VillageParcel):boolean{
