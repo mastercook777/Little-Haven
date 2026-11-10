@@ -37,7 +37,9 @@ export function makeV6Homestead(
  condition=100,craftReady=false,loftReady=false):THREE.Group|null{
  const plan=pioneerV6HomesteadPlan(parcel);if(!plan)return null;
  const g=group(parent,parcel.x,plan.padY,parcel.z,'v06-'+plan.styleId+'-'+phase);
- g.rotation.y=parcel.rotation;g.userData.buildingId=parcel.id;
+ // Three.js +Y rotates local +Z toward +X; zoning/entrance uses the
+ // opposite signed XZ rotation. Keep visual door aligned with saved A* gate.
+ g.rotation.y=-parcel.rotation;g.userData.buildingId=parcel.id;
  g.userData.homesteadStyle=plan.styleId;
  const b=plan.building,yard=plan.yard,gate=plan.gate;
  const house=plan.kind==='home',style=plan.styleId,roof=pioneerV6Roof(style);
