@@ -152,7 +152,7 @@ export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
   startedAt:s.minutes,clearedAt:null};
  f.clearings.push(next);
  f.lastSurveyAt=s.minutes+3*DAY_MINUTES;
- record(s,'为茶棚新开林缘地','乡邻勘出合规又可达的山路空隙。须实际清灌移石八小时，方可在此考虑茶棚。',next.id);
+ record(s,'新宅地清障','乡邻勘出合规又可达的山路空隙。须实际清灌移石八小时，方可考虑扩建住屋或茶寮。',next.id);
  return true;
 }
 export function pioneerClearingReachable(s:PioneerWorld,p:PioneerClearing):boolean{
