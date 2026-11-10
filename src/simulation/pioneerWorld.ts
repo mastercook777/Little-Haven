@@ -251,7 +251,10 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  const obstacles=[...landscape(s),...s.buildings.map(b=>b.parcel)].filter(p=>
   p.id!==home?.parcel.id&&p.id!==task?.parcel?.id&&
   p.id!==shelter?.parcel.id&&p.id!==fieldBuilding?.parcel.id&&
-  p.id!==(activity==='haul-fish'?targetBuilding?.parcel.id:undefined));
+  // Permit the exact workplace entrance, while retaining every unrelated
+  // building, protected forest and river as a blocking obstacle.
+  p.id!==((activity==='haul-fish'||activity==='host-guest'||activity==='craft')?
+   targetBuilding?.parcel.id:undefined));
  let commute:WalkPoint[]|null;
  if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
