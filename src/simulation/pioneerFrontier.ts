@@ -66,7 +66,11 @@ export function recordPioneerFelling(s:PioneerWorld,site:PioneerResourceSite,
   site.id);
 }
 function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
- const blockers=[...landscape(s),...s.buildings.map(b=>b.parcel)];
+ // A committed *under-construction* parcel is already real reserved land.
+ // Ignoring s.intent.parcel used to survey a clearing under the future W1
+ // timber shed; the shed then finished on top of an unworked 0/8 plot.
+ const blockers=[...landscape(s),...s.buildings.map(b=>b.parcel),
+  ...(s.intent?.parcel?[s.intent.parcel]:[])];
  const origin:WalkPoint=[s.camp.x,s.camp.z];
  const candidates:{x:number;z:number;score:number}[]=[];
  // Search the whole safe buffer ring rather than nine speculative
