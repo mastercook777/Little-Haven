@@ -59,3 +59,28 @@ export function pioneerV6PlanFits(parcel:VillageParcel):boolean{
   y.z+y.depth/2<=parcel.depth/2&&y.depth>.42&&
   plan.gate.opening<y.width-1.0;
 }
+
+/** Walking uses the actual building, sidewalls and centered front gate.
+ * The complete homestead remains blocked to OTHER building placement by SAT;
+ * only a person entering through the clear gate may walk inside this paid lot.
+ */
+export function pioneerV6YardWalkable(p:VillageParcel,worldX:number,worldZ:number):boolean{
+ const plan=pioneerV6HomesteadPlan(p);if(!plan)return false;
+ const dx=worldX-p.x,dz=worldZ-p.z;
+ const cs=Math.cos(p.rotation),sn=Math.sin(p.rotation);
+ const x=dx*cs+dz*sn,z=-dx*sn+dz*cs;
+ const starts=plan.building.z+plan.building.depth/2+.14;
+ const wallFront=plan.gate.z-.18;
+ const inYard=Math.abs(x)<plan.yard.width/2-.21&&z>starts&&z<wallFront;
+ const throughGate=Math.abs(x)<plan.gate.opening/2-.11&&z>=wallFront&&
+  z<=p.depth/2+p.clearance+.64;
+ return inYard||throughGate;
+}
+/** Where a villager really stands inside a completed cottage/wood workplace.
+ * The registered public road still terminates outside its front gate. */
+export function pioneerV6CourtyardPoint(p:VillageParcel):readonly [number,number]|null{
+ const plan=pioneerV6HomesteadPlan(p);if(!plan)return null;
+ const z=plan.yard.z,cs=Math.cos(p.rotation),sn=Math.sin(p.rotation);
+ return [Math.round((p.x+z*sn)*1000)/1000,
+  Math.round((p.z+z*cs)*1000)/1000];
+}
