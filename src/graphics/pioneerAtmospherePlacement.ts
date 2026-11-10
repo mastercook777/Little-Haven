@@ -58,7 +58,10 @@ export function pioneerRoofDrips(s:PioneerWorld):readonly (readonly [number,numb
   const cos=Math.cos(p.rotation),sin=Math.sin(p.rotation);
   for(let i=0;i<5;i++){
    const lx=(i-2)*halfWidth*.38,lz=halfDepth*.96;
-   positions.push([p.x+lx*cos+lz*sin,eaveY+.18,p.z-lx*sin+lz*cos]);
+   // Full-lot geometry and SAT use -Y rotation; keep eave drops on
+   // the visible side of the roof rather than the opposite frontage.
+   positions.push([p.x+lx*cos+(v6?-lz*sin:lz*sin),eaveY+.18,
+    p.z+(v6?lx*sin:-lx*sin)+lz*cos]);
   }
  }
  return positions;
