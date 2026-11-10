@@ -10,7 +10,7 @@ export interface PioneerLotCatalogEntry{
  styleId:PioneerV6Style; width:number;depth:number;wood:number;hours:number;
 }
 export const PIONEER_V6_LOTS:Readonly<Record<PioneerV6Style,PioneerLotCatalogEntry>>={
- 'H1-thatch':{styleId:'H1-thatch',width:3.70,depth:3.95,wood:9,hours:16},
+ 'H1-thatch':{styleId:'H1-thatch',width:3.30,depth:3.45,wood:9,hours:16},
  'H2-farmyard':{styleId:'H2-farmyard',width:4.50,depth:4.75,wood:11,hours:18},
  'H3-wing':{styleId:'H3-wing',width:5.25,depth:5.00,wood:14,hours:23},
  'W1-open-yard':{styleId:'W1-open-yard',width:4.40,depth:4.35,wood:8,hours:14}
