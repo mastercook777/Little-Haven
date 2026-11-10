@@ -7,7 +7,7 @@ import {PIONEER_SLOT_KEYS,PIONEER_VERSION,createPioneerWorld,advancePioneerWorld
 import {setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
 import {pioneerClearingReachable} from '../src/simulation/pioneerFrontier.ts';
 import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
-import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
+import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe,findPioneerWalk} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
