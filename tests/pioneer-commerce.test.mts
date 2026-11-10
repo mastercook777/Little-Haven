@@ -152,7 +152,12 @@ test('v0.5.1: hospitality and quietness are actual inventory differences, not fl
  assert.equal(quiet.commerce.activeVisitor?.foodDelta,0);
  // Both villages still consume hourly water from the same real residents;
  // only the hosted transaction additionally subtracts precisely 0.5 water.
- assert.equal(round(quiet.resources.water-hosp.resources.water),.5);
+ // The guest host uses an exclusive worker hour; quiet-policy residents
+ // may spend that same hour gathering resources instead. The exchange
+ // ledger, not post-labor stock, is the exact hospitality-cost contract.
+ assert.equal(round(quiet.commerce.netWater-hosp.commerce.netWater),.5);
+ assert.ok(validPioneerCommerce(hosp)&&validPioneerCommerce(quiet),
+  'guest water cost must reconcile with truthful resource ledger');
  assert.equal(hosp.commerce.totalHosted,quiet.commerce.totalHosted+1);
  assert.ok(hosp.resources.food<quiet.resources.food);
  assert.ok(importPioneerWorld(JSON.stringify(hosp)));
