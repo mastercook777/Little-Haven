@@ -7,7 +7,7 @@ import {activeSeedTrial,considerSeedTrial,dueSeedTrial,performSeedTrialShift,
 import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
-import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
  resolvePioneerNaturalAnchors,validatePioneerNaturalAnchors,
@@ -256,6 +256,19 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
  else commute=findPioneerWalk(from,goal,obstacles);
+ // A house-to-workplace trip may use two *registered and still unobstructed*
+ // radial roads through the commons, even where the coarse A* grid cannot
+ // join their narrow lanes. Never teleport: every .22m is revalidated against
+ // the current natural/building obstacles before awarding the work shift.
+ if(!commute&&home&&builtRoad){
+  const homeRoad=s.roads.find(r=>r.buildingId===home.id);
+  if(homeRoad?.points.length&&builtRoad.points.length){
+   const viaCommons:WalkPoint[]=[
+    ...homeRoad.points.slice().reverse(),...builtRoad.points.slice(1)
+   ];
+   if(roadSegmentsSafe(viaCommons,obstacles))commute=viaCommons;
+  }
+ }
  if(!commute&&fieldBuilding){
   // Keep the original navigable entrance when a side work slot is blocked.
   goal=pioneerEntrance(fieldBuilding.parcel);
