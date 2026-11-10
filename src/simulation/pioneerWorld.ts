@@ -31,9 +31,9 @@ import {createPioneerFrontier,recordPioneerFelling,schedulePioneerClearing,
  performPioneerClearing,pioneerClearingReachable,validatePioneerFrontier,
  type PioneerFrontier} from './pioneerFrontier.ts';
 
-export const PIONEER_VERSION=4;
-export const PIONEER_SLOT_KEYS=['little-haven-pioneer-v04-slot-1','little-haven-pioneer-v04-slot-2'] as const;
-export const PIONEER_ACTIVE_SLOT='little-haven-pioneer-v04-active-slot';
+export const PIONEER_VERSION=6;
+export const PIONEER_SLOT_KEYS=['little-haven-pioneer-v06-slot-1','little-haven-pioneer-v06-slot-2'] as const;
+export const PIONEER_ACTIVE_SLOT='little-haven-pioneer-v06-active-slot';
 export const PIONEER_MINUTES_PER_SECOND=3;
 const HOUR=60;
 const SHELTER_WOOD=7;
@@ -75,7 +75,7 @@ export interface PioneerBuilding{
  operating?:boolean;productionMode?:'harvest'|'seed'|'timber'|'repair';
 }
 export interface PioneerWorld{
- schemaVersion:4;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
+ schemaVersion:6;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
  /** Persist once on legacy import; planting must not jump beneath buildings. */
  naturalAnchors?:PioneerNaturalAnchor[];
  camp:{x:number;z:number};founders:PioneerFounder[];
@@ -150,7 +150,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
     target:point(camp.x,camp.z+.9),homeBuildingId:null}
   ];
  const s:PioneerWorld={
-  schemaVersion:4,mode:'pioneer',seed,minutes:8*60+20,lastSavedAt:now,camp,
+  schemaVersion:6,mode:'pioneer',seed,minutes:8*60+20,lastSavedAt:now,camp,
   founders,naturalAnchors:PIONEER_BASE_NATURAL_ANCHORS.map(a=>({...a})),
   resources:{wood:1,food:5,water:5},sites:resourceSites(seed,camp),
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
@@ -598,7 +598,7 @@ export function savePioneerWorld(s:PioneerWorld,storage:Pick<Storage,'setItem'>,
 export function importPioneerWorld(raw:string):PioneerWorld|null{
  try{
   const s=JSON.parse(raw) as PioneerWorld;
-  if(s?.schemaVersion!==4||s.mode!=='pioneer'||!Number.isFinite(s.seed)||
+  if(s?.schemaVersion!==6||s.mode!=='pioneer'||!Number.isFinite(s.seed)||
    !Number.isFinite(s.minutes)||s.minutes<0||!Number.isFinite(s.lastSavedAt)||
    !Number.isInteger(s.nextEventId)||s.nextEventId<1||
    !['balanced','shelter','food'].includes(s.policy)||
