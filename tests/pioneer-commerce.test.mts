@@ -45,7 +45,13 @@ test('v0.5.1: 5 years create real tea shed and bounded distinct visitors, not ph
  assert.ok(tea!.materialsSpent.wood>=9&&tea!.workHours>=12);
  assert.ok(s.roads.some(r=>r.buildingId===tea!.id&&r.points.length>=2));
  assert.ok(c.totalArrivals>=2,'tea must actually receive named finite-time travelers');
- assert.ok(c.totalExchanges>=1,'a resource-backed exchange must be paid by both parties');
+ assert.ok(c.totalExchanges>=1,'a resource-backed exchange must be paid by both parties: '+
+  JSON.stringify({food:s.resources.food,wood:s.resources.wood,water:s.resources.water,
+   population:s.founders.length,visits:c.visits.slice(-3),arrivals:c.totalArrivals,
+   receptions:c.receptionHours,guest:c.activeVisitor,
+   tea:tea?.parcel,homes:s.founders.slice(3).map(f=>({
+    id:f.id,activity:f.activity,home:f.homeBuildingId,commute:f.commute?.length
+   }))}));
  assert.equal(s.founders.length,12,'passing guests cannot silently enlarge resident population');
  assert.ok(c.visits.length<=12&&c.visits.length>0);
  assert.equal(new Set(c.visits.map(v=>v.id)).size,c.visits.length);
