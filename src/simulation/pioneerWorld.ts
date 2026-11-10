@@ -472,7 +472,11 @@ function step(s:PioneerWorld){
  // reachable, exclusive afternoon hour at the tea stop, forgoing other work.
  const guestWorkers=new Set<number>();
  const visitor=s.commerce.activeVisitor;
- if(hour===13&&!crisis&&visitor?.outcome==='pending'&&
+ // A resident may exchange stocked timber for food *during* a food crisis.
+ // Skipping tea duty merely because grain is low traps the settlement: no
+ // host shift, no lawful exchange, and the visitor leaves without helping.
+ // Inventory limits inside transact() still prohibit free food or gifts.
+ if(hour===13&&visitor?.outcome==='pending'&&
   s.commerce.guestPolicy!=='quiet'&&s.minutes>=visitor.arrivalAt+3*60){
   for(const resident of s.founders.slice(3)){
    allocate(s,resident,'host-guest');
