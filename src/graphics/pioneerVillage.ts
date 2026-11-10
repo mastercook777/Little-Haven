@@ -16,6 +16,7 @@ import {pioneerFacilityArchetype,pioneerGardenStyle,pioneerGardenOrdinal} from '
 import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
  makePioneerSeasonalGrove,pioneerHouseVariant} from './pioneerHeritageArt.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
+import {makeV6Homestead} from './homesteadScene.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import type {PioneerSelection} from '../ui/pioneerInspection.ts';
 import {pioneerCropAppearance,pioneerVisibleWoodLogs} from '../simulation/pioneerVisibility.ts';
