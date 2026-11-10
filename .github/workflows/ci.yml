@@ -65,3 +65,19 @@ jobs:
           name: v060-same-camera-before-after
           path: artifacts/evidence/v060/
           if-no-files-found: warn
+
+  v060-fast-checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build/typecheck first
+        run: npm run build
+      - name: Focused real economy and house tests
+        run: |
+          node --experimental-strip-types --test --test-name-pattern='v0.6|v0.5.1: 5 years|v0.5.2: actual host' tests/pioneer-v06-homestead.test.mts tests/pioneer-commerce.test.mts tests/pioneer-familiar-roads.test.mts
