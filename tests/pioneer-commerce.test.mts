@@ -24,7 +24,7 @@ function diagnoseTeaCommutes(s:ReturnType<typeof createPioneerWorld>){
    const home=s.buildings.find(b=>b.id===f.homeBuildingId);
    const from:WalkPoint=home?pioneerEntrance(home.parcel):[s.camp.x,s.camp.z];
    const blockers=[...pioneerNaturalParcels(s),...s.buildings.map(b=>b.parcel)]
-    .filter(p=>p.id!==home?.id);
+    .filter(p=>p.id!==home?.id&&p.id!==tea.id);
    const homeRoad=s.roads.find(r=>r.buildingId===home?.id);
    const via=homeRoad&&teaRoad?[...homeRoad.points.slice().reverse(),...teaRoad.points.slice(1)]:[];
    return {id:f.id,home:home?.kind,from,to,fromOk:pioneerWalkable(from,blockers),
