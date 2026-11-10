@@ -7,11 +7,32 @@ import {setPioneerGuestPolicy,pioneerVisitorPosition,validPioneerCommerce,
 import {pioneerMilestoneBoard,setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
 import {surveyPioneerPlot} from '../src/simulation/pioneerGrowth.ts';
 import {inspectPioneerSelection} from '../src/ui/pioneerInspection.ts';
+import {pioneerEntrance,findPioneerWalk,roadSegmentsSafe,pioneerWalkable,type WalkPoint} from '../src/simulation/pioneerPaths.ts';
+import {pioneerNaturalParcels} from '../src/simulation/pioneerNaturalAnchors.ts';
 
 const round=(v:number)=>Math.round(v*1000)/1000;
 const days=(s:ReturnType<typeof createPioneerWorld>,d:number)=>
  advancePioneerWorld(s,(d*DAY_MINUTES-s.minutes)/3);
 const matured=()=>{const s=createPioneerWorld(42,1000);days(s,48*5);return s;};
+function diagnoseTeaCommutes(s:ReturnType<typeof createPioneerWorld>){
+ const tea=s.buildings.find(b=>b.kind==='tea-stop');
+ if(!tea)return {teaMissing:true};
+ const to=pioneerEntrance(tea.parcel);
+ const teaRoad=s.roads.find(r=>r.buildingId===tea.id);
+ return {tea:tea.parcel.id,teaRoad:teaRoad?.points.length??0,
+  routes:s.founders.map(f=>{
+   const home=s.buildings.find(b=>b.id===f.homeBuildingId);
+   const from:WalkPoint=home?pioneerEntrance(home.parcel):[s.camp.x,s.camp.z];
+   const blockers=[...pioneerNaturalParcels(s),...s.buildings.map(b=>b.parcel)]
+    .filter(p=>p.id!==home?.id);
+   const homeRoad=s.roads.find(r=>r.buildingId===home?.id);
+   const via=homeRoad&&teaRoad?[...homeRoad.points.slice().reverse(),...teaRoad.points.slice(1)]:[];
+   return {id:f.id,home:home?.kind,from,to,fromOk:pioneerWalkable(from,blockers),
+    toOk:pioneerWalkable(to,blockers),direct:!!findPioneerWalk(from,to,blockers),
+    via:via.length>1&&roadSegmentsSafe(via,blockers),
+    homeRoad:homeRoad?.points.length??0};
+  })};
+}
 
 test('v0.5.1: founder camp has no ghost tea stall, visitors, exchange or permanent strangers',()=>{
  const s=createPioneerWorld(42,1000);
@@ -49,6 +70,7 @@ test('v0.5.1: 5 years create real tea shed and bounded distinct visitors, not ph
   JSON.stringify({food:s.resources.food,wood:s.resources.wood,water:s.resources.water,
    population:s.founders.length,visits:c.visits.slice(-3),arrivals:c.totalArrivals,
    receptions:c.receptionHours,guest:c.activeVisitor,
+   commuteDiagnostics:diagnoseTeaCommutes(s),
    tea:tea?.parcel,homes:s.founders.slice(3).map(f=>({
     id:f.id,activity:f.activity,home:f.homeBuildingId,commute:f.commute?.length
    }))}));
