@@ -5,6 +5,7 @@ import {DAY_MINUTES} from '../src/simulation/calendar.ts';
 import {PIONEER_SLOT_KEYS,PIONEER_VERSION,createPioneerWorld,advancePioneerWorld,
  importPioneerWorld,savePioneerWorld,loadPioneerWorld,setPioneerPolicy} from '../src/simulation/pioneerWorld.ts';
 import {setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
+import {pioneerClearingReachable} from '../src/simulation/pioneerFrontier.ts';
 import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
 import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
@@ -118,7 +119,15 @@ test('v0.6 browser default seed and shelter/river vote retain reachable clearing
  assert.ok(s.frontier.clearings.some(c=>c.phase==='cleared')&&grove.stumps>0,
   'a 3-year river-policy hamlet cannot leave old clearing inaccessible: '+
   JSON.stringify({clearings:s.frontier.clearings,grove,water:s.resources.water,
-   food:s.resources.food,wood:s.resources.wood,
+   clearingCampReachable:s.frontier.clearings.map(p=>pioneerClearingReachable(s,p)),
+   luWorkRoute:s.frontier.clearings.map(p=>{
+    const lu=s.founders[1],home=s.buildings.find(b=>b.id===lu.homeBuildingId);
+    const from=home?pioneerEntrance(home.parcel):[s.camp.x,s.camp.z] as const;
+    const blockers=[...pioneerNaturalParcels(s),...s.buildings.map(b=>b.parcel)]
+     .filter(parcel=>parcel.id!==home?.id);
+    return {from,route:!!findPioneerWalk(from,[p.x,p.z],blockers),home:home?.id};
+   }),
+   currentIntent:s.intent?.kind,food:s.resources.food,wood:s.resources.wood,
    forest:s.sites.filter(x=>x.kind==='forest').map(x=>({stock:x.stock,totalGathered:x.totalGathered})),
    people:s.founders.length,houses:s.buildings.map(b=>({
     kind:b.kind,at:[b.parcel.x,b.parcel.z],size:[b.parcel.width,b.parcel.depth]}))}));
