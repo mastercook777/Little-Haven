@@ -68,7 +68,15 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  const camp={id:'temporary-camp',kind:'protected' as const,
   x:s.camp.x,z:s.camp.z,width:1.25,depth:1.25,rotation:0,
   clearance:.24,accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
- const occupied=[...taken,camp];
+ // Active clearing is a real paid worksite, not free empty land.
+ // No house or timber shed may engulf its unfinished eight-hour footprint.
+ const activeClearings=s.frontier.clearings.filter(c=>c.phase==='clearing');
+ const reservedWorksites=activeClearings.map(c=>({
+  id:c.id,kind:'protected' as const,x:c.x,z:c.z,
+  width:c.radius*2,depth:c.radius*2,rotation:0,clearance:.08,
+  accessX:c.x,accessZ:c.z,builtAt:c.startedAt
+ }));
+ const occupied=[...taken,camp,...reservedWorksites];
  const field=s.sites.find(site=>site.kind==='field');
  const riverDist=distanceToCreekSpline;
  const opened=s.frontier.clearings.find(c=>c.phase==='cleared'&&
@@ -150,6 +158,10 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   const blockers=[...taken,candidate.parcel];
   if(!critical.every(site=>findPioneerWalk(
    [s.camp.x,s.camp.z],[site.x,site.z],blockers)))continue;
+  // A new building must preserve the camp-to-clearing route as well as food,
+  // forest and water routes. A pending site cannot be fenced off forever.
+  if(!activeClearings.every(work=>findPioneerWalk(
+   [s.camp.x,s.camp.z],[work.x,work.z],blockers)))continue;
   if(metrics)metrics.resourceRoutesKept++;
   return {parcel:candidate.parcel,path};
  }
