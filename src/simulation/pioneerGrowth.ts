@@ -197,6 +197,13 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
   return 'wood-yard';
  const cottages=s.buildings.filter(b=>b.kind==='cottage').length;
  const housing=pioneerHousingCapacity(s);
+ // A voted river livelihood must get a legitimate bank parcel *before*
+ // extra houses occupy all usable riverbank. The earlier order kept adding
+ // homes until 12 residents, then found zero legal fish-hut plots.
+ // Still requires stage-2 commons, five residents and two real food fields.
+ const riverReady=s.commons.stage>=2&&s.founders.length>=5&&gardens>=2&&
+  !pioneerHasFacility(s,'fish-hut');
+ if(s.livelihood.direction==='river'&&riverReady)return 'fish-hut';
  if(cottages<5&&s.founders.length<12&&housing<=s.founders.length&&
   pioneerHasFacility(s,'garden')&&s.resources.food>=3)return 'cottage';
  // Real professions, not more identical cottages, keep a mature hamlet
