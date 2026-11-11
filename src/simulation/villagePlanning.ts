@@ -6,6 +6,8 @@ export interface VillageParcel{
  id:string;kind:'dwelling'|'workshop'|'store'|'protected';
  x:number;z:number;width:number;depth:number;rotation:number;
  clearance:number;accessX:number;accessZ:number;builtAt:number;
+ /** v0.6: frozen, paid whole-lot style; absent in the classic world. */
+ homesteadStyle?:'H1-thatch'|'H2-farmyard'|'H3-wing'|'W1-open-yard';
 }
 export type PlotValidation='ok'|'outside-island'|'river-bank'|'road-closure'|'existing-building'|'no-road-access';
 export interface PlotResult{ok:boolean;reason:PlotValidation;nearRoad:number;}

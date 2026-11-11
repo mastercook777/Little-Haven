@@ -91,17 +91,24 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
    patch.userData.siteId=site.id;
    // Stock and regrowth control density, with a few surviving saplings.
    const visible=Math.max(1,Math.round(1+site.stock/site.capacity*9));
+   const livingPositions:[number,number][]=[];
    for(let n=0;n<visible;n++){
     const [x,z]=activeTreePosition(site,n);
     if(!isSafePioneerWildPlant(w,x,z,.34)||nearBuilding(w,x,z))continue;
     conifer(patch,x,z,(.56+(n%3)*.13)*(site.stock/site.capacity<.35?.80:1));
-    standing++;
+    livingPositions.push([x,z]);standing++;
    }
+   // Only genuinely gathered timber creates stumps. Don't erase the whole
+   // grove's history when four fixed sockets are obstructed by later homes.
+   // Deterministically search new *legal nearby* positions, avoiding trunks.
    const stumpCount=Math.min(4,Math.floor(site.totalGathered/7));
+   const placed:[number,number][]=[];
    for(let n=0;n<stumpCount;n++){
-    const [x,z]=activeTreePosition(site,11+n);
-    if(isSafePioneerWildPlant(w,x,z,.20)&&!nearBuilding(w,x,z)){
-     stump(patch,x,z);stumps++;
+    for(let attempt=0;attempt<96;attempt++){
+     const [x,z]=activeTreePosition(site,11+n*113+attempt);
+     if(!isSafePioneerWildPlant(w,x,z,.20)||nearBuilding(w,x,z))continue;
+     if([...livingPositions,...placed].some(([tx,tz])=>Math.hypot(tx-x,tz-z)<.48))continue;
+     stump(patch,x,z);placed.push([x,z]);stumps++;break;
     }
    }
   }
@@ -131,13 +138,22 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
    ground.scale.set(plot.radius*fraction,plot.radius*fraction,1);
    g.add(ground);
    const pieces=plot.phase==='cleared'?3:6-Math.floor(plot.workDone/2);
+   // The general wild-plant mask rightly forbids growth on every cleared
+   // parcel. But this plot's *own paid cut stumps* must be allowed inside
+   // that very parcel; retain all house, road, creek and other plot checks.
+   const plotSafety=plot.phase==='cleared'?{
+    ...w,frontier:{...w.frontier,
+     clearings:w.frontier.clearings.filter(other=>other.id!==plot.id)}
+   }:w;
    for(let n=0;n<pieces;n++){
     const theta=hash(w.seed+n*87+plot.id.length*23)*Math.PI*2;
     const r=hash(n*19+plot.startedAt)*plot.radius*.65;
     const px=plot.x+Math.cos(theta)*r,pz=plot.z+Math.sin(theta)*r;
-    if(!isSafePioneerWildPlant(w,px,pz,.19))continue;
-    if(plot.phase==='cleared')stump(g,Math.cos(theta)*r,Math.sin(theta)*r);
-    else bush(g,Math.cos(theta)*r,Math.sin(theta)*r,.72);
+    if(!isSafePioneerWildPlant(plotSafety,px,pz,.19))continue;
+    if(plot.phase==='cleared'){
+     stump(g,Math.cos(theta)*r,Math.sin(theta)*r);
+     stumps++; // a paid clearing is an actual persistent cut trace
+    }else bush(g,Math.cos(theta)*r,Math.sin(theta)*r,.72);
    }
   }
   falling=null;

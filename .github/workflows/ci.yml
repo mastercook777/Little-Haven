@@ -34,3 +34,59 @@ jobs:
             artifacts/browser-smoke/
             artifacts/pioneer-browser-smoke/
           if-no-files-found: ignore
+
+  v060-visual-evidence:
+    # Independent visual evidence runs after fast compile/simulation checks;
+    # full browser smoke still gates merge but must not hide failing screenshots.
+    if: github.event_name == 'pull_request'
+    needs: v060-fast-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture same-seed same-camera baseline and candidate
+        run: |
+          ln -s "$GITHUB_WORKSPACE/node_modules" .baseline/node_modules
+          # Generate the actual new-village picture first, not last.
+          node tests/v060-visual-evidence.mjs --project=. --label=phase-a --port=5195
+          node tests/v060-visual-evidence.mjs --project=.baseline --label=baseline --port=5194
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create before/after reviewer contact sheets
+        run: |
+          python -m pip install pillow
+          python tests/v060-compare-evidence.py --root artifacts/evidence/v060
+      - name: Upload v0.6 visual audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v060-same-camera-before-after
+          path: artifacts/evidence/v060/
+          if-no-files-found: warn
+
+  v060-fast-checks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Build/typecheck first
+        run: npm run build
+      - name: Focused real economy and house tests
+        run: |
+          node --experimental-strip-types --test --test-name-pattern='v0.6|v0.5.1: 5 years|v0.5.2: actual host' tests/pioneer-v06-homestead.test.mts tests/pioneer-commerce.test.mts tests/pioneer-familiar-roads.test.mts

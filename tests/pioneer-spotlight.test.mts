@@ -78,6 +78,6 @@ test('v0.4.5: open world modes and saves stay unchanged after observing a chapte
  getPioneerSpotlight(s);
  pioneerVisibleWoodLogs(s);
  assert.deepEqual(s,before);
- assert.equal(s.schemaVersion,4);
+ assert.equal(s.schemaVersion,6);
  assert.equal(s.mode,'pioneer');
 });

@@ -3,6 +3,7 @@ import {distanceToCreekSpline,CREEK_WATER_HALF_WIDTH} from './creekCorridor.ts';
 import {parcelCorners,parcelLineDistance,parcelOverlaps,
  type VillageParcel} from './villagePlanning.ts';
 import type {PioneerRoad} from './pioneerPaths.ts';
+import {pioneerV6PlanFits} from './homesteadPlan.ts';
 
 export interface PioneerParcelResult{
  ok:boolean;reason:'ok'|'outside-island'|'river-bank'|'existing-building'|'pioneer-road-blocked';

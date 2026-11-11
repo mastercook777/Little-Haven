@@ -10,6 +10,7 @@ import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type 
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
+import {pioneerV6LotFor,PIONEER_V6_LOTS} from './homesteadPlan.ts';
 import {pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
@@ -50,18 +51,33 @@ function record(s:PioneerWorld,title:string,text:string,causeId:string|null=null
 export interface PioneerSurveyMetrics{
  candidateParcels:number;legalGeometry:number;openedLand:number;
  routeReached:number;resourceRoutesKept:number;
+ rejectedGeometry?:Record<string,number>;
 }
 export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>,
  metrics?:PioneerSurveyMetrics,allowUnopened=false):
  {parcel:VillageParcel;path:WalkPoint[]}|null{
  if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
-  routeReached:0,resourceRoutesKept:0});
+  routeReached:0,resourceRoutesKept:0,rejectedGeometry:{}});
  const data=spec[kind];
+ const preferred=kind==='cottage'?pioneerV6LotFor('cottage',s.buildings.filter(b=>b.kind==='cottage').length):
+  kind==='wood-yard'?pioneerV6LotFor('wood-yard'):null;
+ // H3's full wing and H2's yard are not compulsory forms. When real safe
+ // ground is scarce, a household can explicitly settle for the smaller H1.
+ const designs=kind==='cottage'&&preferred?.styleId!=='H1-thatch'?
+  [preferred!,PIONEER_V6_LOTS['H1-thatch']]:[preferred];
  const taken=[...natural(s),...s.buildings.map(b=>b.parcel)];
  const camp={id:'temporary-camp',kind:'protected' as const,
   x:s.camp.x,z:s.camp.z,width:1.25,depth:1.25,rotation:0,
   clearance:.24,accessX:s.camp.x,accessZ:s.camp.z,builtAt:0};
- const occupied=[...taken,camp];
+ // Active clearing is a real paid worksite, not free empty land.
+ // No house or timber shed may engulf its unfinished eight-hour footprint.
+ const activeClearings=s.frontier.clearings.filter(c=>c.phase==='clearing');
+ const reservedWorksites=activeClearings.map(c=>({
+  id:c.id,kind:'protected' as const,x:c.x,z:c.z,
+  width:c.radius*2,depth:c.radius*2,rotation:0,clearance:.08,
+  accessX:c.x,accessZ:c.z,builtAt:c.startedAt
+ }));
+ const occupied=[...taken,camp,...reservedWorksites];
  const field=s.sites.find(site=>site.kind==='field');
  const riverDist=distanceToCreekSpline;
  const opened=s.frontier.clearings.find(c=>c.phase==='cleared'&&
@@ -89,14 +105,19 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   const x=round(s.camp.x+i*.72+offsetX),z=round(s.camp.z+j*.72+offsetZ);
   if(distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>13.3)continue;
   if(kind==='fish-hut'&&(riverDist(x,z)<2.9||riverDist(x,z)>5.7))continue;
-  for(const rotation of [0,Math.PI/2]){
+  for(const v6 of designs)for(const rotation of [0,Math.PI/2]){
    const road=nearestRoad(x,z);
    const parcel:VillageParcel={id:projectId,
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
-    width:data.width,depth:data.depth,rotation,clearance:.30,
+    width:v6?.width??data.width,depth:v6?.depth??data.depth,rotation,clearance:.30,
+    ...(v6?{homesteadStyle:v6.styleId}:{}),
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
    if(metrics)metrics.candidateParcels++;
-   if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
+   const legality=validatePioneerParcel(parcel,occupied,s.roads);
+   if(!legality.ok){
+    if(metrics)metrics.rejectedGeometry![legality.reason]=(metrics.rejectedGeometry![legality.reason]??0)+1;
+    continue;
+   }
    if(metrics)metrics.legalGeometry++;
    if(!pioneerParcelOpened(s,parcel)&&!allowUnopened)continue;
    if(metrics&&pioneerParcelOpened(s,parcel))metrics.openedLand++;
@@ -125,7 +146,14 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // cleared-ring candidates instead of rejecting growth after the first
  // 210 high-scoring *central* parcels have no walkable access.
  const candidates=(kind==='cottage'&&s.founders.length>=9)||kind==='tea-stop'?420:210;
- for(const candidate of choices.slice(0,candidates)){
+ // Never let dozens of unwalkable H3 plots prevent checking smaller paid
+ // footprints. Both groups still pass *identical* river, SAT, road and
+ // critical-resource A* checks before a house is ever scheduled.
+ const ranked=preferred&&designs.length>1?
+  [...choices.filter(c=>c.parcel.homesteadStyle===preferred.styleId).slice(0,Math.min(120,candidates)),
+   ...choices.filter(c=>c.parcel.homesteadStyle!==preferred.styleId).slice(0,Math.min(200,candidates))]:
+  choices.slice(0,candidates);
+ for(const candidate of ranked){
   const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
   if(allowUnopened&&!pioneerParcelOpened(s,candidate.parcel)&&
@@ -135,6 +163,10 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   const blockers=[...taken,candidate.parcel];
   if(!critical.every(site=>findPioneerWalk(
    [s.camp.x,s.camp.z],[site.x,site.z],blockers)))continue;
+  // A new building must preserve the camp-to-clearing route as well as food,
+  // forest and water routes. A pending site cannot be fenced off forever.
+  if(!activeClearings.every(work=>findPioneerWalk(
+   [s.camp.x,s.camp.z],[work.x,work.z],blockers)))continue;
   if(metrics)metrics.resourceRoutesKept++;
   return {parcel:candidate.parcel,path};
  }
@@ -146,13 +178,22 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
  if(old&&s.resources.wood>=2)return 'repair';
  const gardens=s.buildings.filter(b=>b.kind==='garden').length;
  if(!gardens&&(s.policy==='food'||s.resources.food<16||s.buildings.length>=2))return 'garden';
+ // A binding river council vote reserves the early riverside construction
+ // window. Waiting for twelve settlers/five extra houses physically consumed
+ // all 254 legal-sized candidate sites on the player's default seed. A real
+ // garden must exist first; the fish-hut is still paid and path-tested.
+ if(s.livelihood.direction==='river'&&gardens>=1&&
+  !pioneerHasFacility(s,'fish-hut'))return 'fish-hut';
  // An actual household consumes food every day, including winter. The old
  // growth loop built one garden for nine people and silently starved.
  // The next free bedroom creates *future* demand: prebuild a field before
  // inviting the 5th/9th mouth. Otherwise migration requires extra fields,
  // while the construction planner waits forever for those migrants.
  const capacity=pioneerHousingCapacity(s);
- if(gardens>0&&gardens<Math.ceil(capacity/4))return 'garden';
+ // The village has a hard twelve-person population cap. Spare paid beds
+ // do not constitute actual food demand: never block river and tea work
+ // behind a fourth garden reserved only for an impossible 13th resident.
+ if(gardens>0&&gardens<Math.ceil(Math.min(12,capacity)/4))return 'garden';
  if(gardens>0&&gardens<Math.ceil(s.founders.length/4)&&
   s.resources.food<Math.max(18,s.founders.length*3.5))return 'garden';
  if(!pioneerHasFacility(s,'cottage')&&
@@ -202,7 +243,9 @@ export function schedulePioneerProject(s:PioneerWorld){
   return true;
  }
  const proposal=surveyPioneerPlot(s,kind);
- if(!proposal&&kind==='tea-stop'){
+ if(!proposal){
+  // All genuine village needs (including gardens) may require safe new
+  // land beyond the already occupied first ring.
   // This is a legal future build site, not free new land. First reserve a
   // real clearing job for residents, whose eight hours must fully complete
   // before any future construction or visitor can appear.
@@ -244,11 +287,13 @@ export function schedulePioneerProject(s:PioneerWorld){
  }
  const id='pioneer-need-'+s.nextEventId;
  const data=spec[kind];
+ const v6=proposal.parcel.homesteadStyle?PIONEER_V6_LOTS[proposal.parcel.homesteadStyle]:null;
+ const wood=v6?.wood??data.wood,hours=v6?.hours??data.hours;
  s.intent={id,kind,reason:data.why,createdAt:s.minutes,
   requestedBy:s.founders.filter(f=>f.homeBuildingId).map(f=>f.id),
   parcel:proposal.parcel,path:proposal.path,phase:'materials',
-  woodRequired:data.wood,woodCommitted:0,workDone:0,
-  workRequired:data.hours,pauseReason:'需要 '+data.wood+' 份木料和 '+data.hours+' 工时'};
+  woodRequired:wood,woodCommitted:0,workDone:0,
+  workRequired:hours,pauseReason:'需要 '+wood+' 份木料和 '+hours+' 工时'};
  record(s,'乡邻谋划'+data.label,data.why+' 梁伯勘定了从营地到新工地的可走线路。',id);
  return true;
 }

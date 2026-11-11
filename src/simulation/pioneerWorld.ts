@@ -7,7 +7,7 @@ import {activeSeedTrial,considerSeedTrial,dueSeedTrial,performSeedTrialShift,
 import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
-import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
  resolvePioneerNaturalAnchors,validatePioneerNaturalAnchors,
@@ -31,9 +31,9 @@ import {createPioneerFrontier,recordPioneerFelling,schedulePioneerClearing,
  performPioneerClearing,pioneerClearingReachable,validatePioneerFrontier,
  type PioneerFrontier} from './pioneerFrontier.ts';
 
-export const PIONEER_VERSION=4;
-export const PIONEER_SLOT_KEYS=['little-haven-pioneer-v04-slot-1','little-haven-pioneer-v04-slot-2'] as const;
-export const PIONEER_ACTIVE_SLOT='little-haven-pioneer-v04-active-slot';
+export const PIONEER_VERSION=6;
+export const PIONEER_SLOT_KEYS=['little-haven-pioneer-v06-slot-1','little-haven-pioneer-v06-slot-2'] as const;
+export const PIONEER_ACTIVE_SLOT='little-haven-pioneer-v06-active-slot';
 export const PIONEER_MINUTES_PER_SECOND=3;
 const HOUR=60;
 const SHELTER_WOOD=7;
@@ -75,7 +75,7 @@ export interface PioneerBuilding{
  operating?:boolean;productionMode?:'harvest'|'seed'|'timber'|'repair';
 }
 export interface PioneerWorld{
- schemaVersion:4;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
+ schemaVersion:6;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
  /** Persist once on legacy import; planting must not jump beneath buildings. */
  naturalAnchors?:PioneerNaturalAnchor[];
  camp:{x:number;z:number};founders:PioneerFounder[];
@@ -150,7 +150,7 @@ export function createPioneerWorld(seed=20261103,now=Date.now()):PioneerWorld{
     target:point(camp.x,camp.z+.9),homeBuildingId:null}
   ];
  const s:PioneerWorld={
-  schemaVersion:4,mode:'pioneer',seed,minutes:8*60+20,lastSavedAt:now,camp,
+  schemaVersion:6,mode:'pioneer',seed,minutes:8*60+20,lastSavedAt:now,camp,
   founders,naturalAnchors:PIONEER_BASE_NATURAL_ANCHORS.map(a=>({...a})),
   resources:{wood:1,food:5,water:5},sites:resourceSites(seed,camp),
   intent:null,buildings:[],journal:[],nextEventId:1,policy:'balanced',comfort:32,
@@ -251,11 +251,27 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  const obstacles=[...landscape(s),...s.buildings.map(b=>b.parcel)].filter(p=>
   p.id!==home?.parcel.id&&p.id!==task?.parcel?.id&&
   p.id!==shelter?.parcel.id&&p.id!==fieldBuilding?.parcel.id&&
-  p.id!==(activity==='haul-fish'?targetBuilding?.parcel.id:undefined));
+  // Permit the exact workplace entrance, while retaining every unrelated
+  // building, protected forest and river as a blocking obstacle.
+  p.id!==((activity==='haul-fish'||activity==='host-guest'||activity==='craft')?
+   targetBuilding?.parcel.id:undefined));
  let commute:WalkPoint[]|null;
  if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
  else commute=findPioneerWalk(from,goal,obstacles);
+ // A house-to-workplace trip may use two *registered and still unobstructed*
+ // radial roads through the commons, even where the coarse A* grid cannot
+ // join their narrow lanes. Never teleport: every .22m is revalidated against
+ // the current natural/building obstacles before awarding the work shift.
+ if(!commute&&home&&builtRoad){
+  const homeRoad=s.roads.find(r=>r.buildingId===home.id);
+  if(homeRoad?.points.length&&builtRoad.points.length){
+   const viaCommons:WalkPoint[]=[
+    ...homeRoad.points.slice().reverse(),...builtRoad.points.slice(1)
+   ];
+   if(roadSegmentsSafe(viaCommons,obstacles))commute=viaCommons;
+  }
+ }
  if(!commute&&fieldBuilding){
   // Keep the original navigable entrance when a side work slot is blocked.
   goal=pioneerEntrance(fieldBuilding.parcel);
@@ -472,9 +488,13 @@ function step(s:PioneerWorld){
  // reachable, exclusive afternoon hour at the tea stop, forgoing other work.
  const guestWorkers=new Set<number>();
  const visitor=s.commerce.activeVisitor;
- if(hour===13&&!crisis&&visitor?.outcome==='pending'&&
+ // A resident may exchange stocked timber for food *during* a food crisis.
+ // Skipping tea duty merely because grain is low traps the settlement: no
+ // host shift, no lawful exchange, and the visitor leaves without helping.
+ // Inventory limits inside transact() still prohibit free food or gifts.
+ if(hour===13&&visitor?.outcome==='pending'&&
   s.commerce.guestPolicy!=='quiet'&&s.minutes>=visitor.arrivalAt+3*60){
-  for(const resident of s.founders.slice(3)){
+  for(const resident of [...s.founders.slice(3),...s.founders.slice(0,3)]){
    allocate(s,resident,'host-guest');
    if(resident.activity!=='host-guest')continue;
    if(performPioneerGuestShift(s,resident.id))guestWorkers.add(resident.id);
@@ -501,7 +521,7 @@ function step(s:PioneerWorld){
   if(field.length&&gather(s,f,'field',amount, 'farm'))return true;
   return gather(s,f,'forage',amount,'forage');
  };
- if(seedWorkers.has(liang.id)||coFarmWorkers.has(liang.id)||livelihoodWorkers.has(liang.id)){
+ if(guestWorkers.has(liang.id)||seedWorkers.has(liang.id)||coFarmWorkers.has(liang.id)||livelihoodWorkers.has(liang.id)){
   // This resident spent the hour at the trial plot instead of collecting.
  }else if(crisis&&!needWood){
   if(!foodTask(liang,.86))allocate(s,liang,'rest');
@@ -511,7 +531,7 @@ function step(s:PioneerWorld){
  else allocate(s,liang,'tend-fire');
  const foodTarget=Math.max(s.founders.length*2.65,
   s.policy==='food'?18:s.policy==='shelter'?5.5:9.5);
- if(seedWorkers.has(he.id)||coFarmWorkers.has(he.id)||livelihoodWorkers.has(he.id)){
+ if(guestWorkers.has(he.id)||seedWorkers.has(he.id)||coFarmWorkers.has(he.id)||livelihoodWorkers.has(he.id)){
   // Trial work replaces the ordinary farm shift.
  }else if(s.resources.food<foodTarget||!building||crisis){
   if(!foodTask(he,weather==='rain'?.63:.94))allocate(s,he,'rest');
@@ -519,14 +539,19 @@ function step(s:PioneerWorld){
  else allocate(s,he,'shelter');
  const waterTarget=s.policy==='food'?8:s.policy==='shelter'?2.8:4.3;
  const clearing=s.frontier.clearings.find(c=>c.phase==='clearing');
+ // A clearing takes ONE resident hour, not a full day's village water
+ // reserve. Requiring 0.65 water * every resident before a single shift
+ // stranded the default 12-person river-policy valley at 0/8 clearing hours.
+ // Basic rations and urgent timber still take precedence; water consumption
+ // is paid separately by every founder in the authoritative hourly tick.
  const clearingShift=!!clearing&&hour===14&&!crisis&&
-  s.resources.food>=Math.max(3,s.founders.length*1.1)&&
-  s.resources.water>=Math.max(waterTarget,s.founders.length*.65)&&
+  s.resources.food>=Math.max(3,s.founders.length*.80)&&
+  s.resources.water>=Math.max(1.4,Math.min(2.8,s.founders.length*.20))&&
   !needWood;
  const commonsShift=hour===15&&s.commons.project?.phase==='building'&&
   !crisis&&s.resources.food>=s.founders.length*.72&&
   s.resources.water>=Math.max(waterTarget,s.founders.length*.55);
- if(seedWorkers.has(lu.id)||coFarmWorkers.has(lu.id)||livelihoodWorkers.has(lu.id)){
+ if(guestWorkers.has(lu.id)||seedWorkers.has(lu.id)||coFarmWorkers.has(lu.id)||livelihoodWorkers.has(lu.id)){
   // Seed trial work is exclusive of fetching water or clearing land.
  }else if(clearingShift&&clearing){
   // Clearing consumes Lu's assigned hour instead of crediting two jobs.
@@ -598,7 +623,7 @@ export function savePioneerWorld(s:PioneerWorld,storage:Pick<Storage,'setItem'>,
 export function importPioneerWorld(raw:string):PioneerWorld|null{
  try{
   const s=JSON.parse(raw) as PioneerWorld;
-  if(s?.schemaVersion!==4||s.mode!=='pioneer'||!Number.isFinite(s.seed)||
+  if(s?.schemaVersion!==6||s.mode!=='pioneer'||!Number.isFinite(s.seed)||
    !Number.isFinite(s.minutes)||s.minutes<0||!Number.isFinite(s.lastSavedAt)||
    !Number.isInteger(s.nextEventId)||s.nextEventId<1||
    !['balanced','shelter','food'].includes(s.policy)||

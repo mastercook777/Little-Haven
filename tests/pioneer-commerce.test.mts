@@ -7,11 +7,32 @@ import {setPioneerGuestPolicy,pioneerVisitorPosition,validPioneerCommerce,
 import {pioneerMilestoneBoard,setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
 import {surveyPioneerPlot} from '../src/simulation/pioneerGrowth.ts';
 import {inspectPioneerSelection} from '../src/ui/pioneerInspection.ts';
+import {pioneerEntrance,findPioneerWalk,roadSegmentsSafe,pioneerWalkable,type WalkPoint} from '../src/simulation/pioneerPaths.ts';
+import {pioneerNaturalParcels} from '../src/simulation/pioneerNaturalAnchors.ts';
 
 const round=(v:number)=>Math.round(v*1000)/1000;
 const days=(s:ReturnType<typeof createPioneerWorld>,d:number)=>
  advancePioneerWorld(s,(d*DAY_MINUTES-s.minutes)/3);
 const matured=()=>{const s=createPioneerWorld(42,1000);days(s,48*5);return s;};
+function diagnoseTeaCommutes(s:ReturnType<typeof createPioneerWorld>){
+ const tea=s.buildings.find(b=>b.kind==='tea-stop');
+ if(!tea)return {teaMissing:true};
+ const to=pioneerEntrance(tea.parcel);
+ const teaRoad=s.roads.find(r=>r.buildingId===tea.id);
+ return {tea:tea.parcel.id,teaRoad:teaRoad?.points.length??0,
+  routes:s.founders.map(f=>{
+   const home=s.buildings.find(b=>b.id===f.homeBuildingId);
+   const from:WalkPoint=home?pioneerEntrance(home.parcel):[s.camp.x,s.camp.z];
+   const blockers=[...pioneerNaturalParcels(s),...s.buildings.map(b=>b.parcel)]
+    .filter(p=>p.id!==home?.id&&p.id!==tea.id);
+   const homeRoad=s.roads.find(r=>r.buildingId===home?.id);
+   const via=homeRoad&&teaRoad?[...homeRoad.points.slice().reverse(),...teaRoad.points.slice(1)]:[];
+   return {id:f.id,home:home?.kind,from,to,fromOk:pioneerWalkable(from,blockers),
+    toOk:pioneerWalkable(to,blockers),direct:!!findPioneerWalk(from,to,blockers),
+    via:via.length>1&&roadSegmentsSafe(via,blockers),
+    homeRoad:homeRoad?.points.length??0};
+  })};
+}
 
 test('v0.5.1: founder camp has no ghost tea stall, visitors, exchange or permanent strangers',()=>{
  const s=createPioneerWorld(42,1000);
@@ -45,7 +66,14 @@ test('v0.5.1: 5 years create real tea shed and bounded distinct visitors, not ph
  assert.ok(tea!.materialsSpent.wood>=9&&tea!.workHours>=12);
  assert.ok(s.roads.some(r=>r.buildingId===tea!.id&&r.points.length>=2));
  assert.ok(c.totalArrivals>=2,'tea must actually receive named finite-time travelers');
- assert.ok(c.totalExchanges>=1,'a resource-backed exchange must be paid by both parties');
+ assert.ok(c.totalExchanges>=1,'a resource-backed exchange must be paid by both parties: '+
+  JSON.stringify({food:s.resources.food,wood:s.resources.wood,water:s.resources.water,
+   population:s.founders.length,visits:c.visits.slice(-3),arrivals:c.totalArrivals,
+   receptions:c.receptionHours,guest:c.activeVisitor,
+   commuteDiagnostics:diagnoseTeaCommutes(s),
+   tea:tea?.parcel,homes:s.founders.slice(3).map(f=>({
+    id:f.id,activity:f.activity,home:f.homeBuildingId,commute:f.commute?.length
+   }))}));
  assert.equal(s.founders.length,12,'passing guests cannot silently enlarge resident population');
  assert.ok(c.visits.length<=12&&c.visits.length>0);
  assert.equal(new Set(c.visits.map(v=>v.id)).size,c.visits.length);
@@ -124,7 +152,12 @@ test('v0.5.1: hospitality and quietness are actual inventory differences, not fl
  assert.equal(quiet.commerce.activeVisitor?.foodDelta,0);
  // Both villages still consume hourly water from the same real residents;
  // only the hosted transaction additionally subtracts precisely 0.5 water.
- assert.equal(round(quiet.resources.water-hosp.resources.water),.5);
+ // The guest host uses an exclusive worker hour; quiet-policy residents
+ // may spend that same hour gathering resources instead. The exchange
+ // ledger, not post-labor stock, is the exact hospitality-cost contract.
+ assert.equal(round(quiet.commerce.netWater-hosp.commerce.netWater),.5);
+ assert.ok(validPioneerCommerce(hosp)&&validPioneerCommerce(quiet),
+  'guest water cost must reconcile with truthful resource ledger');
  assert.equal(hosp.commerce.totalHosted,quiet.commerce.totalHosted+1);
  assert.ok(hosp.resources.food<quiet.resources.food);
  assert.ok(importPioneerWorld(JSON.stringify(hosp)));

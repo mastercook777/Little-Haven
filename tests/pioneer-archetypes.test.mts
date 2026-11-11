@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import {PIONEER_COTTAGE_ARCHETYPES,pioneerCottageArchetype,
  pioneerCottageOrdinal,cottageEnvelopeSafe} from '../src/graphics/pioneerArchetypes.ts';
 import {makePioneerMountainRoof} from '../src/graphics/pioneerHeritageArt.ts';
+import {pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import {createPioneerWorld,advancePioneerWorld,importPioneerWorld} from '../src/simulation/pioneerWorld.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {DAY_MINUTES} from '../src/simulation/calendar.ts';
@@ -52,12 +53,13 @@ test('v0.5.6B: actual mature valley gains different roofs, keeps all paid beds a
  const cottages=s.buildings.filter(b=>b.kind==='cottage');
  assert.ok(cottages.length>=3,
   'mature village must build at least three genuine cottages under existing resource rules');
- const ids=cottages.map(b=>pioneerCottageArchetype(
-  pioneerCottageOrdinal(s.buildings,b.id)).id);
- assert.ok(new Set(ids).size>=3);
- const profiles=cottages.map(b=>pioneerCottageArchetype(
-  pioneerCottageOrdinal(s.buildings,b.id)).roof);
- assert.ok(new Set(profiles.map(x=>x.ridgeY)).size>=3);
+ const ids=cottages.map(b=>b.parcel.homesteadStyle??
+  pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).id);
+ assert.ok(new Set(ids).size>=2,'v0.6 first slice must show real unequal residential silhouettes');
+ const profiles=cottages.map(b=>b.parcel.homesteadStyle?
+  pioneerV6Roof(b.parcel.homesteadStyle):
+  pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).roof);
+ assert.ok(new Set(profiles.map(x=>x.ridgeY)).size>=2);
  const runoff=pioneerRoofDrips(s);
  const expected=s.buildings.filter(b=>
   ['cottage','granary','wood-yard','fish-hut','tea-stop'].includes(b.kind));
@@ -65,12 +67,15 @@ test('v0.5.6B: actual mature valley gains different roofs, keeps all paid beds a
  // Each cottage has five attached roof drips following the family eave
  // height, rather than inheriting v0.5.5's hard-coded 1.97 y.
  for(const b of cottages){
-  const expectedY=pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).roof.eaveY+.18;
+  const expectedY=(b.parcel.homesteadStyle?
+   pioneerV6Roof(b.parcel.homesteadStyle):
+   pioneerCottageArchetype(pioneerCottageOrdinal(s.buildings,b.id)).roof).eaveY+.18;
   assert.ok(runoff.some(([,y])=>Math.abs(y-expectedY)<.002));
  }
  const restored=importPioneerWorld(JSON.stringify(s));
  assert.ok(restored);
  assert.deepEqual(restored!.buildings,s.buildings);
  assert.deepEqual(restored!.buildings.filter(b=>b.kind==='cottage').map(b=>
-  pioneerCottageArchetype(pioneerCottageOrdinal(restored!.buildings,b.id)).id),ids);
+  b.parcel.homesteadStyle??
+   pioneerCottageArchetype(pioneerCottageOrdinal(restored!.buildings,b.id)).id),ids);
 });

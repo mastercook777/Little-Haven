@@ -66,7 +66,11 @@ export function recordPioneerFelling(s:PioneerWorld,site:PioneerResourceSite,
   site.id);
 }
 function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
- const blockers=[...landscape(s),...s.buildings.map(b=>b.parcel)];
+ // A committed *under-construction* parcel is already real reserved land.
+ // Ignoring s.intent.parcel used to survey a clearing under the future W1
+ // timber shed; the shed then finished on top of an unworked 0/8 plot.
+ const blockers=[...landscape(s),...s.buildings.map(b=>b.parcel),
+  ...(s.intent?.parcel?[s.intent.parcel]:[])];
  const origin:WalkPoint=[s.camp.x,s.camp.z];
  const candidates:{x:number;z:number;score:number}[]=[];
  // Search the whole safe buffer ring rather than nine speculative
@@ -152,7 +156,7 @@ export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
   startedAt:s.minutes,clearedAt:null};
  f.clearings.push(next);
  f.lastSurveyAt=s.minutes+3*DAY_MINUTES;
- record(s,'为茶棚新开林缘地','乡邻勘出合规又可达的山路空隙。须实际清灌移石八小时，方可在此考虑茶棚。',next.id);
+ record(s,'新宅地清障','乡邻勘出合规又可达的山路空隙。须实际清灌移石八小时，方可考虑扩建住屋或茶寮。',next.id);
  return true;
 }
 export function pioneerClearingReachable(s:PioneerWorld,p:PioneerClearing):boolean{

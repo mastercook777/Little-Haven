@@ -431,7 +431,7 @@ $('pioneerExport').addEventListener('click',()=>{
  persist();const data=JSON.stringify(world,null,2);
  const url=URL.createObjectURL(new Blob([data],{type:'application/json'}));
  const a=document.createElement('a');a.href=url;
- a.download='little-haven-pioneer-v04-slot-'+slot+'.json';a.click();
+ a.download='little-haven-pioneer-v06-slot-'+slot+'.json';a.click();
  window.setTimeout(()=>URL.revokeObjectURL(url),1000);
  toast('开荒存档已导出。');
 });
@@ -441,7 +441,7 @@ $<HTMLInputElement>('pioneerFile').addEventListener('change',async()=>{
  $<HTMLInputElement>('pioneerFile').value='';
  if(!file)return;if(file.size>2_000_000){toast('存档过大。');return;}
  const parsed=importPioneerWorld(await file.text());
- if(!parsed){toast('无效的开荒 v4 存档，旧谷存档不能导入新谷。');return;}
+ if(!parsed){toast('仅支持 v0.6 新山谷存档；旧版 v4 数据仍安全保留，请重新开荒。');return;}
  if(!confirm('导入文件将覆盖当前开荒槽，是否继续？'))return;
  replaceWorld(parsed);persist();toast('开荒记录已恢复。');
 });
@@ -527,8 +527,15 @@ const debugging={
   renderUI();return changed;},
  reset:(seed=world.seed)=>{replaceWorld(createPioneerWorld(seed));persist();return true;},
  getVisuals:()=>valley.signatures(),
+ getCameraSnapshot:()=>({
+  eye:camera.position.toArray(),target:orbit.target.toArray(),
+  zoom:camera.zoom,left:camera.left,right:camera.right,
+  top:camera.top,bottom:camera.bottom
+ }),
  getRendererInfo:()=>({calls:renderer.info.render.calls,
-  triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries})
+  triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,
+  textures:renderer.info.memory.textures,dpr:renderer.getPixelRatio(),
+  shadows:renderer.shadowMap.enabled,canvasPixels:[canvas.width,canvas.height]})
 };
 (window as typeof window&{__PIONEER_DEBUG__?:typeof debugging}).__PIONEER_DEBUG__=debugging;
 requestAnimationFrame(tick);
