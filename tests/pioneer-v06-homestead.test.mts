@@ -71,6 +71,37 @@ test('v0.6 paid full-lot residential shapes and open workspace have actual gate 
  }
 });
 
+test('v0.6 Phase B paid silhouette geometry distinguishes all three residential types',()=>{
+ const seen=new Set<string>();
+ const featureByStyle={
+  'H1-thatch':'low-thatch-roof-rhythm',
+  'H2-farmyard':'farmyard-attached-veranda',
+  'H3-wing':'paid-side-work-wing'
+ } as const;
+ for(const style of Object.keys(featureByStyle) as Array<keyof typeof featureByStyle>){
+  const lot=PIONEER_V6_LOTS[style];
+  const parcel={id:'paid-'+style,kind:'dwelling' as const,x:0,z:0,
+   width:lot.width,depth:lot.depth,rotation:0,clearance:.3,
+   accessX:0,accessZ:lot.depth/2+.8,builtAt:100,homesteadStyle:style};
+  const foundation=makeV6Homestead(new THREE.Group(),parcel,'foundation')!;
+  assert.equal(foundation.getObjectByName(featureByStyle[style]),undefined,
+   'silhouette additions cannot appear before a paid house is completed');
+  const full=makeV6Homestead(new THREE.Group(),parcel,'complete',94,true,true)!;
+  assert.equal(full.userData.buildingId,parcel.id);
+  const addition=full.getObjectByName(featureByStyle[style]);
+  assert.ok(addition,style+' must have a visibly distinct physical silhouette');
+  if(style!=='H1-thatch'){
+   const box=new THREE.Box3().setFromObject(addition!);
+   assert.ok(box.max.x<lot.width/2+.04&&box.min.x>-lot.width/2-.04,
+    style+' side-volume cannot protrude outside the surveyed paid lot');
+  }
+  assert.ok(full.getObjectByName('paid-residential-loft'));
+  const realProfile=pioneerV6Roof(style);
+  seen.add(realProfile.ridgeY.toFixed(2)+'/'+realProfile.eaveY.toFixed(2));
+ }
+ assert.equal(seen.size,3,'three homesteads need three different true roof heights');
+});
+
 test('v0.6 rotated full lot faces its saved A* entrance, not the opposite wall',()=>{
  const lot=PIONEER_V6_LOTS['H2-farmyard'];
  const p={id:'rotated-homestead',kind:'dwelling' as const,x:0,z:0,

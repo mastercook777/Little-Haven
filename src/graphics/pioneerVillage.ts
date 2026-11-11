@@ -192,7 +192,29 @@ function campVisual(root:THREE.Group,s:PioneerWorld){
  // 3: social plaza with an off-center, small ceremonial ember, notice board,
  // tables and paving, not the three-bed overnight camp.
  const plaza=stageRoot(3,'commons-stage-3-village-square');
- const pavement=pad(plaza,1.47);pavement.name='village-plaza-ground';
+ // The third commons stage has already cost real timber and work hours.
+ // A broad paved public room changes the actual village silhouette instead
+ // of leaving a tiny first-night campfire surrounded by identical huts.
+ const pavement=pad(plaza,1.93);pavement.name='village-plaza-ground';
+ const civicEdge=new THREE.Mesh(new THREE.RingGeometry(1.74,2.17,48),
+  material('#a79b7d'));
+ civicEdge.rotation.x=-Math.PI/2;civicEdge.position.y=.021;
+ civicEdge.receiveShadow=true;civicEdge.name='real-paid-commons-edge';
+ plaza.add(civicEdge);
+ // One actual instanced draw call rather than three dozen separate stones.
+ const pavers=new THREE.InstancedMesh(boxGeo,stone,36);
+ const yAxis=new THREE.Vector3(0,1,0),m=new THREE.Matrix4();
+ const q=new THREE.Quaternion(),scale=new THREE.Vector3(.33,.045,.27);
+ for(let i=0;i<36;i++){
+  const theta=i*Math.PI*2/36,dist=1.72+(i%3)*.13;
+  q.setFromAxisAngle(yAxis,theta+.19);
+  m.compose(new THREE.Vector3(Math.cos(theta)*dist,.040,
+   Math.sin(theta)*dist),q,scale);
+  pavers.setMatrixAt(i,m);
+ }
+ pavers.instanceMatrix.needsUpdate=true;
+ pavers.receiveShadow=true;pavers.name='real-commons-paved-steps';
+ plaza.add(pavers);
  for(let i=0;i<18;i++){
   const a=i*2.399,r=.53+(i%5)*.17;
   const stoneP=orb(plaza,Math.cos(a)*r,.04,Math.sin(a)*r,.19,
@@ -206,6 +228,18 @@ function campVisual(root:THREE.Group,s:PioneerWorld){
  box(board,0,1.41,.08,.94,.60,.04,material('#bfb492'));
  for(let i=0;i<3;i++)box(board,-.27,1.60-i*.18,.12,.43,.045,.02,wood);
  box(board,0,1.87,0,1.26,.13,.17,wood);
+ // Covered village notice pavilion, only after the paid third commons stage.
+ // It does not create hidden housing capacity or replace a civic work shift.
+ const noticeRoof=group(plaza,.92,0,-.70);
+ noticeRoof.name='paid-community-notice-pavilion';
+ for(const x of [-.57,.57])for(const z of [-.42,.42])
+  pole(noticeRoof,x,1.01,z,.055,1.83,lightWood);
+ box(noticeRoof,0,1.96,0,1.40,.13,1.15,wood);
+ for(const sign of [-1,1]){
+  const side=box(noticeRoof,sign*.38,2.13,0,.79,.13,1.36,
+   material('#837c69'));
+  side.rotation.z=sign===1?-.18:.18;
+ }
  for(const x of [-.62,.62])box(plaza,x,.52,.72,.66,.17,.33,lightWood);
  box(plaza,0,.66,.69,.68,.10,.46,material('#a68d63'));
  for(const [x,z] of [[-1.2,.10],[1.2,.35]])

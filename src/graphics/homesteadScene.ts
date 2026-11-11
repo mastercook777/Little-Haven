@@ -113,19 +113,63 @@ export function makeV6Homestead(
   }
   part(g,0,.19,yard.z-yard.depth/2,yard.width,.06,.11,stone);
   // A side service wing is paid as H3 and already reserved in the large lot.
-  if(style==='H3-wing'){
-   const wing=group(g,b.width/2+.38,0,b.z+.10,'paid-side-work-wing');
-   part(wing,0,.70,0,.72,1.26,1.45,clay);
-   const lean=part(wing,.03,1.46,0,.92,.12,1.72,thatch);
-   lean.rotation.z=-.16;
-   part(wing,0,.28,.71,.44,.31,.15,darkTimber);
+  // Each home owns its secondary silhouette *inside the surveyed and paid
+  // parcel*. These are inhabited extensions or functional verandas, not
+  // free-standing decorative homes with phantom inhabitants.
+  if(style==='H1-thatch'){
+   const ribs=group(body,0,0,0,'low-thatch-roof-rhythm');
+   // Long light reed seams reinforce the low straw roof at this camera scale.
+   for(const side of [-1,1])for(const z of [-.75,.03,.78]){
+    const tie=part(ribs,side*.81,2.065,z,.092,.085,.16,reed,'real-thatch-ridge-tie');
+    tie.rotation.z=side===1?-.27:.27;
+   }
+   // A modest wood drying pole is located in the actual front courtyard.
+   for(const x of [-.77,.77])upright(g,x,.69,gate.z-.69,.049,.98);
+   part(g,0,1.20,gate.z-.69,1.64,.09,.10,wood,'thatched-house-drying-rail');
+  }else if(style==='H2-farmyard'){
+   // A broad low side veranda breaks the H2 house into a main tiled volume
+   // and a sheltered working edge, instead of another identical blue box.
+   const veranda=group(g,b.width/2+.12,0,b.z+.26,'farmyard-attached-veranda');
+   part(veranda,.01,.13,0,1.02,.20,1.67,stone,'farmyard-veranda-stone-step');
+   for(const z of [-.67,.67])upright(veranda,.43,1.00,z,.075,1.63);
+   const eave=part(veranda,.10,1.91,0,1.00,.16,1.86,darkTimber,'farmyard-veranda-sloping-eave');
+   eave.rotation.z=-.18;
+   for(const z of [-.56,.54])
+    part(veranda,.12,1.81,z,1.00,.045,.10,wood);
+   part(veranda,.30,.69,-.45,.56,.73,.13,clay,'real-farmyard-kitchen-bench');
+   part(g,0,.52,gate.z,1.35,.15,.17,wood,'farmyard-timber-gate-lintel');
+  }else if(style==='H3-wing'){
+   // The wide side wing has a distinct lower roofline and genuine wall
+   // volume. It is included in H3's 5.25-unit reserved plot and paid labor.
+   const wing=group(g,b.width/2+.34,0,b.z+.10,'paid-side-work-wing');
+   part(wing,0,1.03,0,1.07,1.81,1.70,clay,'wing-inhabited-volume');
+   for(const z of [-.65,.65])
+    part(wing,-.03,1.09,z,1.12,.10,.15,darkTimber);
+   part(wing,.17,1.02,.855,.40,.48,.05,paper,'wing-front-window');
+   const lean=part(wing,.06,2.04,0,1.14,.17,2.00,darkTimber,'wing-separate-roof-plane');
+   lean.rotation.z=-.21;
+   for(const z of [-.70,0,.70]){
+    const tile=part(wing,.03,2.16,z,1.08,.035,.14,slab);
+    tile.rotation.z=-.21;
+   }
+   part(g,0,1.06,gate.z,1.55,.16,.22,darkTimber,'wing-courtyard-gate-header');
+   for(const x of [-.63,.63])upright(g,x,.64,gate.z,.067,.98);
+   const cap=part(g,0,1.24,gate.z,1.76,.17,.55,slab,'wing-tiled-entry-canopy');
+   cap.rotation.z=-.035;
   }
   if(loftReady){
-   const loft=group(body,.72,roof.eaveY+.12,.19,'paid-residential-loft');
-   part(loft,0,.09,0,.65,.44,.31,clay);
-   part(loft,0,.11,.18,.39,.25,.04,paper);
-   const mini=part(loft,0,.37,0,.81,.11,.56,darkTimber);
-   mini.rotation.z=-.12;
+   const tall=style==='H3-wing';
+   const loft=group(body,tall?-.53:.72,roof.eaveY+.11,tall?-.19:.19,'paid-residential-loft');
+   const w=tall ? .90 : style==='H2-farmyard' ? .78 : .57;
+   const lift=tall ? .64 : .43;
+   part(loft,0,lift*.45,0,w,lift,.36,style==='H1-thatch'?clay:mortar,
+    'visible-paid-dormer-body');
+   part(loft,0,lift*.45,.20,w*.61,.29,.05,paper,'paid-dormer-window');
+   for(const side of [-1,1]){
+    const lid=part(loft,side*w*.26,lift+.10,0,w*.57,.09,.65,
+     style==='H1-thatch'?thatch:darkTimber,'paid-dormer-real-roof');
+    lid.rotation.z=side===1?-.27:.27;
+   }
   }
  }else{
   // Raw logs, work apron and two open racks; the advanced saw appears ONLY
