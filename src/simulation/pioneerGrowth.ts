@@ -178,6 +178,12 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
  if(old&&s.resources.wood>=2)return 'repair';
  const gardens=s.buildings.filter(b=>b.kind==='garden').length;
  if(!gardens&&(s.policy==='food'||s.resources.food<16||s.buildings.length>=2))return 'garden';
+ // A binding river council vote reserves the early riverside construction
+ // window. Waiting for twelve settlers/five extra houses physically consumed
+ // all 254 legal-sized candidate sites on the player's default seed. A real
+ // garden must exist first; the fish-hut is still paid and path-tested.
+ if(s.livelihood.direction==='river'&&gardens>=1&&
+  !pioneerHasFacility(s,'fish-hut'))return 'fish-hut';
  // An actual household consumes food every day, including winter. The old
  // growth loop built one garden for nine people and silently starved.
  // The next free bedroom creates *future* demand: prebuild a field before
@@ -197,13 +203,6 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
   return 'wood-yard';
  const cottages=s.buildings.filter(b=>b.kind==='cottage').length;
  const housing=pioneerHousingCapacity(s);
- // A voted river livelihood must get a legitimate bank parcel *before*
- // extra houses occupy all usable riverbank. The earlier order kept adding
- // homes until 12 residents, then found zero legal fish-hut plots.
- // Still requires stage-2 commons, five residents and two real food fields.
- const riverReady=s.commons.stage>=2&&s.founders.length>=5&&gardens>=2&&
-  !pioneerHasFacility(s,'fish-hut');
- if(s.livelihood.direction==='river'&&riverReady)return 'fish-hut';
  if(cottages<5&&s.founders.length<12&&housing<=s.founders.length&&
   pioneerHasFacility(s,'garden')&&s.resources.food>=3)return 'cottage';
  // Real professions, not more identical cottages, keep a mature hamlet
