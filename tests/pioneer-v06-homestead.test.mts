@@ -14,6 +14,7 @@ import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {parcelOverlaps} from '../src/simulation/villagePlanning.ts';
 import {pioneerNaturalParcels} from '../src/simulation/pioneerNaturalAnchors.ts';
+import {surveyPioneerPlot,type PioneerSurveyMetrics} from '../src/simulation/pioneerGrowth.ts';
 
 test('v0.6 starts with three founders and no phantom houses or paid courtyards',()=>{
  const s=createPioneerWorld(42,1000);
@@ -115,6 +116,19 @@ test('v0.6 browser default seed and shelter/river vote retain reachable clearing
  assert.ok(s.buildings.length>0);
  assert.equal(setPioneerDirection(s,'river'),true);
  advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ const fishMetrics={} as PioneerSurveyMetrics;
+ const futureMetrics={} as PioneerSurveyMetrics;
+ const reachableFish=surveyPioneerPlot(s,'fish-hut',fishMetrics);
+ const futureFish=surveyPioneerPlot(s,'fish-hut',futureMetrics,true);
+ assert.ok(s.buildings.some(b=>b.kind==='fish-hut')&&
+  s.sites.some(site=>site.kind==='fish'&&site.totalGathered>0),
+  'real browser seed after shelter/river vote must establish river livelihood: '+
+  JSON.stringify({intent:s.intent?.kind,people:s.founders.length,
+   houses:s.buildings.map(b=>({kind:b.kind,x:b.parcel.x,z:b.parcel.z})),
+   resource:s.resources,fishMetrics,futureMetrics,
+   currentSite:reachableFish?.parcel,futureSite:futureFish?.parcel,
+   nextSurveyAt:s.nextSurveyAt,clearings:s.frontier.clearings,
+   journal:s.journal.slice(-15).map(x=>x.title)}));
  const grove=buildPioneerForestArt(new THREE.Group(),s).signatures();
  assert.ok(s.frontier.clearings.some(c=>c.phase==='cleared')&&grove.stumps>0,
   'a 3-year river-policy hamlet cannot leave old clearing inaccessible: '+
