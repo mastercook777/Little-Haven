@@ -25,7 +25,11 @@ const base='http://127.0.0.1:'+port+'/';
 const DAY=1440,YEAR=48*DAY;
 await mkdir(output,{recursive:true});
 let serverOutput='';
-const server=spawn('npm',['run','dev','--','--host','127.0.0.1','--port',String(port),'--strictPort'],{
+// Launch Vite itself, not `npm run dev`. npm leaves a grandchild
+// holding stdout/stderr open after SIGTERM; the first baseline capture then
+// hangs for six hours and GitHub cancels before v0.6 ever gets captured.
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js',
+ '--host','127.0.0.1','--port',String(port),'--strictPort'],{
  cwd:project,stdio:['ignore','pipe','pipe']
 });
 server.stdout.on('data',b=>serverOutput+=b.toString());
@@ -116,6 +120,11 @@ try{
     sha256:createHash('sha256').update(png).digest('hex'),
     graySha256:createHash('sha256').update(gray).digest('hex')
    });
+   // Keep readable partial evidence if a late WebGL frame or later seed fails.
+   await writeFile(join(output,'manifest.json'),JSON.stringify({
+    label,project,baselineCamera:'Reset camera, same default pose',
+    hardware:'CI software WebGL / SwiftShader',fpsNote,failures,captures
+   },null,2));
    process.stdout.write(name+': '+snapshot.buildings.length+' built / '+
     snapshot.founders+' people / '+snapshot.renderer.calls+' calls\n');
   }
@@ -131,4 +140,10 @@ try{
 }finally{
  await browser?.close();
  server.kill('SIGTERM');
+ server.stdout.destroy();
+ server.stderr.destroy();
+ await new Promise(resolve=>{
+  if(server.exitCode!==null||server.signalCode!==null){resolve();return;}
+  server.once('exit',resolve);
+ });
 }
