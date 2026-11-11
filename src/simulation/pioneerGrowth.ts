@@ -51,12 +51,13 @@ function record(s:PioneerWorld,title:string,text:string,causeId:string|null=null
 export interface PioneerSurveyMetrics{
  candidateParcels:number;legalGeometry:number;openedLand:number;
  routeReached:number;resourceRoutesKept:number;
+ rejectedGeometry?:Record<string,number>;
 }
 export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>,
  metrics?:PioneerSurveyMetrics,allowUnopened=false):
  {parcel:VillageParcel;path:WalkPoint[]}|null{
  if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
-  routeReached:0,resourceRoutesKept:0});
+  routeReached:0,resourceRoutesKept:0,rejectedGeometry:{}});
  const data=spec[kind];
  const preferred=kind==='cottage'?pioneerV6LotFor('cottage',s.buildings.filter(b=>b.kind==='cottage').length):
   kind==='wood-yard'?pioneerV6LotFor('wood-yard'):null;
@@ -112,7 +113,11 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
     ...(v6?{homesteadStyle:v6.styleId}:{}),
     accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
    if(metrics)metrics.candidateParcels++;
-   if(!validatePioneerParcel(parcel,occupied,s.roads).ok)continue;
+   const legality=validatePioneerParcel(parcel,occupied,s.roads);
+   if(!legality.ok){
+    if(metrics)metrics.rejectedGeometry![legality.reason]=(metrics.rejectedGeometry![legality.reason]??0)+1;
+    continue;
+   }
    if(metrics)metrics.legalGeometry++;
    if(!pioneerParcelOpened(s,parcel)&&!allowUnopened)continue;
    if(metrics&&pioneerParcelOpened(s,parcel))metrics.openedLand++;
