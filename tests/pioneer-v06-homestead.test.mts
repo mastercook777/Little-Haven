@@ -169,7 +169,8 @@ test('v0.6 paid compound models are actually used by the real village renderer',
   assert.equal(full.userData.buildingId,parcel.id);
   assert.ok(full.userData.staticBatchStats?.merged>=3&&
    full.userData.staticBatchStats.after<full.userData.staticBatchStats.before,
-   style+' live authored house should batch repetitive wood geometry');
+   style+' live authored house should batch repetitive wood geometry: '+
+   JSON.stringify(full.userData.staticBatchStats));
   assert.ok(full.getObjectByName('paid-working-ground'));
   assert.ok(full.getObjectByName('real-main-building-volume'),
    style+' was replaced by the old generic roof despite saved homesteadStyle');
