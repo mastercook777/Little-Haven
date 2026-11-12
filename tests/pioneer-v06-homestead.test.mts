@@ -11,10 +11,50 @@ import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe,findPioneerWalk} from '
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
+import {pioneerGroundUsePlan,makePioneerGroundUseArt} from '../src/graphics/pioneerGroundUseArt.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {parcelOverlaps} from '../src/simulation/villagePlanning.ts';
 import {pioneerNaturalParcels} from '../src/simulation/pioneerNaturalAnchors.ts';
 import {surveyPioneerPlot,type PioneerSurveyMetrics} from '../src/simulation/pioneerGrowth.ts';
+
+test('v0.6 Phase B ground is paid and registered, not a canned empty valley',()=>{
+ const s=createPioneerWorld(42,1000);
+ const empty=pioneerGroundUsePlan(s),emptyMesh=makePioneerGroundUseArt(s);
+ assert.equal(empty.plots.length,0);
+ assert.equal(empty.paths.length,0);
+ assert.equal(empty.sharedNodes.length,0);
+ assert.equal(emptyMesh.root.children.length,0,
+  'no permanent paths, private courtyards or paving before first construction');
+ advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ const plan=pioneerGroundUsePlan(s),scene=makePioneerGroundUseArt(s);
+ assert.ok(s.buildings.length>=5&&s.roads.length>=5);
+ assert.equal(plan.plots.length,s.buildings.length);
+ assert.equal(scene.signatures().paidGroundPlots,s.buildings.length);
+ assert.equal(scene.signatures().paintedRealRoads,s.roads.length);
+ assert.ok(scene.signatures().roadLength>20);
+ assert.ok(scene.root.getObjectByName('registered-road-shoulder-not-an-extra-path'));
+ assert.ok(scene.root.getObjectByName('paid-fields-soil-courts'));
+ assert.ok(scene.root.getObjectByName('paid-homes-soil-courts'));
+ const ids=new Set(s.buildings.map(b=>b.id));
+ assert.ok(plan.paths.every(road=>s.roads.some(r=>r.id===road.id&&ids.has(r.buildingId))),
+  'visible tracks must be actual registered roads to completed buildings');
+ // The soil meshes are formed only from the paid parcel interior, not from
+ // an arbitrary painted district that crosses other roofs, forest or river.
+ for(const child of scene.root.children){
+  if(!(child instanceof THREE.Mesh)||!child.name.startsWith('paid-'))continue;
+  const vertices=child.geometry.getAttribute('position');
+  for(let i=0;i<vertices.count;i++){
+   const x=vertices.getX(i),z=vertices.getZ(i);
+   const inside=s.buildings.some(b=>{
+    const p=b.parcel,dx=x-p.x,dz=z-p.z,
+     cs=Math.cos(p.rotation),sn=Math.sin(p.rotation);
+    const lx=dx*cs+dz*sn,lz=-dx*sn+dz*cs;
+    return Math.abs(lx)<=p.width/2+.001&&Math.abs(lz)<=p.depth/2+.001;
+   });
+   assert.ok(inside,'paid soil escaped legal built land at '+x+','+z);
+  }
+ }
+});
 
 test('v0.6 starts with three founders and no phantom houses or paid courtyards',()=>{
  const s=createPioneerWorld(42,1000);
