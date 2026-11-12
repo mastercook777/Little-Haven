@@ -382,6 +382,14 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  seedMark?:'working'|'resolved'|'abandoned',craftReady=false,loftReady=false,
  pioneerVariant=0){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
+ // This factory must be the REAL runtime renderer, not merely a unit-test
+ // asset. Phase A imported it but never called it: saved H1/H2/H3/W1 lots
+ // were silently drawn with the old v0.5 small-box models.
+ const authored=makeV6Homestead(parent,p,phase,condition,craftReady,loftReady);
+ if(authored){
+  authored.name='pioneer-'+kind+'-'+phase;
+  return authored;
+ }
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
  if(kind==='garden'){
