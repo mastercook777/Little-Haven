@@ -17,6 +17,7 @@ import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
  makePioneerSeasonalGrove,pioneerHouseVariant} from './pioneerHeritageArt.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
 import {makeV6Homestead} from './homesteadScene.ts';
+import {makePioneerGroundUseArt} from './pioneerGroundUseArt.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import type {PioneerSelection} from '../ui/pioneerInspection.ts';
 import {pioneerCropAppearance,pioneerVisibleWoodLogs} from '../simulation/pioneerVisibility.ts';
@@ -696,6 +697,7 @@ export interface PioneerGraphics{
  setSelected(selection:PioneerSelection|null):void;
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
+  paidGroundPlots:number;paintedRealRoads:number;sharedRoadPavers:number;roadLength:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
    seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
    fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number;
@@ -736,6 +738,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const weatherArt=createWeatherArt(root,mobile,reducedMotion,pioneerWeatherPlacement(world));
  const constructionLayer=group(root);constructionLayer.name='actual-settlement-registry';
  let roadLayer=drawFootpaths(root,world.roads);
+ let groundArt=makePioneerGroundUseArt(world);
+ root.add(groundArt.root);
  let lastRoads=roadGeometrySignature(world.roads);
  const people=world.founders.map(f=>makeFigure(root,f));
  // A visitor is not a permanent resident and cannot occupy a house.
@@ -847,8 +851,15 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    lastBuildSig=signature;lastProgressIndex=progressIndex;
   }
   const roadSignature=roadGeometrySignature(s.roads);
-  if(roadSignature!==lastRoads){
+  const roadsChanged=roadSignature!==lastRoads;
+  if(roadsChanged){
    root.remove(roadLayer);roadLayer=drawFootpaths(root,s.roads);lastRoads=roadSignature;
+  }
+  if(rebuilt||roadsChanged){
+   root.remove(groundArt.root);
+   groundArt.root.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});
+   groundArt=makePioneerGroundUseArt(s);
+   root.add(groundArt.root);
   }
   while(people.length<s.founders.length)people.push(makeFigure(root,s.founders[people.length]));
   const season=getPioneerCalendar(s).season;
@@ -992,6 +1003,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   buildings:latestWorld.buildings.length,renderedStructures,
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
   people:people.length,roads:latestWorld.roads.length,
+  ...groundArt.signatures(),
   commonsStage:latestWorld.commons.stage,
   commonsBeds:latestWorld.commons.stage===0?3:0,
   cookingActors:latestWorld.founders.filter(f=>f.activity==='cook').length,
