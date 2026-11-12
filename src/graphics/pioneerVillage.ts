@@ -17,6 +17,8 @@ import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
  makePioneerSeasonalGrove,pioneerHouseVariant} from './pioneerHeritageArt.ts';
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
 import {makeV6Homestead} from './homesteadScene.ts';
+import {makePioneerGroundUseArt} from './pioneerGroundUseArt.ts';
+import {applyPioneerTerrainUse} from './pioneerTerrainUse.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import type {PioneerSelection} from '../ui/pioneerInspection.ts';
 import {pioneerCropAppearance,pioneerVisibleWoodLogs} from '../simulation/pioneerVisibility.ts';
@@ -192,7 +194,29 @@ function campVisual(root:THREE.Group,s:PioneerWorld){
  // 3: social plaza with an off-center, small ceremonial ember, notice board,
  // tables and paving, not the three-bed overnight camp.
  const plaza=stageRoot(3,'commons-stage-3-village-square');
- const pavement=pad(plaza,1.47);pavement.name='village-plaza-ground';
+ // The third commons stage has already cost real timber and work hours.
+ // A broad paved public room changes the actual village silhouette instead
+ // of leaving a tiny first-night campfire surrounded by identical huts.
+ const pavement=pad(plaza,1.93);pavement.name='village-plaza-ground';
+ const civicEdge=new THREE.Mesh(new THREE.RingGeometry(1.74,2.17,48),
+  material('#a79b7d'));
+ civicEdge.rotation.x=-Math.PI/2;civicEdge.position.y=.021;
+ civicEdge.receiveShadow=true;civicEdge.name='real-paid-commons-edge';
+ plaza.add(civicEdge);
+ // One actual instanced draw call rather than three dozen separate stones.
+ const pavers=new THREE.InstancedMesh(boxGeo,stone,36);
+ const yAxis=new THREE.Vector3(0,1,0),m=new THREE.Matrix4();
+ const q=new THREE.Quaternion(),scale=new THREE.Vector3(.33,.045,.27);
+ for(let i=0;i<36;i++){
+  const theta=i*Math.PI*2/36,dist=1.72+(i%3)*.13;
+  q.setFromAxisAngle(yAxis,theta+.19);
+  m.compose(new THREE.Vector3(Math.cos(theta)*dist,.040,
+   Math.sin(theta)*dist),q,scale);
+  pavers.setMatrixAt(i,m);
+ }
+ pavers.instanceMatrix.needsUpdate=true;
+ pavers.receiveShadow=true;pavers.name='real-commons-paved-steps';
+ plaza.add(pavers);
  for(let i=0;i<18;i++){
   const a=i*2.399,r=.53+(i%5)*.17;
   const stoneP=orb(plaza,Math.cos(a)*r,.04,Math.sin(a)*r,.19,
@@ -206,6 +230,18 @@ function campVisual(root:THREE.Group,s:PioneerWorld){
  box(board,0,1.41,.08,.94,.60,.04,material('#bfb492'));
  for(let i=0;i<3;i++)box(board,-.27,1.60-i*.18,.12,.43,.045,.02,wood);
  box(board,0,1.87,0,1.26,.13,.17,wood);
+ // Covered village notice pavilion, only after the paid third commons stage.
+ // It does not create hidden housing capacity or replace a civic work shift.
+ const noticeRoof=group(plaza,.92,0,-.70);
+ noticeRoof.name='paid-community-notice-pavilion';
+ for(const x of [-.57,.57])for(const z of [-.42,.42])
+  pole(noticeRoof,x,1.01,z,.055,1.83,lightWood);
+ box(noticeRoof,0,1.96,0,1.40,.13,1.15,wood);
+ for(const sign of [-1,1]){
+  const side=box(noticeRoof,sign*.38,2.13,0,.79,.13,1.36,
+   material('#837c69'));
+  side.rotation.z=sign===1?-.18:.18;
+ }
  for(const x of [-.62,.62])box(plaza,x,.52,.72,.66,.17,.33,lightWood);
  box(plaza,0,.66,.69,.68,.10,.46,material('#a68d63'));
  for(const [x,z] of [[-1.2,.10],[1.2,.35]])
@@ -346,6 +382,14 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
  seedMark?:'working'|'resolved'|'abandoned',craftReady=false,loftReady=false,
  pioneerVariant=0){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
+ // This factory must be the REAL runtime renderer, not merely a unit-test
+ // asset. Phase A imported it but never called it: saved H1/H2/H3/W1 lots
+ // were silently drawn with the old v0.5 small-box models.
+ const authored=makeV6Homestead(parent,p,phase,condition,craftReady,loftReady);
+ if(authored){
+  authored.name='pioneer-'+kind+'-'+phase;
+  return authored;
+ }
  const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
  if(kind==='garden'){
@@ -662,6 +706,8 @@ export interface PioneerGraphics{
  setSelected(selection:PioneerSelection|null):void;
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
+  paidGroundPlots:number;paintedRealRoads:number;sharedRoadPavers:number;roadLength:number;
+  terrainChangedVertices:number;terrainMeanUse:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
    seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
    fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number;
@@ -690,7 +736,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const cliff=new THREE.Mesh(cliffGeometry,[material('#8b7663'),material('#716150')]);
  cliff.rotation.x=Math.PI/2;cliff.position.y=-.09;
  cliff.receiveShadow=true;root.add(cliff);
- root.add(buildCarvedTerrain(edge,grass));
+ const terrain=buildCarvedTerrain(edge,grass);
+ root.add(terrain);
  const river=buildRiverArt(root);vegetation(root,world);resourceLandmarks(root,world);
  const forest=buildPioneerForestArt(root,world);
  const camp=campVisual(root,world);
@@ -702,7 +749,12 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const weatherArt=createWeatherArt(root,mobile,reducedMotion,pioneerWeatherPlacement(world));
  const constructionLayer=group(root);constructionLayer.name='actual-settlement-registry';
  let roadLayer=drawFootpaths(root,world.roads);
+ let groundArt=makePioneerGroundUseArt(world);
+ root.add(groundArt.root);
  let lastRoads=roadGeometrySignature(world.roads);
+ let lastGroundRegistry=world.buildings.map(b=>b.id).join('|')+'/'+lastRoads;
+ let lastTerrainRegistry='';
+ let terrainUseStats={alteredVertices:0,totalVertices:0,meanUse:0};
  const people=world.founders.map(f=>makeFigure(root,f));
  // A visitor is not a permanent resident and cannot occupy a house.
  const traveler=group(root);traveler.name='actual-roadside-visitor';
@@ -813,8 +865,30 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    lastBuildSig=signature;lastProgressIndex=progressIndex;
   }
   const roadSignature=roadGeometrySignature(s.roads);
-  if(roadSignature!==lastRoads){
+  const roadsChanged=roadSignature!==lastRoads;
+  if(roadsChanged){
    root.remove(roadLayer);roadLayer=drawFootpaths(root,s.roads);lastRoads=roadSignature;
+  }
+  // Progress frames, house repair/weather and roof effects rebuild the
+  // structure meshes frequently; ground only depends on COMPLETED parcels
+  // and registered road geometry. Do not reconstruct every labor hour.
+  const groundRegistry=s.buildings.map(b=>b.id).join('|')+'/'+roadSignature;
+  const terrainRegistry=groundRegistry+';commons='+s.commons.stage+';cleared='+
+   s.frontier.clearings.filter(c=>c.phase==='cleared').map(c=>c.id).join('|');
+  if(terrainRegistry!==lastTerrainRegistry){
+   terrainUseStats=applyPioneerTerrainUse(terrain,s);
+   lastTerrainRegistry=terrainRegistry;
+  }
+  if(groundRegistry!==lastGroundRegistry){
+   root.remove(groundArt.root);
+   groundArt.root.traverse(o=>{
+    if(!(o instanceof THREE.Mesh))return;
+    o.geometry.dispose();
+    for(const m of (Array.isArray(o.material)?o.material:[o.material]))m.dispose();
+   });
+   groundArt=makePioneerGroundUseArt(s);
+   root.add(groundArt.root);
+   lastGroundRegistry=groundRegistry;
   }
   while(people.length<s.founders.length)people.push(makeFigure(root,s.founders[people.length]));
   const season=getPioneerCalendar(s).season;
@@ -958,6 +1032,9 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   buildings:latestWorld.buildings.length,renderedStructures,
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
   people:people.length,roads:latestWorld.roads.length,
+  ...groundArt.signatures(),
+  terrainChangedVertices:terrainUseStats.alteredVertices,
+  terrainMeanUse:terrainUseStats.meanUse,
   commonsStage:latestWorld.commons.stage,
   commonsBeds:latestWorld.commons.stage===0?3:0,
   cookingActors:latestWorld.founders.filter(f=>f.activity==='cook').length,
