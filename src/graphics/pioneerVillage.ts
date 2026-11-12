@@ -18,6 +18,7 @@ import {makePioneerMountainRoof,dressPioneerCottage,dressPioneerGranary,
 import {buildPioneerForestArt} from './pioneerForestArt.ts';
 import {makeV6Homestead} from './homesteadScene.ts';
 import {makePioneerGroundUseArt} from './pioneerGroundUseArt.ts';
+import {applyPioneerTerrainUse} from './pioneerTerrainUse.ts';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import type {PioneerSelection} from '../ui/pioneerInspection.ts';
 import {pioneerCropAppearance,pioneerVisibleWoodLogs} from '../simulation/pioneerVisibility.ts';
@@ -698,6 +699,7 @@ export interface PioneerGraphics{
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
   paidGroundPlots:number;paintedRealRoads:number;sharedRoadPavers:number;roadLength:number;
+  terrainChangedVertices:number;terrainMeanUse:number;
   forestTrees:number;forestStumps:number;fallingTree:boolean;clearings:number;clearedPlots:number;
    seedMarkers:number;gardenSprouts:number;campWoodLogs:number;focusedResident:boolean;
    fishCaughtProps:number;grainJars:number;sawbenches:number;fishingActors:number;loftDormers:number;
@@ -726,7 +728,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const cliff=new THREE.Mesh(cliffGeometry,[material('#8b7663'),material('#716150')]);
  cliff.rotation.x=Math.PI/2;cliff.position.y=-.09;
  cliff.receiveShadow=true;root.add(cliff);
- root.add(buildCarvedTerrain(edge,grass));
+ const terrain=buildCarvedTerrain(edge,grass);
+ root.add(terrain);
  const river=buildRiverArt(root);vegetation(root,world);resourceLandmarks(root,world);
  const forest=buildPioneerForestArt(root,world);
  const camp=campVisual(root,world);
@@ -742,6 +745,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  root.add(groundArt.root);
  let lastRoads=roadGeometrySignature(world.roads);
  let lastGroundRegistry=world.buildings.map(b=>b.id).join('|')+'/'+lastRoads;
+ let lastTerrainRegistry='';
+ let terrainUseStats={alteredVertices:0,totalVertices:0,meanUse:0};
  const people=world.founders.map(f=>makeFigure(root,f));
  // A visitor is not a permanent resident and cannot occupy a house.
  const traveler=group(root);traveler.name='actual-roadside-visitor';
@@ -860,6 +865,12 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   // structure meshes frequently; ground only depends on COMPLETED parcels
   // and registered road geometry. Do not reconstruct every labor hour.
   const groundRegistry=s.buildings.map(b=>b.id).join('|')+'/'+roadSignature;
+  const terrainRegistry=groundRegistry+';commons='+s.commons.stage+';cleared='+
+   s.frontier.clearings.filter(c=>c.phase==='cleared').map(c=>c.id).join('|');
+  if(terrainRegistry!==lastTerrainRegistry){
+   terrainUseStats=applyPioneerTerrainUse(terrain,s);
+   lastTerrainRegistry=terrainRegistry;
+  }
   if(groundRegistry!==lastGroundRegistry){
    root.remove(groundArt.root);
    groundArt.root.traverse(o=>{
@@ -1014,6 +1025,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),
   people:people.length,roads:latestWorld.roads.length,
   ...groundArt.signatures(),
+  terrainChangedVertices:terrainUseStats.alteredVertices,
+  terrainMeanUse:terrainUseStats.meanUse,
   commonsStage:latestWorld.commons.stage,
   commonsBeds:latestWorld.commons.stage===0?3:0,
   cookingActors:latestWorld.founders.filter(f=>f.activity==='cook').length,
