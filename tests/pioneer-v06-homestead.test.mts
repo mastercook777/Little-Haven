@@ -9,6 +9,7 @@ import {pioneerClearingReachable} from '../src/simulation/pioneerFrontier.ts';
 import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
 import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe,findPioneerWalk} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
+import {buildPioneerFacilityVisual} from '../src/graphics/pioneerVillage.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
 import {pioneerGroundUsePlan,makePioneerGroundUseArt} from '../src/graphics/pioneerGroundUseArt.ts';
@@ -148,6 +149,34 @@ test('v0.6 paid full-lot residential shapes and open workspace have actual gate 
    assert.ok(full.getObjectByName('actual-wood-working-apron'));
    assert.ok(full.getObjectByName('actual-crafted-sawbench'));
    assert.equal(full.getObjectByName('mountain-double-leaf-door'),undefined);
+  }
+ }
+});
+
+test('v0.6 paid compound models are actually used by the real village renderer',()=>{
+ for(const entry of Object.values(PIONEER_V6_LOTS)){
+  const style=entry.styleId,kind=style==='W1-open-yard'?'wood-yard':'cottage';
+  const parcel={id:'live-'+style,kind:'dwelling' as const,x:-6,z:-3,
+   width:entry.width,depth:entry.depth,rotation:0,clearance:.30,
+   accessX:-6,accessZ:-3+entry.depth/2+.8,builtAt:100,homesteadStyle:style};
+  const root=new THREE.Group();
+  const unfinished=buildPioneerFacilityVisual(root,parcel,kind,'foundation',.3);
+  assert.ok(unfinished.getObjectByName('paid-foundation'),style+' actual builder floor missing');
+  assert.ok(!unfinished.getObjectByName('real-main-building-volume'),
+   style+' must not generate complete buildings during excavation');
+  const full=buildPioneerFacilityVisual(root,parcel,kind,'complete',1,98,
+   undefined,false,true);
+  assert.equal(full.userData.buildingId,parcel.id);
+  assert.ok(full.getObjectByName('paid-working-ground'));
+  assert.ok(full.getObjectByName('real-main-building-volume'),
+   style+' was replaced by the old generic roof despite saved homesteadStyle');
+  assert.ok(full.getObjectByName('paid-residential-loft')||
+   kind==='wood-yard',style+' paid loft missing');
+  if(kind==='cottage'){
+   assert.ok(full.getObjectByName('real-courtyard-gatewall'));
+   assert.ok(full.getObjectByName('household-footpath'));
+  }else{
+   assert.ok(full.getObjectByName('actual-wood-working-apron'));
   }
  }
 });
