@@ -3,6 +3,7 @@ import type {VillageParcel} from '../simulation/villagePlanning.ts';
 import {pioneerV6HomesteadPlan,type PioneerV6Style} from '../simulation/homesteadPlan.ts';
 import {makePioneerMountainRoof,dressPioneerCottage} from './pioneerHeritageArt.ts';
 import {buildPioneerRoof,type PioneerRoofProfile} from './pioneerRoof.ts';
+import {batchStaticSubtree} from './batchStatic.ts';
 
 /** Phase A authored lots. The full footprint belongs to ONE real building
  * registry entry, and does not appear until residents pay and construct it. */
@@ -191,5 +192,12 @@ export function makeV6Homestead(
    saw.rotation.z=.35;
   }
  }
+ // Many wood frames share a single material. Merge only UNNAMED static
+ // details; keep eave/snow, selection IDs, courtyards, paid dormers and
+ // workbench names reachable for the actual live browser and tests.
+ // Shared cube/cylinder geometry is used by other lots: never dispose it.
+ const batched=batchStaticSubtree(g,{disposeOriginals:false,preserveNamedMeshes:true});
+ g.userData.staticBatchStats={before:batched.before,after:batched.after,
+  groups:batched.groups,merged:batched.merged};
  return g;
 }
