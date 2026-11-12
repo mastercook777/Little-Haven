@@ -12,10 +12,51 @@ import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
 import {pioneerGroundUsePlan,makePioneerGroundUseArt} from '../src/graphics/pioneerGroundUseArt.ts';
+import {pioneerTerrainUseAt,applyPioneerTerrainUse} from '../src/graphics/pioneerTerrainUse.ts';
+import {buildCarvedTerrain} from '../src/graphics/carvedTerrain.ts';
+import {creekPointAt} from '../src/simulation/creekCorridor.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {parcelOverlaps} from '../src/simulation/villagePlanning.ts';
 import {pioneerNaturalParcels} from '../src/simulation/pioneerNaturalAnchors.ts';
 import {surveyPioneerPlot,type PioneerSurveyMetrics} from '../src/simulation/pioneerGrowth.ts';
+
+test('v0.6 Phase B terrain carries real growing land use without altering the riverbed',()=>{
+ const empty=createPioneerWorld(42,1000);
+ assert.equal(pioneerTerrainUseAt(empty,empty.camp.x,empty.camp.z).weight,0);
+ const creek=creekPointAt(.51);
+ assert.equal(pioneerTerrainUseAt(empty,creek[0],creek[1]).weight,0);
+ const outline:[number,number][]=[[-15,-10],[13,-10],[13,10],[-15,10]];
+ const grass=new THREE.MeshStandardMaterial({color:'#8eae7d'});
+ const mesh=buildCarvedTerrain(outline,grass);
+ const verts=mesh.geometry.getAttribute('position');
+ const colors=mesh.geometry.getAttribute('color');
+ const original=Array.from(colors.array);
+ const noUse=applyPioneerTerrainUse(mesh,empty);
+ assert.equal(noUse.alteredVertices,0);
+ assert.deepEqual(Array.from(colors.array),original);
+ advancePioneerWorld(empty,(48*3*DAY_MINUTES-empty.minutes)/3);
+ const home=empty.buildings.find(b=>b.kind==='cottage')!;
+ assert.ok(home);
+ const inhabited=pioneerTerrainUseAt(empty,home.parcel.x,home.parcel.z);
+ assert.ok(inhabited.weight>.30,'real households must affect surrounding land');
+ assert.equal(pioneerTerrainUseAt(empty,creek[0],creek[1]).weight,0,
+  'the actual creek corridor may never be painted over');
+ const paid=applyPioneerTerrainUse(mesh,empty);
+ assert.ok(paid.alteredVertices>40&&paid.meanUse>.01,
+  'the new land-use layer must affect the full visible terrain, not one tiny decal');
+ const first=Array.from(colors.array);
+ assert.notDeepEqual(first,original);
+ applyPioneerTerrainUse(mesh,empty);
+ assert.deepEqual(Array.from(colors.array),first,
+  'repeated rendering cannot accumulate or drift soil colors');
+ const restored=createPioneerWorld(42,1000);
+ const gone=applyPioneerTerrainUse(mesh,restored);
+ assert.equal(gone.alteredVertices,0);
+ assert.deepEqual(Array.from(colors.array),original,
+  'new-game land must restore the actual unbuilt grassy island');
+ assert.equal(mesh.geometry.getAttribute('position'),verts,
+  'no decorative paint can move the riverbed or walkable terrain');
+});
 
 test('v0.6 Phase B ground is paid and registered, not a canned empty valley',()=>{
  const s=createPioneerWorld(42,1000);
