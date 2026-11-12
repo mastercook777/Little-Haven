@@ -741,6 +741,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  let groundArt=makePioneerGroundUseArt(world);
  root.add(groundArt.root);
  let lastRoads=roadGeometrySignature(world.roads);
+ let lastGroundRegistry=world.buildings.map(b=>b.id).join('|')+'/'+lastRoads;
  const people=world.founders.map(f=>makeFigure(root,f));
  // A visitor is not a permanent resident and cannot occupy a house.
  const traveler=group(root);traveler.name='actual-roadside-visitor';
@@ -855,11 +856,20 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   if(roadsChanged){
    root.remove(roadLayer);roadLayer=drawFootpaths(root,s.roads);lastRoads=roadSignature;
   }
-  if(rebuilt||roadsChanged){
+  // Progress frames, house repair/weather and roof effects rebuild the
+  // structure meshes frequently; ground only depends on COMPLETED parcels
+  // and registered road geometry. Do not reconstruct every labor hour.
+  const groundRegistry=s.buildings.map(b=>b.id).join('|')+'/'+roadSignature;
+  if(groundRegistry!==lastGroundRegistry){
    root.remove(groundArt.root);
-   groundArt.root.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});
+   groundArt.root.traverse(o=>{
+    if(!(o instanceof THREE.Mesh))return;
+    o.geometry.dispose();
+    for(const m of (Array.isArray(o.material)?o.material:[o.material]))m.dispose();
+   });
    groundArt=makePioneerGroundUseArt(s);
    root.add(groundArt.root);
+   lastGroundRegistry=groundRegistry;
   }
   while(people.length<s.founders.length)people.push(makeFigure(root,s.founders[people.length]));
   const season=getPioneerCalendar(s).season;
