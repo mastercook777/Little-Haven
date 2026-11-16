@@ -134,7 +134,8 @@ export function settlePioneerResidentMotion(s:PioneerWorld,previous:ReadonlyMap<
    .reduce((n,p,i)=>i?n+gap(path[i-1],p):n,0)/distance;
   const delay=((f.id*7+s.seed)%11+11)%11;
   const duration=Math.min(53-delay,Math.max(3,distance*1.8));
-  f.motion={path,starts:s.minutes+delay,ends:s.minutes+delay+duration,fromHomeId,toHomeId,fishPickup,
+  f.motion={path,starts:s.minutes+delay,ends:s.minutes+delay+duration,fromHomeId,toHomeId,
+   ...(fishPickup===undefined?{}:{fishPickup}),
    carryingWood:old?.activity==='collect-wood'&&f.activity!=='collect-wood'};
  }
 }
