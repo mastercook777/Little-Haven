@@ -48,18 +48,26 @@ export function dressPioneerCottage(parent:THREE.Object3D,
  parent.add(facade);
  // A carved double-leaf door sits inside the front wall opening.
  for(const side of [-1,1]){
-  const x=side*.166;
-  part(facade,x,.75,front,.326,1.08,.069,M.oldWood,'mountain-double-leaf-door');
+  const hinge=new THREE.Group();
+  hinge.name='residential-door-hinge';
+  hinge.position.set(side*.329,0,front);
+  hinge.userData.swing=side;
+  facade.add(hinge);
+  const x=-side*.163;
+  part(hinge,x,.75,0,.326,1.08,.069,M.oldWood,'mountain-double-leaf-door');
   for(const dx of [-.105,.105])
-   part(facade,x+dx,.75,front+.047,.024,.91,.034,M.brightWood);
-  part(facade,x,.98,front+.050,.30,.042,.035,M.brightWood);
+   part(hinge,x+dx,.75,.047,.024,.91,.034,M.brightWood);
+  part(hinge,x,.98,.050,.30,.042,.035,M.brightWood);
  }
  part(facade,0,1.34,front+.018,.81,.11,.16,M.oldWood,'doorway-timber-lintel');
  for(const side of [-1,1]){
   const x=side*(w*.35),windowFront=d*.535-frontInset;
   // Opaque sill, paper panes, multiple visible timber lattice subdivisions.
   part(facade,x,1.05,windowFront,.46,.51,.080,M.oldWood,'mountain-lattice-frame');
-  part(facade,x,1.05,windowFront+.052,.36,.40,.024,M.paper,'mountain-paper-window');
+  const paper=part(facade,x,1.05,windowFront+.052,.36,.40,.024,
+   M.paper.clone(),'mountain-paper-window');
+  paper.userData.keepDynamicMesh=true;
+  paper.userData.residentialLamp=true;
   for(const offset of [-.105,.105])
    part(facade,x+offset,1.05,windowFront+.076,.031,.42,.029,M.brightWood);
   part(facade,x,1.04,windowFront+.081,.39,.034,.035,M.brightWood);

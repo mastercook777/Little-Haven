@@ -124,9 +124,9 @@ export function makeV6Homestead(
     const tie=part(ribs,side*.81,2.065,z,.092,.085,.16,reed,'real-thatch-ridge-tie');
     tie.rotation.z=side===1?-.27:.27;
    }
-   // A modest wood drying pole is located in the actual front courtyard.
-   for(const x of [-.77,.77])upright(g,x,.69,gate.z-.69,.049,.98);
-   part(g,0,1.20,gate.z-.69,1.64,.09,.10,wood,'thatched-house-drying-rail');
+   // The rail runs beside the gate-to-door lane so residents can pass.
+   for(const z of [yard.z-.23,yard.z+.23])upright(g,-1.06,.69,z,.049,.98);
+   part(g,-1.06,1.20,yard.z,.10,.09,.57,wood,'thatched-house-drying-rail');
   }else if(style==='H2-farmyard'){
    // A broad low side veranda breaks the H2 house into a main tiled volume
    // and a sheltered working edge, instead of another identical blue box.

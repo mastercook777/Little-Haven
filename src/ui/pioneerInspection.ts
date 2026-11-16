@@ -4,6 +4,7 @@ import {pioneerBuildingLabel} from '../simulation/pioneerGrowth.ts';
 import {pioneerFoodCapacity} from '../simulation/pioneerLivelihood.ts';
 import {pioneerResidentContacts,pioneerFamiliarRoadDays} from '../simulation/pioneerCommerce.ts';
 import {gardenSeedTrial} from '../simulation/livingFates/seedTrial.ts';
+import {samplePioneerResident} from '../simulation/pioneerResidentMotion.ts';
 import {pioneerCommonsNames} from '../simulation/pioneerCommons.ts';
 import {getPioneerFacilityPreference,isPioneerFacilityActive,isPioneerOperational} from '../simulation/pioneerFacilities.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerResourceSite} from '../simulation/pioneerWorld.ts';
@@ -33,6 +34,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
   const f=s.founders.find(x=>String(x.id)===selection.id);
   const person=f&&s.livingFates.people[f.id];
   if(!f||!person)return null;
+  const motion=samplePioneerResident(f,s.minutes);
   const contacts=pioneerResidentContacts(s,f.id);
   const bonds=publicPersonRelations(s,f.id);
   const memories=publicPersonHistory(s,f.id);
@@ -45,7 +47,11 @@ export function inspectPioneerSelection(s:PioneerWorld,
    {label:'来谷记录',value:person.arrivalKnown?date(person.arrivalAt):'旧档已有乡邻 · 来时未详'},
    {label:'落脚住处',value:f.homeBuildingId?
     (s.buildings.find(b=>b.id===f.homeBuildingId)?.kind==='cottage'?'山居':'避雨棚'):'尚在营地'},
-   {label:'此刻正在',value:f.activity==='seed-trial'?'留种照料试田':f.activity==='fish'?'河岸捕鱼':
+   {label:'此刻正在',value:motion.indoors?
+    f.activity==='eat-home'?'在屋内用早饭':'已进屋歇息':
+    motion.moving&&f.activity==='shelter'?'沿路回家':
+    f.activity==='eat-break'?'在附近歇脚用餐':
+    f.activity==='seed-trial'?'留种照料试田':f.activity==='fish'?'河岸捕鱼':
      f.activity==='haul-fish'?'背鱼归仓':f.activity==='craft'?'木坊锯作':f.activity==='host-guest'?'在茶棚接待过客':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
     f.activity==='build'?'参与建屋':f.activity==='eat'?'村心用餐':f.activity==='socialize'?'邻里闲谈':'村中日常'},
    {label:'已见本领',value:person.publicFacts.knownSkills.join('、')||'仍在相处中'},

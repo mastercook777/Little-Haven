@@ -5,6 +5,7 @@ import {DAY_MINUTES} from '../src/simulation/calendar.ts';
 import {PIONEER_SLOT_KEYS,PIONEER_VERSION,createPioneerWorld,advancePioneerWorld,
  importPioneerWorld,savePioneerWorld,loadPioneerWorld,setPioneerPolicy} from '../src/simulation/pioneerWorld.ts';
 import {setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
+import {pioneerHomeDoor,samplePioneerResident} from '../src/simulation/pioneerResidentMotion.ts';
 import {PIONEER_VALLEY} from '../src/simulation/pioneerGeography.ts';
 import {pioneerClearingReachable,pioneerParcelOpened} from '../src/simulation/pioneerFrontier.ts';
 import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
@@ -392,4 +393,37 @@ test('v0.6.2 western homes grow from cleared land, legal roads and actual househ
   }
   assert.ok(importPioneerWorld(JSON.stringify(world)));
  }
+});
+
+test('v0.6.3 villagers keep their position between shifts, eat apart and enter occupied homes',()=>{
+ const s=createPioneerWorld(20261296,1000);
+ const day=108*DAY_MINUTES;
+ const go=(minute:number)=>advancePioneerWorld(s,(minute-s.minutes)/3);
+ go(day+11*60+59.99);
+ assert.equal(s.founders.length,12);
+ const houses=s.buildings.filter(b=>b.occupants.length>0);
+ const before=s.commons.mealsServed;
+ const beforePosition=s.founders.map(f=>samplePioneerResident(f,s.minutes).point);
+ go(day+12*60);
+ assert.equal(s.commons.mealsServed-before,4);
+ assert.equal(s.founders.filter(f=>f.activity==='cook'||f.activity==='eat').length,3);
+ assert.equal(s.founders.filter(f=>f.activity==='eat-break').length,9);
+ assert.deepEqual(s.founders.map(f=>samplePioneerResident(f,s.minutes).point),beforePosition);
+ go(day+20*60);
+ const inbound=s.founders.filter(f=>f.motion?.toHomeId&&f.motion.path.length>1);
+ assert.ok(inbound.length>=8);
+ assert.ok(new Set(inbound.map(f=>f.motion!.starts)).size>=4);
+ for(const f of inbound){
+  const house=houses.find(b=>b.id===f.homeBuildingId)!;
+  assert.ok(f.motion!.path.some(p=>p.every((n,i)=>n===pioneerHomeDoor(house)[i])));
+  assert.equal(samplePioneerResident(f,f.motion!.ends+.01).indoors,house.id);
+ }
+ go(day+20*60+14);
+ const resumed=importPioneerWorld(JSON.stringify(s))!;
+ assert.deepEqual(resumed.founders.map(f=>samplePioneerResident(f,resumed.minutes)),
+  s.founders.map(f=>samplePioneerResident(f,s.minutes)));
+ go(day+21*60);
+ assert.ok(s.founders.every(f=>samplePioneerResident(f,s.minutes).indoors===f.homeBuildingId));
+ go(day+DAY_MINUTES+7*60+30);
+ assert.ok(s.founders.every(f=>samplePioneerResident(f,s.minutes).indoors===f.homeBuildingId));
 });
