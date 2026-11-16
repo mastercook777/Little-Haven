@@ -260,3 +260,13 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
  .livelihood-guest-choices button small{font-size:8px}
  .livelihood-guest-ledger{font-size:9px}
 }
+
+#pioneerWestView{display:none}
+@media(max-width:760px){
+ #pioneerWestView:not([hidden]){display:block;position:absolute;z-index:6;
+  right:11px;bottom:112px;min-height:44px;padding:7px 11px;font-size:11px;
+  background:var(--paper)}
+ .pioneer-west-view .pioneer-intro,
+ .pioneer-west-view .pioneer-panel,
+ .pioneer-west-view .pioneer-chronicle{display:none}
+}

@@ -4,6 +4,7 @@ import {findPioneerWalk,pioneerWalkable,type WalkPoint} from './pioneerPaths.ts'
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import type {VillageParcel} from './villagePlanning.ts';
 import {pioneerNaturalParcels,isSafePioneerWildPlant} from './pioneerNaturalAnchors.ts';
+import {PIONEER_VALLEY} from './pioneerGeography.ts';
 import {DAY_MINUTES} from './calendar.ts';
 
 export interface PioneerFelling {
@@ -28,6 +29,8 @@ const hash=(n:number)=>{
 };
 const landscape=(s:PioneerWorld)=>pioneerNaturalParcels(s);
 const dist=(a:{x:number;z:number},b:{x:number;z:number})=>Math.hypot(a.x-b.x,a.z-b.z);
+const lotRadius=(p:VillageParcel)=>Math.hypot(p.width/2+p.clearance,p.depth/2+p.clearance);
+const coversLot=(c:PioneerClearing,p:VillageParcel)=>dist(c,p)+lotRadius(p)<=c.radius;
 const record=(s:PioneerWorld,title:string,text:string,causeId:string)=>{
  appendPioneerJournal(s,title,text,causeId);
 };
@@ -82,6 +85,7 @@ function frontierPatch(s:PioneerWorld,index:number):PioneerClearing|null{
    const distance=8.5+j*1.0;
    const x=round(s.camp.x+Math.cos(theta)*distance);
    const z=round(s.camp.z+Math.sin(theta)*distance);
+   if(x<PIONEER_VALLEY.westernHomesX)continue;
    const patch:VillageParcel={id:'frontier-survey',kind:'protected',x,z,
     width:2.4,depth:2.4,rotation:0,clearance:.18,
     accessX:x,accessZ:z,builtAt:s.minutes};
@@ -132,9 +136,11 @@ export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
  const occupied=[...landscape(s),...s.buildings.map(b=>b.parcel)];
  if(!validatePioneerParcel(p,occupied,s.roads).ok||
   !findPioneerWalk([s.camp.x,s.camp.z],[p.x,p.z],occupied))return false;
+ const western=p.x<PIONEER_VALLEY.westernHomesX;
+ const radius=western?lotRadius(p)+.32:2.2;
  const active=f.clearings.find(c=>c.phase==='clearing');
  if(active){
-  if(dist(active,p)<=1.5)return true;
+  if(western?coversLot(active,p):dist(active,p)<=1.5)return true;
   // A house built after the original survey can strand the plot. No
   // phantom workers should receive credit for standing behind blocked lanes.
   if(pioneerClearingReachable(s,active)||s.minutes-active.startedAt<3*DAY_MINUTES)
@@ -143,7 +149,7 @@ export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
   // displaced clearing is not a completed clearing, nor a free new parcel.
   const lost=active.workDone;
   active.x=p.x;active.z=p.z;active.workDone=0;active.startedAt=s.minutes;
-  active.clearedAt=null;active.radius=2.2;
+  active.clearedAt=null;active.radius=radius;
   f.lastSurveyAt=s.minutes+3*DAY_MINUTES;
   record(s,'林缘改勘','原清障地因新屋与乡路而无法安全抵达。村民另选合规可达的工地；'+
    (lost>0?'原来投入的 '+round(lost)+' 小时不能移作新地功劳。':
@@ -152,11 +158,13 @@ export function requestPioneerExpansionClearing(s:PioneerWorld,p:VillageParcel){
  }
  if(f.clearings.length>=8)return false;
  const next:PioneerClearing={id:'clearing-'+(f.clearings.length+1),
-  x:p.x,z:p.z,radius:2.2,phase:'clearing',workDone:0,workRequired:8,
+  x:p.x,z:p.z,radius,phase:'clearing',workDone:0,workRequired:8,
   startedAt:s.minutes,clearedAt:null};
  f.clearings.push(next);
  f.lastSurveyAt=s.minutes+3*DAY_MINUTES;
- record(s,'新宅地清障','乡邻勘出合规又可达的山路空隙。须实际清灌移石八小时，方可考虑扩建住屋或茶寮。',next.id);
+ record(s,western?'西麓勘荒':'新宅地清障',
+  western?'乡邻沿着可走的山径勘出整片宅地。动工前，还要用八个工时清灌移石。':
+   '乡邻勘出合规又可达的山路空隙。须实际清灌移石八小时，方可考虑扩建住屋或茶寮。',next.id);
  return true;
 }
 export function pioneerClearingReachable(s:PioneerWorld,p:PioneerClearing):boolean{
@@ -176,6 +184,8 @@ export function performPioneerClearing(s:PioneerWorld,p:PioneerClearing,effort:n
 /** Only outer-band plots need clearing; already occupied and first-ring
  * legacy plots remain legal for importing v0.4.1/v0.4.2 saves. */
 export function pioneerParcelOpened(s:PioneerWorld,p:VillageParcel){
+ if(p.x<PIONEER_VALLEY.westernHomesX)
+  return s.frontier.clearings.some(c=>c.phase==='cleared'&&coversLot(c,p));
  const campDistance=dist(s.camp,p);
  if(campDistance<=9.7)return true;
  // A cleared patch removes surface vegetation; the outer band is

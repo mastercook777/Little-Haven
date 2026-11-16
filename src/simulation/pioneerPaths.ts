@@ -1,6 +1,6 @@
 import {distanceToCreekSpline} from './creekCorridor.ts';
 import {PIONEER_VALLEY,pioneerIslandFraction} from './pioneerGeography.ts';
-import {parcelCorners,type VillageParcel} from './villagePlanning.ts';
+import {type VillageParcel} from './villagePlanning.ts';
 
 /** The dirt trails in pioneer mode are actual saved walkable connections. No
  * decorative legacy village roads are required for traversal or rendering. */
@@ -9,7 +9,12 @@ export interface PioneerRoad{
  id:string;buildingId:string;points:WalkPoint[];uses:number;
  grade:'track'|'dirt';createdAt:number;
 }
-const GRID=.68,MIN_X=-19.2,MIN_Z=-10.65,NX=54,NZ=33;
+const GRID=.68;
+// Extend the old lattice by whole cells so existing streets still line up.
+const westCells=Math.ceil((PIONEER_VALLEY.westRadius-PIONEER_VALLEY.radiusX)/GRID);
+const sideCells=Math.ceil(PIONEER_VALLEY.westBulgeZ/GRID);
+const MIN_X=-19.2-westCells*GRID,MIN_Z=-10.65-sideCells*GRID;
+const NX=54+westCells,NZ=33+sideCells*2;
 const round=(n:number)=>Math.round(n*1000)/1000;
 const ix=(x:number)=>Math.max(0,Math.min(NX-1,Math.round((x-MIN_X)/GRID)));
 const iz=(z:number)=>Math.max(0,Math.min(NZ-1,Math.round((z-MIN_Z)/GRID)));
@@ -45,15 +50,20 @@ export function roadSegmentsSafe(points:readonly WalkPoint[],occupied:readonly V
 export function findPioneerWalk(start:WalkPoint,end:WalkPoint,occupied:readonly VillageParcel[]):WalkPoint[]|null{
  if(!pioneerWalkable(start,occupied)||!pioneerWalkable(end,occupied))return null;
  const count=NX*NZ;
- const passable=new Uint8Array(count);
- for(let k=0;k<count;k++)if(pioneerWalkable(coords(k),occupied))passable[k]=1;
+ // Cache cells on demand. An expanded island should not make every
+ // short camp-to-resource trip scan the entire western hillside.
+ const cells=new Int8Array(count);
+ const passable=(k:number)=>{
+  if(cells[k]===0)cells[k]=pioneerWalkable(coords(k),occupied)?1:-1;
+  return cells[k]===1;
+ };
  const nearest=(p:WalkPoint):number=>{
   const x=ix(p[0]),z=iz(p[1]);
   let best=-1,bestDistance=Infinity;
   for(let radius=0;radius<=3;radius++){
    for(let dz=-radius;dz<=radius;dz++)for(let dx=-radius;dx<=radius;dx++){
     const gx=x+dx,gz=z+dz;if(gx<0||gx>=NX||gz<0||gz>=NZ)continue;
-    const k=index(gx,gz);if(!passable[k])continue;
+    const k=index(gx,gz);if(!passable(k))continue;
     const d=span(p,coords(k));
     if(d<bestDistance){best=k;bestDistance=d;}
    }
@@ -77,8 +87,8 @@ export function findPioneerWalk(start:WalkPoint,end:WalkPoint,occupied:readonly 
   const x=current%NX,z=Math.floor(current/NX);
   for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]){
    const nx=x+dx,nz=z+dz;if(nx<0||nx>=NX||nz<0||nz>=NZ)continue;
-   const neighbor=index(nx,nz);if(!passable[neighbor]||closed[neighbor])continue;
-   if(dx&&dz&&(!passable[index(nx,z)]||!passable[index(x,nz)]))continue;
+   const neighbor=index(nx,nz);if(!passable(neighbor)||closed[neighbor])continue;
+   if(dx&&dz&&(!passable(index(nx,z))||!passable(index(x,nz))))continue;
    const candidate=cost[current]+Math.hypot(dx,dz);
    if(candidate>=cost[neighbor])continue;
    cost[neighbor]=candidate;back[neighbor]=current;
@@ -105,7 +115,7 @@ export function findPioneerWalk(start:WalkPoint,end:WalkPoint,occupied:readonly 
  if(!roadSegmentsSafe(result,occupied))return null;
  return result.map(p=>[round(p[0]),round(p[1])]);
 }
-export function pioneerEntrance(p:VillageParcel):WalkPoint{
+export function pioneerEntrance(p:Pick<VillageParcel,'x'|'z'|'rotation'|'depth'|'clearance'>):WalkPoint{
  // Both cottage and pioneer shelter have a +Z local doorway.
  const reach=p.depth/2+p.clearance+.52;
  return [round(p.x-Math.sin(p.rotation)*reach),

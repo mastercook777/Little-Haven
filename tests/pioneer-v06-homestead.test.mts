@@ -5,9 +5,10 @@ import {DAY_MINUTES} from '../src/simulation/calendar.ts';
 import {PIONEER_SLOT_KEYS,PIONEER_VERSION,createPioneerWorld,advancePioneerWorld,
  importPioneerWorld,savePioneerWorld,loadPioneerWorld,setPioneerPolicy} from '../src/simulation/pioneerWorld.ts';
 import {setPioneerDirection} from '../src/simulation/pioneerLivelihood.ts';
-import {pioneerClearingReachable} from '../src/simulation/pioneerFrontier.ts';
+import {PIONEER_VALLEY} from '../src/simulation/pioneerGeography.ts';
+import {pioneerClearingReachable,pioneerParcelOpened} from '../src/simulation/pioneerFrontier.ts';
 import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
-import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe,findPioneerWalk} from '../src/simulation/pioneerPaths.ts';
+import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe,findPioneerWalk,samplePioneerWalk} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
 import {buildPioneerFacilityVisual} from '../src/graphics/pioneerVillage.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
@@ -341,4 +342,54 @@ test('v0.6 slots reject old world documents without deleting any old key',()=>{
  assert.equal(loaded.buildings.length,0);
  assert.equal(map.get('little-haven-pioneer-v04-slot-1'),prior);
  assert.equal(map.get('little-haven-living-v03-slot-1'),'old-classic');
+});
+
+test('v0.6.2 western homes grow from cleared land, legal roads and actual households',()=>{
+ for(const seed of [42,20261296]){
+  const world=createPioneerWorld(seed,1000);
+  const western=(x:number)=>x<PIONEER_VALLEY.westernHomesX;
+  assert.ok(pioneerWalkable([-24,0],[]),'the west nav lattice must cover the enlarged island');
+  const advanceTo=(day:number,hour=22)=>advancePioneerWorld(
+   world,(day*DAY_MINUTES+hour*60-world.minutes)/3);
+  advanceTo(12);
+  assert.ok(world.buildings.every(b=>!western(b.parcel.x)));
+  advanceTo(40);
+  const first=world.frontier.clearings.find(c=>western(c.x)&&c.radius>2.2);
+  assert.ok(first?.phase==='clearing'&&first.workDone<8);
+  assert.ok(!world.buildings.some(b=>western(b.parcel.x)));
+  const during=importPioneerWorld(JSON.stringify(world))!;
+  assert.deepEqual(during.frontier,world.frontier);
+  advanceTo(108);
+  advancePioneerWorld(during,(world.minutes-during.minutes)/3);
+  assert.deepEqual(during.buildings,world.buildings);
+  assert.deepEqual(during.roads,world.roads);
+  const homes=world.buildings.filter(b=>b.kind==='cottage'&&western(b.parcel.x));
+  assert.ok(homes.length>=2);
+  const large=homes.find(b=>b.parcel.homesteadStyle==='H3-wing')!;
+  assert.ok(large?.completedAt>first.clearedAt!);
+  assert.equal(large.materialsSpent.wood,PIONEER_V6_LOTS['H3-wing'].wood);
+  assert.ok(large.workHours>=PIONEER_V6_LOTS['H3-wing'].hours);
+  const blockers=[...pioneerNaturalParcels(world),...world.buildings.map(b=>b.parcel)];
+  for(const home of homes){
+   const road=world.roads.find(r=>r.buildingId===home.id)!;
+   assert.deepEqual(road.points.at(-1),pioneerEntrance(home.parcel));
+   assert.ok(roadSegmentsSafe(road.points,blockers),home.id);
+   assert.ok(pioneerParcelOpened(world,home.parcel));
+   assert.ok(home.occupants.length>0);
+   const residents=world.founders.filter(f=>f.homeBuildingId===home.id);
+   const yardResidents=residents.filter(f=>f.activity==='shelter'||f.activity==='eat-home');
+   assert.ok(yardResidents.length>0);
+   assert.equal(new Set(yardResidents.map(f=>f.target.join(','))).size,yardResidents.length);
+   for(const resident of yardResidents){
+    const commute=resident.commute!;
+    assert.deepEqual(commute[0],pioneerEntrance(home.parcel));
+    assert.deepEqual(commute.at(-1),resident.target);
+    for(let i=0;i<=20;i++){
+     const [x,z]=samplePioneerWalk(commute,i/20);
+     assert.ok(pioneerV6YardWalkable(home.parcel,x,z),'the home path cannot cross the gate wall');
+    }
+   }
+  }
+  assert.ok(importPioneerWorld(JSON.stringify(world)));
+ }
 });

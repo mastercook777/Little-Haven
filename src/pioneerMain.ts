@@ -3,6 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage.ts';
 import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
 import {getPioneerSpotlight,type PioneerSpotlight} from './ui/pioneerSpotlight.ts';
+import {PIONEER_VALLEY} from './simulation/pioneerGeography.ts';
 import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
 import {PIONEER_GUEST_POLICIES,setPioneerGuestPolicy,
  type PioneerGuestPolicy} from './simulation/pioneerCommerce.ts';
@@ -36,7 +37,7 @@ const defaultEye=new THREE.Vector3(27.3,30,39);
 camera.position.copy(defaultEye);camera.lookAt(-1.7,0,0);
 const orbit=new OrbitControls(camera,canvas);
 orbit.target.set(-1.7,0,0);orbit.enablePan=true;orbit.enableDamping=true;
- orbit.minTargetRadius=0;orbit.maxTargetRadius=19;orbit.cursor.set(-1.7,0,0);
+orbit.minTargetRadius=0;orbit.maxTargetRadius=PIONEER_VALLEY.westRadius;orbit.cursor.set(-1.7,0,0);
 orbit.dampingFactor=.065;orbit.minPolarAngle=.43;orbit.maxPolarAngle=1.26;
 orbit.minZoom=.72;orbit.maxZoom=2.3;orbit.rotateSpeed=.64;
 orbit.mouseButtons.LEFT=THREE.MOUSE.ROTATE;
@@ -233,10 +234,10 @@ function renderUI(){
  const buildingChoices='<button type="button" data-pick-commons="camp">村心 · '+
   safe(pioneerCommonsNames[world.commons.stage])+'</button>'+
   world.frontier.clearings.map(c=>'<button type="button" data-pick-clearing="'+safe(c.id)+'">'+
-   (c.phase==='cleared'?'林缘空地':'正在清林')+' · '+safe(c.id)+'</button>').join('')+
+   (c.x<PIONEER_VALLEY.westernHomesX&&c.radius>2.2?'西麓 · ':'')+(c.phase==='cleared'?'林缘空地':'正在清林')+' · '+safe(c.id)+'</button>').join('')+
   (world.buildings.length?
    world.buildings.map((b,i)=>'<button type="button" data-pick-building="'+safe(b.id)+'">'+
-    safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
+    (b.parcel.x<PIONEER_VALLEY.westernHomesX?'西麓 · ':'')+safe(pioneerBuildingLabel(b.kind))+' · '+(i+1)+'</button>').join(''):
    '<span>第一间屋尚未落成。</span>');
  const list=$('pioneerBuildingChoices');
  if(list.innerHTML!==buildingChoices)list.innerHTML=buildingChoices;
@@ -280,6 +281,7 @@ function replaceWorld(next:PioneerWorld){
   }
  });
  world=next;valley=buildPioneerVillage(scene,world);
+ setWestView(false);westView.hidden=true;
  selection=null;focusMotion=null;canvas.style.cursor='grab';
  lastLighting='';renderUI();
 }
@@ -324,11 +326,19 @@ $('pioneerBuildingChoices').addEventListener('click',event=>{
  }
  const clearing=target.closest<HTMLButtonElement>('button[data-pick-clearing]');
  if(clearing?.dataset.pickClearing){
-  chooseInspection({kind:'clearing',id:clearing.dataset.pickClearing});return;
+  const id=clearing.dataset.pickClearing;
+  const site=world.frontier.clearings.find(c=>c.id===id);
+  if(site&&site.x<PIONEER_VALLEY.westernHomesX)focusWesternLocation(site.x,site.z);
+  chooseInspection({kind:'clearing',id});return;
  }
  const button=target.closest<HTMLButtonElement>('button[data-pick-building]');
  const id=button?.dataset.pickBuilding;
- if(id&&world.buildings.some(b=>b.id===id))chooseInspection({kind:'building',id});
+ const building=world.buildings.find(b=>b.id===id);
+ if(building){
+  const {x,z}=building.parcel;
+  if(x<PIONEER_VALLEY.westernHomesX)focusWesternLocation(x,z);
+  chooseInspection({kind:'building',id:building.id});
+ }
 });
 $('pioneerSpotlightFocus').addEventListener('click',()=>{
  const now=getPioneerSpotlight(world);
@@ -343,13 +353,28 @@ $('pioneerSpotlightFocus').addEventListener('click',()=>{
  const [x,z]=parcel?[parcel.x,parcel.z]:clearing?[clearing.x,clearing.z]:
   resource?[resource.x,resource.z]:person?[person.target[0],person.target[1]]:
   [world.camp.x,world.camp.z];
- // Preserve the current orbit angle. Shift toward the actual object without
- // creating another camera, resource or phantom piece of world history.
+ focusLocation(x,z);
+ chooseInspection(item);
+});
+const westView=$<HTMLButtonElement>('pioneerWestView');
+function setWestView(active:boolean){
+ $('pioneerApp').classList.toggle('pioneer-west-view',active);
+ westView.setAttribute('aria-pressed',String(active));
+ westView.textContent=active?'查看手记':'观景';
+}
+westView.addEventListener('click',()=>setWestView(westView.getAttribute('aria-pressed')!=='true'));
+function focusWesternLocation(x:number,z:number){
+ if(innerWidth<760){
+  westView.hidden=false;
+  setWestView(true);
+ }
+ focusLocation(x,z);
+}
+function focusLocation(x:number,z:number){
  focusMotion={from:orbit.target.clone(),to:new THREE.Vector3(x,0,z),
   started:performance.now(),fromZoom:camera.zoom,
   toZoom:Math.max(camera.zoom,innerWidth<760?1.27:1.50)};
- chooseInspection(item);
-});
+}
 function animateFocus(now:number){
  if(!focusMotion)return;
  const t=Math.min(1,Math.max(0,(now-focusMotion.started)/510));
@@ -416,6 +441,7 @@ $('pioneerSeasonSkip').addEventListener('click',()=>{
 $('pioneerPause').addEventListener('click',()=>{paused=!paused;renderUI();});
 $('pioneerCamera').addEventListener('click',()=>{
  focusMotion=null;camera.position.copy(defaultEye);orbit.target.set(-1.7,0,0);
+ setWestView(false);westView.hidden=true;
  camera.zoom=1;camera.updateProjectionMatrix();orbit.update();
 });
 $('pioneerZoomIn').addEventListener('click',()=>{camera.zoom=Math.min(2.3,camera.zoom*1.15);camera.updateProjectionMatrix();});

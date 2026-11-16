@@ -8,6 +8,8 @@ import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
 import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {pioneerV6CourtyardPoint,pioneerV6YardWalkable} from './homesteadPlan.ts';
+import {PIONEER_VALLEY} from './pioneerGeography.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
  resolvePioneerNaturalAnchors,validatePioneerNaturalAnchors,
@@ -244,6 +246,14 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
  if(activity==='haul-fish')goal=targetBuilding?pioneerEntrance(targetBuilding.parcel):
   [s.camp.x,s.camp.z];
+ const westernHome=shelter&&shelter.parcel.x<PIONEER_VALLEY.westernHomesX?shelter:null;
+ const yardCenter=westernHome?pioneerV6CourtyardPoint(westernHome.parcel):null;
+ if(yardCenter&&westernHome){
+  const index=westernHome.occupants.indexOf(f.id);
+  const offset=(index-(westernHome.occupants.length-1)/2)*.72;
+  const place=pioneerV6CourtyardPoint(westernHome.parcel,offset);
+  if(place&&pioneerV6YardWalkable(westernHome.parcel,place[0],place[1]))goal=place;
+ }
  const isSame=f.activity===activity&&f.target[0]===goal[0]&&f.target[1]===goal[1];
  if(isSame&&f.commute?.length)return;
  const from:WalkPoint=activity==='haul-fish'&&site?
@@ -256,7 +266,9 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   p.id!==((activity==='haul-fish'||activity==='host-guest'||activity==='craft')?
    targetBuilding?.parcel.id:undefined));
  let commute:WalkPoint[]|null;
- if(home&&shelter?.id===home.id)commute=[from,goal];
+ if(yardCenter&&westernHome&&(goal[0]!==from[0]||goal[1]!==from[1]))
+  commute=[from,yardCenter,goal];
+ else if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
  else commute=findPioneerWalk(from,goal,obstacles);
  // A house-to-workplace trip may use two *registered and still unobstructed*
