@@ -3,7 +3,7 @@ import {appendPioneerJournal} from './pioneerChronicle.ts';
 import {onPioneerTeaStopBuilt} from './pioneerCommerce.ts';
 import {distanceToCreekSpline} from './creekCorridor.ts';
 import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/peopleState.ts';
-import {nearestRoad,type VillageParcel} from './villagePlanning.ts';
+import {nearestOnSegment,nearestRoad,type VillageParcel} from './villagePlanning.ts';
 import {pioneerNaturalParcels} from './pioneerNaturalAnchors.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
@@ -11,7 +11,8 @@ import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
 import {pioneerV6LotFor,PIONEER_V6_LOTS} from './homesteadPlan.ts';
-import {pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
+import {PIONEER_VALLEY} from './pioneerGeography.ts';
+import {pioneerClearingReachable,pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
 
 const round=(n:number)=>Math.round(n*1000)/1000;
 const hash=(n:number)=>{
@@ -54,7 +55,7 @@ export interface PioneerSurveyMetrics{
  rejectedGeometry?:Record<string,number>;
 }
 export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'shelter'>,
- metrics?:PioneerSurveyMetrics,allowUnopened=false):
+ metrics?:PioneerSurveyMetrics,allowUnopened=false,western=false):
  {parcel:VillageParcel;path:WalkPoint[]}|null{
  if(metrics)Object.assign(metrics,{candidateParcels:0,legalGeometry:0,openedLand:0,
   routeReached:0,resourceRoutesKept:0,rejectedGeometry:{}});
@@ -63,7 +64,7 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   kind==='wood-yard'?pioneerV6LotFor('wood-yard'):null;
  // H3's full wing and H2's yard are not compulsory forms. When real safe
  // ground is scarce, a household can explicitly settle for the smaller H1.
- const designs=kind==='cottage'&&preferred?.styleId!=='H1-thatch'?
+ const designs=!western&&kind==='cottage'&&preferred?.styleId!=='H1-thatch'?
   [preferred!,PIONEER_V6_LOTS['H1-thatch']]:[preferred];
  const taken=[...natural(s),...s.buildings.map(b=>b.parcel)];
  const camp={id:'temporary-camp',kind:'protected' as const,
@@ -82,7 +83,10 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  const riverDist=distanceToCreekSpline;
  const opened=s.frontier.clearings.find(c=>c.phase==='cleared'&&
   distance(c,s.camp)>7.2);
- const center=kind==='cottage'&&s.founders.length>=9&&opened?
+ const westHomes=s.buildings.filter(b=>b.kind==='cottage'&&
+  b.parcel.x<PIONEER_VALLEY.westernHomesX);
+ const center=western?westHomes[0]?.parcel??{x:-21.5,z:2.4}:
+  kind==='cottage'&&s.founders.length>=9&&opened?
   {x:opened.x,z:opened.z}:
   kind==='fish-hut'?{x:3.6,z:-2.1}:
   kind==='granary'?{x:s.camp.x+3.3,z:s.camp.z+1.6}:
@@ -98,20 +102,23 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
   field?{x:field.x,z:field.z-2.0}:{x:s.camp.x+1.6,z:s.camp.z-3.4};
  const choices:{parcel:VillageParcel;score:number}[]=[];
  const salt=s.buildings.length+1;
- const offsetX=(hash(s.seed+salt*193)-.5)*.47;
- const offsetZ=(hash(s.seed+salt*509)-.5)*.47;
+ // The west survey must rediscover the same coordinates after clearing.
+ const gridSalt=western?1:salt;
+ const offsetX=(hash(s.seed+gridSalt*193)-.5)*.47;
+ const offsetZ=(hash(s.seed+gridSalt*509)-.5)*.47;
  const projectId='pioneer-'+kind+'-'+s.nextEventId;
- for(let i=-17;i<=17;i++)for(let j=-14;j<=14;j++){
+ const westSteps=Math.ceil((s.camp.x-PIONEER_VALLEY.centerX+PIONEER_VALLEY.westRadius)/.72);
+ for(let i=western?-westSteps:-17;i<=(western?0:17);i++)for(let j=-14;j<=14;j++){
   const x=round(s.camp.x+i*.72+offsetX),z=round(s.camp.z+j*.72+offsetZ);
-  if(distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>13.3)continue;
+  if(western?x>=PIONEER_VALLEY.westernHomesX:
+   x<PIONEER_VALLEY.westernHomesX||distance({x,z},s.camp)<3.9||distance({x,z},s.camp)>13.3)continue;
   if(kind==='fish-hut'&&(riverDist(x,z)<2.9||riverDist(x,z)>5.7))continue;
   for(const v6 of designs)for(const rotation of [0,Math.PI/2]){
-   const road=nearestRoad(x,z);
    const parcel:VillageParcel={id:projectId,
     kind:kind==='cottage'?'dwelling':'workshop',x,z,
     width:v6?.width??data.width,depth:v6?.depth??data.depth,rotation,clearance:.30,
     ...(v6?{homesteadStyle:v6.styleId}:{}),
-    accessX:road.point[0],accessZ:road.point[1],builtAt:s.minutes};
+    accessX:x,accessZ:z,builtAt:s.minutes};
    if(metrics)metrics.candidateParcels++;
    const legality=validatePioneerParcel(parcel,occupied,s.roads);
    if(!legality.ok){
@@ -119,13 +126,30 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
     continue;
    }
    if(metrics)metrics.legalGeometry++;
-   if(!pioneerParcelOpened(s,parcel)&&!allowUnopened)continue;
-   if(metrics&&pioneerParcelOpened(s,parcel))metrics.openedLand++;
+   const landOpen=pioneerParcelOpened(s,parcel);
+   if(!landOpen&&!allowUnopened)continue;
+   if(metrics&&landOpen)metrics.openedLand++;
+   let road=nearestRoad(x,z);
+   if(western){
+    const entrance=pioneerEntrance(parcel);
+    road={point:entrance,distance:0,route:-1};
+    let distance=Infinity;
+    for(const existing of s.roads)for(let k=1;k<existing.points.length;k++){
+     const approach=nearestOnSegment(entrance,existing.points[k-1],existing.points[k]);
+     if(approach.distance<distance){
+      distance=approach.distance;
+      road={...approach,route:-1};
+     }
+    }
+   }
+   [parcel.accessX,parcel.accessZ]=road.point;
    const proximity=distance({x,z},center);
    const policy=s.policy==='shelter'&&kind==='cottage'?
     Math.hypot(x-(s.camp.x-1.6),z-(s.camp.z-4))*.15:
     s.policy==='food'?Math.hypot(x-(s.camp.x-4),z-(s.camp.z+4))*.12:0;
-   const score=proximity*.57+distance({x,z},s.camp)*.11+
+   const score=western?proximity+road.distance*.34+
+    hash(s.seed+i*719+j*991+salt*533+rotation*80)*.13:
+    proximity*.57+distance({x,z},s.camp)*.11+
     (kind==='fish-hut'?Math.abs(riverDist(x,z)-3.35)*1.8:0)+
     road.distance*.12+policy+hash(s.seed+i*719+j*991+salt*533+rotation*80)*.81;
    choices.push({parcel,score});
@@ -149,18 +173,20 @@ export function surveyPioneerPlot(s:PioneerWorld,kind:Exclude<PioneerBuildKind,'
  // Never let dozens of unwalkable H3 plots prevent checking smaller paid
  // footprints. Both groups still pass *identical* river, SAT, road and
  // critical-resource A* checks before a house is ever scheduled.
- const ranked=preferred&&designs.length>1?
+ const ranked=western?choices:
+  preferred&&designs.length>1?
   [...choices.filter(c=>c.parcel.homesteadStyle===preferred.styleId).slice(0,Math.min(120,candidates)),
    ...choices.filter(c=>c.parcel.homesteadStyle!==preferred.styleId).slice(0,Math.min(200,candidates))]:
   choices.slice(0,candidates);
  for(const candidate of ranked){
-  const path=pioneerBuildingPath(s.camp,candidate.parcel,taken);
+  const blockers=[...taken,candidate.parcel];
+  const path=western?findPioneerWalk([s.camp.x,s.camp.z],
+   pioneerEntrance(candidate.parcel),blockers):pioneerBuildingPath(s.camp,candidate.parcel,taken);
   if(!path)continue;
   if(allowUnopened&&!pioneerParcelOpened(s,candidate.parcel)&&
    !findPioneerWalk([s.camp.x,s.camp.z],
     [candidate.parcel.x,candidate.parcel.z],taken))continue;
   if(metrics)metrics.routeReached++;
-  const blockers=[...taken,candidate.parcel];
   if(!critical.every(site=>findPioneerWalk(
    [s.camp.x,s.camp.z],[site.x,site.z],blockers)))continue;
   // A new building must preserve the camp-to-clearing route as well as food,
@@ -242,7 +268,19 @@ export function schedulePioneerProject(s:PioneerWorld){
   record(s,'修屋工单',pioneerBuildingLabel(target.kind)+'屋面老化，乡邻主动讨论补梁和换顶。',id);
   return true;
  }
- const proposal=surveyPioneerPlot(s,kind);
+ const westward=kind==='cottage'&&s.buildings.filter(b=>b.kind==='cottage').length>=2;
+ let proposal=westward?surveyPioneerPlot(s,kind,undefined,false,true):null;
+ if(westward&&!proposal){
+  const active=s.frontier.clearings.find(c=>c.phase==='clearing');
+  const waitingForWest=active&&active.x<PIONEER_VALLEY.westernHomesX&&
+   active.radius>2.2&&pioneerClearingReachable(s,active);
+  const future=waitingForWest?null:surveyPioneerPlot(s,kind,undefined,true,true);
+  if(waitingForWest||(future&&(requestPioneerExpansionClearing(s,future.parcel)||active))){
+   s.nextSurveyAt=s.minutes+3*DAY_MINUTES;
+   return false;
+  }
+ }
+ proposal??=surveyPioneerPlot(s,kind);
  if(!proposal){
   // All genuine village needs (including gardens) may require safe new
   // land beyond the already occupied first ring.
@@ -294,7 +332,8 @@ export function schedulePioneerProject(s:PioneerWorld){
   parcel:proposal.parcel,path:proposal.path,phase:'materials',
   woodRequired:wood,woodCommitted:0,workDone:0,
   workRequired:hours,pauseReason:'需要 '+wood+' 份木料和 '+hours+' 工时'};
- record(s,'乡邻谋划'+data.label,data.why+' 梁伯勘定了从营地到新工地的可走线路。',id);
+ record(s,'乡邻谋划'+data.label,data.why+(proposal.parcel.x<PIONEER_VALLEY.westernHomesX?
+  ' 西麓已经清障，乡邻沿勘定的小路前往新工地。':' 梁伯勘定了从营地到新工地的可走线路。'),id);
  return true;
 }
 export function completePioneerProject(s:PioneerWorld){

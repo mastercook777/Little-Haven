@@ -43,7 +43,7 @@ export function parcelOverlaps(a:VillageParcel,b:VillageParcel):boolean{
  }
  return true;
 }
-function nearestOnSegment(p:GroundPoint,a:GroundPoint,b:GroundPoint):{point:GroundPoint;distance:number}{
+export function nearestOnSegment(p:GroundPoint,a:GroundPoint,b:GroundPoint):{point:GroundPoint;distance:number}{
  const dx=b[0]-a[0],dz=b[1]-a[1],sq=dx*dx+dz*dz;
  const t=sq?clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dz)/sq,0,1):0;
  const point=P(a[0]+dx*t,a[1]+dz*t);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type {PioneerWorld,PioneerResourceSite} from '../simulation/pioneerWorld.ts';
-import {pioneerIslandFraction} from '../simulation/pioneerGeography.ts';
+import {PIONEER_VALLEY,pioneerIslandFraction} from '../simulation/pioneerGeography.ts';
 import {isSafePioneerWildPlant} from '../simulation/pioneerNaturalAnchors.ts';
 
 /** The resource site's inventory remains aggregated. These few instanced
@@ -115,8 +115,10 @@ export function buildPioneerForestArt(parent:THREE.Group,s:PioneerWorld):Pioneer
   // Western buffer is visibly undergrown before it is made usable.
   // The first trees are small and sparse; large inherited valley
   // silhouettes remain separate protected world-kit and never reskin.
-  for(let n=0;n<92;n++){
-   const x=-19.0+hash(w.seed*7+n*31)*9.5;
+  const westEdge=PIONEER_VALLEY.centerX-PIONEER_VALLEY.westRadius;
+  for(let n=0;n<137;n++){
+   const x=n<92?-19+hash(w.seed*7+n*31)*9.5:
+    westEdge+hash(w.seed*7+n*31)*(-19-westEdge);
    const z=-9.1+hash(w.seed*11+n*47)*18.2;
    if(pioneerIslandFraction(x,z,2.15,2.1)>.93)continue;
    if(Math.hypot(x-w.camp.x,z-w.camp.z)<4.8)continue;

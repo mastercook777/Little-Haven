@@ -5,7 +5,7 @@ import {createWeatherArt} from './weatherArt.ts';
 import {createPioneerSeasonalVfx} from './pioneerSeasonalVfx.ts';
 import {pioneerWeatherPlacement,pioneerRoofDrips} from './pioneerAtmospherePlacement.ts';
 import {getPioneerNaturalAnchors,pioneerDeciduousLocations} from '../simulation/pioneerNaturalAnchors.ts';
-import {PIONEER_VALLEY} from '../simulation/pioneerGeography.ts';
+import {PIONEER_VALLEY,pioneerValleyDepth} from '../simulation/pioneerGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
 import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
@@ -724,8 +724,10 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const edge:[number,number][]=[];
  for(let i=0;i<48;i++){
   const a=i/48*Math.PI*2,r=1+.032*Math.sin(i*2.9)+.020*Math.cos(i*5.8);
-  edge.push([PIONEER_VALLEY.centerX+Math.cos(a)*PIONEER_VALLEY.radiusX*r,
-   Math.sin(a)*PIONEER_VALLEY.radiusZ*r]);
+  const cosine=Math.cos(a);
+  const radiusX=cosine<0?PIONEER_VALLEY.westRadius:PIONEER_VALLEY.radiusX;
+  const x=PIONEER_VALLEY.centerX+cosine*radiusX*r;
+  edge.push([x,Math.sin(a)*pioneerValleyDepth(x)*r]);
  }
  const shape=new THREE.Shape();shape.moveTo(...edge[0]);
  for(let i=1;i<edge.length;i++)shape.lineTo(...edge[i]);shape.closePath();

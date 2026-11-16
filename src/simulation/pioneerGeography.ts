@@ -1,13 +1,17 @@
-/** Pioneer-only enlargement of the miniature island. The classic valley
- * deliberately retains its existing geometry, routes and collision bounds.
- * Expansion is mostly to the west: the eastern creek continues to enter and
- * leave at the previous northern/southern island bank. */
+/** The western hills extend the pioneer map without moving the creek,
+ * the east shore or any coordinate stored by the previous release. */
 export const PIONEER_VALLEY={
- centerX:-1.7,radiusX:18.5,radiusZ:12.2,
- walkMarginX:1.30,walkMarginZ:1.25,
+ centerX:-1.7,radiusX:18.5,westRadius:27.5,radiusZ:12.2,
+ westBulgeZ:4.8,walkMarginX:1.30,walkMarginZ:1.25,westernHomesX:-17,
 } as const;
+
+export function pioneerValleyDepth(x:number){
+ const depthGain=Math.max(0,Math.min(1,(-x-12)/9));
+ return PIONEER_VALLEY.radiusZ+PIONEER_VALLEY.westBulgeZ*depthGain;
+}
+
 export function pioneerIslandFraction(x:number,z:number,marginX=0,marginZ=0){
  const b=PIONEER_VALLEY;
- return ((x-b.centerX)/(b.radiusX-marginX))**2+
-  (z/(b.radiusZ-marginZ))**2;
+ const radiusX=x<b.centerX?b.westRadius:b.radiusX;
+ return ((x-b.centerX)/(radiusX-marginX))**2+(z/(pioneerValleyDepth(x)-marginZ))**2;
 }
