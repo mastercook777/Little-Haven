@@ -8,8 +8,8 @@ import {getWeatherForMinutes} from './weather.ts';
 import {nearestRoad,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
 import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {settlePioneerResidentMotion,validPioneerResidentMotion,type PioneerResidentMotion} from './pioneerResidentMotion.ts';
 import {pioneerV6CourtyardPoint,pioneerV6YardWalkable} from './homesteadPlan.ts';
-import {PIONEER_VALLEY} from './pioneerGeography.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
  resolvePioneerNaturalAnchors,validatePioneerNaturalAnchors,
@@ -47,13 +47,14 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'socialize'|'commons-build'|'clear-land'|'fish'|'haul-fish'|'craft'|'host-guest';
+export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'eat-break'|'socialize'|'commons-build'|'clear-land'|'fish'|'haul-fish'|'craft'|'host-guest';
 export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard'|'fish-hut'|'granary'|'tea-stop';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
  id:number;name:string;role:string;color:string;
  activity:PioneerWork;target:[number,number];homeBuildingId:string|null;
  commute?:WalkPoint[];pathRoadId?:string;
+ motion?:PioneerResidentMotion;
 }
 export interface PioneerResourceSite{
  id:string;kind:'forest'|'forage'|'spring'|'field'|'fish';x:number;z:number;
@@ -246,13 +247,12 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   [s.camp.x+(f.id%4-1.5)*.43,s.camp.z+(f.id%3-1)*.38];
  if(activity==='haul-fish')goal=targetBuilding?pioneerEntrance(targetBuilding.parcel):
   [s.camp.x,s.camp.z];
- const westernHome=shelter&&shelter.parcel.x<PIONEER_VALLEY.westernHomesX?shelter:null;
- const yardCenter=westernHome?pioneerV6CourtyardPoint(westernHome.parcel):null;
- if(yardCenter&&westernHome){
-  const index=westernHome.occupants.indexOf(f.id);
-  const offset=(index-(westernHome.occupants.length-1)/2)*.72;
-  const place=pioneerV6CourtyardPoint(westernHome.parcel,offset);
-  if(place&&pioneerV6YardWalkable(westernHome.parcel,place[0],place[1]))goal=place;
+ const yardCenter=shelter?pioneerV6CourtyardPoint(shelter.parcel):null;
+ if(yardCenter&&shelter){
+  const index=shelter.occupants.indexOf(f.id);
+  const offset=(index-(shelter.occupants.length-1)/2)*.72;
+  const place=pioneerV6CourtyardPoint(shelter.parcel,offset);
+  if(place&&pioneerV6YardWalkable(shelter.parcel,place[0],place[1]))goal=place;
  }
  const isSame=f.activity===activity&&f.target[0]===goal[0]&&f.target[1]===goal[1];
  if(isSame&&f.commute?.length)return;
@@ -266,7 +266,7 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   p.id!==((activity==='haul-fish'||activity==='host-guest'||activity==='craft')?
    targetBuilding?.parcel.id:undefined));
  let commute:WalkPoint[]|null;
- if(yardCenter&&westernHome&&(goal[0]!==from[0]||goal[1]!==from[1]))
+ if(yardCenter&&shelter&&(goal[0]!==from[0]||goal[1]!==from[1]))
   commute=[from,yardCenter,goal];
  else if(home&&shelter?.id===home.id)commute=[from,goal];
  else if(!home&&jobRoute?.length)commute=jobRoute.map(p=>[p[0],p[1]]);
@@ -406,34 +406,42 @@ function step(s:PioneerWorld){
  if(hour===7||hour===12||hour===18){
   const served=servePioneerMeal(s);
   if(served>=s.founders.length/6){
-   const seats=[3,4,6,8][s.commons.stage];
-   for(let i=0;i<s.founders.length;i++){
-    const f=s.founders[i];
-    const activity:PioneerWork=s.commons.stage>=1&&i===1?'cook':
-     i<seats?'eat':'eat-home';
-    allocate(s,f,activity);
-    if(activity==='cook'&&f.activity==='cook')
-     s.commons.cookingHours=round(s.commons.cookingHours+1);
+   const early=s.founders.length<=4;
+   const cook=s.commons.stage>=1&&(hour!==7||early)?s.founders[1]:undefined;
+   const candidates=s.founders.filter(f=>f!==cook);
+   const seats=early?candidates.length:hour===7?0:hour===12?2:3;
+   const offset=(day+(hour===18?3:0))%candidates.length;
+   const common=new Set(Array.from({length:seats},(_,i)=>candidates[(offset+i)%candidates.length]));
+   for(const f of s.founders){
+    if(hour===12&&seats&&!early&&f!==cook&&!common.has(f)){
+     // The meal is already paid. A lunch break can stay at today's workplace.
+     f.activity='eat-break';
+     f.pathRoadId=undefined;
+     continue;
+    }
+    allocate(s,f,f===cook?'cook':common.has(f)?'eat':f.homeBuildingId?'eat-home':'eat');
+    if(f.activity==='cook')s.commons.cookingHours=round(s.commons.cookingHours+1);
    }
    return;
   }
   // With almost empty cupboards there is no fake feast. A normal daylight
   // emergency gathering shift runs below instead.
  }
- if(hour===19&&s.commons.stage>=1&&
+ if(hour===19&&s.commons.stage>=1&&weather!=='rain'&&
   s.resources.food>=s.founders.length*.45&&
   s.resources.water>=s.founders.length*.30){
-  const seats=[0,3,5,7][s.commons.stage];
-  const attending=s.founders.slice(0,seats);
+  const seats=Math.min(3,s.founders.length);
+  const attending=Array.from({length:seats},(_,i)=>s.founders[(day+i)%s.founders.length]);
   for(const f of attending){
    allocate(s,f,'socialize');
    if(f.activity==='socialize')s.commons.socialHours++;
   }
-  for(const f of s.founders.slice(seats))
+  for(const f of s.founders)if(!attending.includes(f))
    allocate(s,f,f.homeBuildingId?'shelter':'rest');
-  if(day%9===2&&attending.length>=2){
+  const gathered=attending.filter(f=>f.activity==='socialize');
+  if(day%9===2&&gathered.length>=2){
    log(s,'火塘边的闲话',
-    attending.slice(0,3).map(f=>f.name).join('与')+
+    gathered.map(f=>f.name).join('与')+
     '在'+['营火','火塘','灶棚','村心'][s.commons.stage]+'歇脚，聊起田里收成和屋舍修葺。',
     'pioneer-commons');
   }
@@ -613,7 +621,13 @@ export function advancePioneerWorld(s:PioneerWorld,realSeconds:number){
  if(!Number.isFinite(realSeconds)||realSeconds<0)throw new RangeError('Invalid advance');
  const from=Math.floor(s.minutes/HOUR),target=s.minutes+realSeconds*PIONEER_MINUTES_PER_SECOND;
  const to=Math.floor(target/HOUR);
- for(let i=from+1;i<=to;i++){s.minutes=i*HOUR;step(s);settleLivingFatesHour(s);}
+ for(let i=from+1;i<=to;i++){
+  s.minutes=i*HOUR;
+  const previous=new Map(s.founders.map(f=>[f.id,{...f}]));
+  step(s);
+  settlePioneerResidentMotion(s,previous);
+  settleLivingFatesHour(s);
+ }
  s.minutes=target;
  return {hours:to-from,buildings:s.buildings.length,
   stage:s.intent?.phase??(s.buildings.length?'in-use':'unplanned')};
@@ -643,6 +657,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    !Array.isArray(s.founders)||s.founders.length<3||s.founders.length>12||
    !s.founders.every(f=>Number.isInteger(f.id)&&f.id>=1&&Number.isFinite(f.target?.[0])&&Number.isFinite(f.target?.[1]))||
    new Set(s.founders.map(f=>f.id)).size!==s.founders.length||
+   !s.founders.every(f=>f.motion===undefined||validPioneerResidentMotion(f.motion,s.minutes))||
    !s.resources||!['wood','food','water'].every(k=>Number.isFinite(s.resources[k as keyof typeof s.resources])&&s.resources[k as keyof typeof s.resources]>=0)||
    !Array.isArray(s.sites)||s.sites.length<3||s.sites.length>20||
    !s.sites.every(site=>Number.isFinite(site.stock)&&site.stock>=0&&Number.isFinite(site.capacity)&&site.capacity>=site.stock&&Number.isFinite(site.totalGathered))||

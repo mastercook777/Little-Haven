@@ -8,7 +8,8 @@ import {getPioneerNaturalAnchors,pioneerDeciduousLocations} from '../simulation/
 import {PIONEER_VALLEY,pioneerValleyDepth} from '../simulation/pioneerGeography.ts';
 import {getPioneerCalendar,getPioneerWeather,type PioneerWorld,type PioneerFounder,
  type PioneerBuildKind} from '../simulation/pioneerWorld.ts';
-import {samplePioneerWalk,roadGeometrySignature,type PioneerRoad,type WalkPoint} from '../simulation/pioneerPaths.ts';
+import {pioneerHomeDoor,samplePioneerResident} from '../simulation/pioneerResidentMotion.ts';
+import {roadGeometrySignature,type PioneerRoad} from '../simulation/pioneerPaths.ts';
 import {buildPioneerRoof,PIONEER_SHELTER_ROOF} from './pioneerRoof.ts';
 import {dressCharacter} from './characterKit.ts';
 import {pioneerCottageArchetype,pioneerCottageOrdinal} from './pioneerArchetypes.ts';
@@ -268,7 +269,7 @@ function campVisual(root:THREE.Group,s:PioneerWorld){
 }
 function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|'frame'|'complete',
  progress:number){
- const g=group(root,parcel.x,.18,parcel.z);g.rotation.y=parcel.rotation;
+ const g=group(root,parcel.x,.18,parcel.z);g.rotation.y=-parcel.rotation;
  g.name=phase==='complete'?'pioneer-occupied-shelter':'pioneer-construction';
  g.userData.buildingId=parcel.id;
  // Maximal roof and porch projection remains inside the reserved SAT footprint.
@@ -303,13 +304,16 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
   for(const x of [-.99,.99])box(g,x,.90,-.84,.10,1.25,.08,wood);
   box(g,0,.67,-.84,1.86,1.10,.08,
    new THREE.MeshStandardMaterial({color:'#bcb08d',transparent:true,opacity:.88,side:THREE.DoubleSide}));
-  const entrance=box(g,0,.58,.88,.93,.83,.07,material('#9b7956'));
-  entrance.name='shelter-entrance';
+  const hinge=group(g,-.465,0,.88);
+  hinge.name='residential-door-hinge';hinge.userData.swing=-1;
+  box(hinge,.465,.58,0,.93,.83,.07,material('#9b7956')).name='shelter-entrance';
   box(g,0,.27,1.24,1.15,.16,.45,stone);
   for(const x of [-.72,.72])
    orb(g,x,.24,1.45,.22,material('#88a36c'),1,.55,1);
   const lamp=orb(g,-.73,1.62,1.02,.16,
-   material('#f1d59a','#d49b5d'),.8,1.15,.8);lamp.name='shelter-lantern';
+   new THREE.MeshStandardMaterial({color:'#f1d59a',emissive:'#d49b5d',emissiveIntensity:0}),
+   .8,1.15,.8);
+  lamp.name='shelter-lantern';lamp.userData.residentialLamp=true;
  }
  plinth.name='shelter-plinth';
  return g;
@@ -390,7 +394,7 @@ function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind
   authored.name='pioneer-'+kind+'-'+phase;
   return authored;
  }
- const g=group(parent,p.x,.18,p.z);g.rotation.y=p.rotation;
+ const g=group(parent,p.x,.18,p.z);g.rotation.y=kind==='cottage'?-p.rotation:p.rotation;
  g.name='pioneer-'+kind+'-'+phase;g.userData.buildingId=p.id;
  if(kind==='garden'){
   const gardenStyle=pioneerGardenStyle(pioneerVariant);
@@ -704,6 +708,9 @@ function drawFootpaths(parent:THREE.Group,roads:readonly PioneerRoad[]){
 export interface PioneerGraphics{
  root:THREE.Group;update(s:PioneerWorld,seconds:number):void;
  setSelected(selection:PioneerSelection|null):void;
+ residentViews():{id:number;activity:string;position:number[];yaw:number;visible:boolean;
+  bowl:boolean;tool:boolean;moving:boolean;indoors:string|null}[];
+ homeViews():{id:string;open:boolean;lit:boolean}[];
  signatures():{buildings:number;renderedStructures:number;phase:string;people:number;
   roads:number;commonsStage:number;commonsBeds:number;cookingActors:number;socialActors:number;
   paidGroundPlots:number;paintedRealRoads:number;sharedRoadPavers:number;roadLength:number;
@@ -773,6 +780,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
  const gardenCrops=new Map<string,THREE.Mesh[]>();
  const fishProps=new Map<string,THREE.Mesh[]>(),grainProps=new Map<string,THREE.Mesh[]>();
  const waitingFishProps=new Map<string,THREE.Object3D>();
+ const homes=new Map<string,{door:ReturnType<typeof pioneerHomeDoor>;hinges:THREE.Object3D[];
+  lamps:THREE.MeshStandardMaterial[];opening:number;lit:boolean}>();
  let latestWorld=world;
  let selected:PioneerSelection|null=null;
  const glow=new THREE.Mesh(new THREE.RingGeometry(.89,1.0,48),
@@ -797,14 +806,14 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   }else if(selected.kind==='person'){
    const index=s.founders.findIndex(f=>String(f.id)===selected?.id);
    const figure=index>=0?people[index]:undefined;
-   if(figure){
+   if(figure?.root.visible){
     glow.visible=true;glow.position.set(figure.root.position.x,.23,figure.root.position.z);
     glow.scale.set(.55,.55,1);glow.rotation.set(-Math.PI/2,0,0);
    }else glow.visible=false;
   }else glow.visible=false;
  }
  function update(s:PioneerWorld,seconds:number){
-  updateMarker(s);forest.update(s,seconds);
+  forest.update(s,seconds);
   latestWorld=s;
   const phase=s.intent?.phase??'none';
   const progress=s.intent?.workDone??0;
@@ -817,7 +826,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    (s.intent?.parcel?.z??'');
   let rebuilt=false;
   if(signature!==lastBuildSig||progressIndex!==lastProgressIndex){
-   rebuilt=true;gardenCrops.clear();fishProps.clear();grainProps.clear();waitingFishProps.clear();
+   rebuilt=true;gardenCrops.clear();fishProps.clear();grainProps.clear();waitingFishProps.clear();homes.clear();
    while(constructionLayer.children.length){
     const old=constructionLayer.children[0];constructionLayer.remove(old);
    }
@@ -828,6 +837,15 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
      trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined,
       built.kind==='cottage'?pioneerCottageOrdinal(s.buildings,built.id):
        built.kind==='garden'?pioneerGardenOrdinal(s.buildings,built.id):0);
+    if(built.kind==='cottage'||built.kind==='shelter'){
+     const hinges:THREE.Object3D[]=[],lamps:THREE.MeshStandardMaterial[]=[];
+     plot.traverse(child=>{
+      if(child.name==='residential-door-hinge')hinges.push(child);
+      if(child instanceof THREE.Mesh&&child.userData.residentialLamp&&
+       child.material instanceof THREE.MeshStandardMaterial)lamps.push(child.material);
+     });
+     homes.set(built.id,{door:pioneerHomeDoor(built),hinges,lamps,opening:0,lit:false});
+    }
     if(built.kind==='garden'){
      const crops:THREE.Mesh[]=[];
      plot.traverse(child=>{
@@ -948,75 +966,84 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const logs=pioneerVisibleWoodLogs(s);
   for(let i=0;i<camp.woodLogs.length;i++)
    camp.woodLogs[i].visible=i<logs;
+  for(const home of homes.values()){home.opening=0;home.lit=false;}
   people.forEach((visual,i)=>{
-   const f=s.founders[i],night=dayHour>=20||dayHour<7;
-   const path:readonly WalkPoint[]=f.commute?.length?f.commute:[[s.camp.x,s.camp.z],[f.target[0],f.target[1]]];
-   const phaseHour=(s.minutes%60)/60;
-   // Walk the actual saved route, including bends around houses and riverbank.
-   const along=night?1:phaseHour<.27?phaseHour/.27:
-    phaseHour>.78?(1-phaseHour)/.22:1;
-   const t=Math.max(0,Math.min(1,along));
-   const [x,z]=samplePioneerWalk(path,t);
-   const ahead=samplePioneerWalk(path,Math.min(1,t+.035));
-   const moving=!night&&(phaseHour<.27||phaseHour>.78)&&path.length>1;
+   const f=s.founders[i],motion=samplePioneerResident(f,s.minutes);
+   const {point:[x,z],ahead,moving,arrived,indoors,doorPass,carryingFish}=motion;
+   const doorway=doorPass?homes.get(doorPass):undefined;
+   const doorDistance=doorway?Math.hypot(x-doorway.door[0],z-doorway.door[1]):Infinity;
+   if(doorway)doorway.opening=Math.max(doorway.opening,Math.max(0,Math.min(1,(1.55-doorDistance)/.82)));
+   const household=indoors?homes.get(indoors):undefined;
+   if(household&&(dayHour>=19||dayHour<7))household.lit=true;
    const bob=moving?Math.abs(Math.sin(seconds*7+i))*.045:0;
    visual.root.position.set(x,.19+bob,z);
-   const heading=Math.atan2(ahead[0]-x,ahead[1]-z);
-   if(Number.isFinite(heading)&&moving)visual.root.rotation.y=heading;
+   if(moving&&Math.hypot(ahead[0]-x,ahead[1]-z)>.001)
+    visual.root.rotation.y=Math.atan2(ahead[0]-x,ahead[1]-z);
    const swing=moving?Math.sin(seconds*9+i)*.35:.04*Math.sin(seconds*2+i);
    visual.arms[0].rotation.x=swing;visual.arms[1].rotation.x=-swing;
    visual.legs[0].rotation.x=-swing;visual.legs[1].rotation.x=swing;
-   visual.root.scale.setScalar(i<3?1:.95);
+   const bodyScale=i<3?1:.95;
+   const crouch=doorDistance<.75?.20*(1-doorDistance/.75):0;
+   visual.root.scale.set(bodyScale,bodyScale*(1-crouch),bodyScale);
    visual.upper.rotation.z=moving?Math.sin(seconds*8+i)*.025:Math.sin(seconds*.75+i)*.01;
-   visual.tool.visible=f.activity==='cook';
-   visual.mealBowl.visible=f.activity==='eat'||f.activity==='eat-home'||f.activity==='host-guest';
+   visual.tool.visible=f.activity==='cook'&&arrived;
+   visual.mealBowl.visible=arrived&&
+    ['eat','eat-home','eat-break','host-guest'].includes(f.activity);
    const forester=f.activity==='collect-wood'||f.activity==='clear-land';
-   visual.axe.visible=forester&&!(moving&&phaseHour>.78);
-   visual.rod.visible=f.activity==='fish'&&!moving;
-   visual.cargo.visible=f.activity==='collect-wood'&&moving&&phaseHour>.78;
-   visual.fishBasket.visible=f.activity==='haul-fish';
-   visual.axe.rotation.z=forester&&!moving?
+   visual.axe.visible=forester&&arrived;
+   visual.rod.visible=f.activity==='fish'&&arrived;
+   visual.cargo.visible=f.activity!=='collect-wood'&&moving&&f.motion?.carryingWood===true;
+   visual.fishBasket.visible=carryingFish;
+   visual.axe.rotation.z=forester&&arrived?
     .32*Math.sin(seconds*6+i):0;
-   if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build'||f.activity==='craft')&&!moving){
+   if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build'||f.activity==='craft')&&arrived){
     const effort=Math.sin(seconds*5+i)*.20;
     visual.arms[0].rotation.x=-.72+effort;visual.arms[1].rotation.x=-.72-effort;
-   }else if(forester&&!moving){
+   }else if(forester&&arrived){
     visual.arms[0].rotation.x=-1.03+.35*Math.sin(seconds*7+i);
     visual.arms[1].rotation.x=-.38;
     visual.head.rotation.x=.15;
-   }else if(f.activity==='fish'&&!moving){
+   }else if(f.activity==='fish'&&arrived){
     visual.arms[0].rotation.x=-.83+.10*Math.sin(seconds*2.4+i);
     visual.arms[1].rotation.x=-.61;
     visual.rod.rotation.x=.12*Math.sin(seconds*2+i);
-   }else if(f.activity==='haul-fish'){
+   }else if(carryingFish){
     visual.arms[0].rotation.x=-.84;visual.arms[1].rotation.x=-.84;
     visual.head.rotation.x=.08;
-   }else if(f.activity==='host-guest'&&!moving){
+   }else if(f.activity==='host-guest'&&arrived){
      // The serving resident is at the actual tea stop with a bowl,
      // visibly spending this hour instead of collecting in the forest.
      visual.arms[0].rotation.x=-.81+.12*Math.sin(seconds*2.5+i);
      visual.arms[1].rotation.x=-.64;
      visual.head.rotation.y=.12*Math.sin(seconds*1.7+i);
-    }else if(f.activity==='cook'&&!moving){
+    }else if(f.activity==='cook'&&arrived){
     visual.arms[0].rotation.x=-1.0+.3*Math.sin(seconds*4+i);
     visual.arms[1].rotation.x=-.50+.25*Math.cos(seconds*4+i);
     visual.tool.rotation.z=.15*Math.sin(seconds*4+i);
     visual.head.rotation.x=.13;
-   }else if((f.activity==='eat'||f.activity==='eat-home')&&!moving){
+   }else if((f.activity==='eat'||f.activity==='eat-home'||f.activity==='eat-break')&&arrived){
     visual.arms[0].rotation.x=-.92+.16*Math.sin(seconds*5+i);
     visual.arms[1].rotation.x=-.66;
     visual.head.rotation.x=.16;
-   }else if(f.activity==='socialize'&&!moving){
+   }else if(f.activity==='socialize'&&arrived){
     visual.arms[0].rotation.z=.22*Math.sin(seconds*3+i);
     visual.arms[1].rotation.x=-.44+.22*Math.cos(seconds*2+i);
     visual.head.rotation.y=.22*Math.sin(seconds*1.8+i);
-   }else if((f.activity==='forage'||f.activity==='farm'||f.activity==='seed-trial')&&!moving){
+   }else if((f.activity==='forage'||f.activity==='farm'||f.activity==='seed-trial')&&arrived){
     visual.root.position.y-=.15;visual.head.rotation.x=.12;
     visual.arms[0].rotation.x=-.55;visual.arms[1].rotation.x=-.55;
    }else visual.head.rotation.x=0;
    if(f.activity!=='socialize'&&f.activity!=='host-guest'){visual.head.rotation.y=0;visual.arms[0].rotation.z=0;}
-   visual.root.visible=true;
+   visual.root.visible=!indoors;
   });
+  for(const home of homes.values()){
+   for(const hinge of home.hinges)hinge.rotation.y=home.opening*hinge.userData.swing*1.25;
+   for(const lamp of home.lamps){
+    lamp.emissive.set('#e6a451');
+    lamp.emissiveIntensity=home.lit?.78:0;
+   }
+  }
+  updateMarker(s);
   const visiting=s.commerce.activeVisitor;
   traveler.visible=!!visiting&&s.buildings.some(b=>b.id===visiting.teaStopId);
   if(traveler.visible&&visiting){
@@ -1029,7 +1056,13 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   river.animate(seconds);
  }
  update(world,0);
- return {root,update,setSelected:(selection)=>{selected=selection;updateMarker(latestWorld);},
+ return {root,update,residentViews:()=>people.map((figure,i)=>{
+   const resident=latestWorld.founders[i];
+   const motion=samplePioneerResident(resident,latestWorld.minutes);
+   return {id:resident.id,activity:resident.activity,position:figure.root.position.toArray(),
+    yaw:figure.root.rotation.y,visible:figure.root.visible,bowl:figure.mealBowl.visible,
+    tool:figure.tool.visible,moving:motion.moving,indoors:motion.indoors};
+  }),homeViews:()=>[...homes].map(([id,{opening,lit}])=>({id,open:opening>.01,lit})),setSelected:(selection)=>{selected=selection;updateMarker(latestWorld);},
   signatures:()=>({
   buildings:latestWorld.buildings.length,renderedStructures,
   phase:latestWorld.intent?.phase??(latestWorld.buildings.length?'complete':'none'),

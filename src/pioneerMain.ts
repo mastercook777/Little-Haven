@@ -3,6 +3,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {buildPioneerVillage,pioneerHitSelection} from './graphics/pioneerVillage.ts';
 import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspection.ts';
 import {getPioneerSpotlight,type PioneerSpotlight} from './ui/pioneerSpotlight.ts';
+import {samplePioneerResident} from './simulation/pioneerResidentMotion.ts';
 import {PIONEER_VALLEY} from './simulation/pioneerGeography.ts';
 import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
 import {PIONEER_GUEST_POLICIES,setPioneerGuestPolicy,
@@ -78,7 +79,7 @@ const labels:Record<PioneerWork,string>={
  rest:'照看营地', 'collect-wood':'林缘拾柴','forage':'入林采食',
  'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
  'shelter':'回家休息','farm':'耕作收菜','seed-trial':'试种留种','repair':'修屋补梁',
- 'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'家中吃饭',
+ 'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'在自家庭院用餐','eat-break':'在手边歇脚用餐',
  'socialize':'村心闲谈','commons-build':'修建公共村心',
  'clear-land':'林缘清障开荒',
  fish:'河岸捕鱼','haul-fish':'背鱼归仓',craft:'木坊锯作','host-guest':'茶棚接客'
@@ -351,7 +352,7 @@ $('pioneerSpotlightFocus').addEventListener('click',()=>{
  const resource=item.kind==='site'?world.sites.find(site=>site.id===item.id):undefined;
  const person=item.kind==='person'?world.founders.find(f=>String(f.id)===item.id):undefined;
  const [x,z]=parcel?[parcel.x,parcel.z]:clearing?[clearing.x,clearing.z]:
-  resource?[resource.x,resource.z]:person?[person.target[0],person.target[1]]:
+  resource?[resource.x,resource.z]:person?samplePioneerResident(person,world.minutes).point:
   [world.camp.x,world.camp.z];
  focusLocation(x,z);
  chooseInspection(item);
@@ -553,6 +554,8 @@ const debugging={
   renderUI();return changed;},
  reset:(seed=world.seed)=>{replaceWorld(createPioneerWorld(seed));persist();return true;},
  getVisuals:()=>valley.signatures(),
+ getResidentViews:()=>valley.residentViews(),
+ getHomeViews:()=>valley.homeViews(),
  getCameraSnapshot:()=>({
   eye:camera.position.toArray(),target:orbit.target.toArray(),
   zoom:camera.zoom,left:camera.left,right:camera.right,
