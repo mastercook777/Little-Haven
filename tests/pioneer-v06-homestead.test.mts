@@ -409,6 +409,12 @@ test('v0.6.3 villagers keep their position between shifts, eat apart and enter o
  assert.equal(s.founders.filter(f=>f.activity==='cook'||f.activity==='eat').length,3);
  assert.equal(s.founders.filter(f=>f.activity==='eat-break').length,9);
  assert.deepEqual(s.founders.map(f=>samplePioneerResident(f,s.minutes).point),beforePosition);
+ go(day+17*60);
+ const porter=s.founders.find(f=>f.activity==='haul-fish');
+ if(porter){
+  assert.ok(porter.motion?.fishPickup!==undefined);
+  assert.ok(porter.motion.path.some(p=>s.sites.some(site=>site.kind==='fish'&&p[0]===site.x&&p[1]===site.z)));
+ }
  go(day+20*60);
  const inbound=s.founders.filter(f=>f.motion?.toHomeId&&f.motion.path.length>1);
  assert.ok(inbound.length>=8);

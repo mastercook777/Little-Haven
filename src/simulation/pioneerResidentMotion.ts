@@ -108,10 +108,10 @@ export function settlePioneerResidentMotion(s:PioneerWorld,previous:ReadonlyMap<
   const prior=old?.commute;
   const pickup=f.activity==='haul-fish'?cached?.[0]:undefined;
   const approach=pickup?(same(exit,pickup)?[exit]:publicRoute(s,exit,pickup,occupied)):null;
+  const delivery=pickup&&approach?publicRoute(s,pickup,entry,occupied):null;
   let main:WalkPoint[]|null;
   if(localRoute)main=localRoute;
-  else if(approach&&cached&&same(cached.at(-1)!,entry)&&roadSegmentsSafe(cached,occupied))
-   main=[...approach,...cached.slice(1)];
+  else if(approach&&delivery)main=[...approach,...delivery.slice(1)];
   else if(same(exit,entry))main=[exit];
   else main=publicRoute(s,exit,entry,occupied);
   if(!main&&prior&&cached&&same(prior.at(-1)!,exit)&&same(cached.at(-1)!,entry)&&
