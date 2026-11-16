@@ -9,12 +9,94 @@ import {pioneerClearingReachable} from '../src/simulation/pioneerFrontier.ts';
 import {PIONEER_V6_LOTS,pioneerV6HomesteadPlan,pioneerV6PlanFits,pioneerV6YardWalkable,pioneerV6CourtyardPoint} from '../src/simulation/homesteadPlan.ts';
 import {pioneerWalkable,pioneerEntrance,roadSegmentsSafe,findPioneerWalk} from '../src/simulation/pioneerPaths.ts';
 import {makeV6Homestead,pioneerV6Roof} from '../src/graphics/homesteadScene.ts';
+import {buildPioneerFacilityVisual} from '../src/graphics/pioneerVillage.ts';
 import {pioneerRoofDrips} from '../src/graphics/pioneerAtmospherePlacement.ts';
 import {buildPioneerForestArt} from '../src/graphics/pioneerForestArt.ts';
+import {pioneerGroundUsePlan,makePioneerGroundUseArt} from '../src/graphics/pioneerGroundUseArt.ts';
+import {pioneerTerrainUseAt,applyPioneerTerrainUse} from '../src/graphics/pioneerTerrainUse.ts';
+import {buildCarvedTerrain} from '../src/graphics/carvedTerrain.ts';
+import {creekPointAt} from '../src/simulation/creekCorridor.ts';
 import {validatePioneerParcel} from '../src/simulation/pioneerParcelRules.ts';
 import {parcelOverlaps} from '../src/simulation/villagePlanning.ts';
 import {pioneerNaturalParcels} from '../src/simulation/pioneerNaturalAnchors.ts';
 import {surveyPioneerPlot,type PioneerSurveyMetrics} from '../src/simulation/pioneerGrowth.ts';
+
+test('v0.6 Phase B terrain carries real growing land use without altering the riverbed',()=>{
+ const empty=createPioneerWorld(42,1000);
+ assert.equal(pioneerTerrainUseAt(empty,empty.camp.x,empty.camp.z).weight,0);
+ const creek=creekPointAt(.51);
+ assert.equal(pioneerTerrainUseAt(empty,creek[0],creek[1]).weight,0);
+ const outline:[number,number][]=[[-15,-10],[13,-10],[13,10],[-15,10]];
+ const grass=new THREE.MeshStandardMaterial({color:'#8eae7d'});
+ const mesh=buildCarvedTerrain(outline,grass);
+ const verts=mesh.geometry.getAttribute('position');
+ const colors=mesh.geometry.getAttribute('color');
+ const original=Array.from(colors.array);
+ const noUse=applyPioneerTerrainUse(mesh,empty);
+ assert.equal(noUse.alteredVertices,0);
+ assert.deepEqual(Array.from(colors.array),original);
+ advancePioneerWorld(empty,(48*3*DAY_MINUTES-empty.minutes)/3);
+ const home=empty.buildings.find(b=>b.kind==='cottage')!;
+ assert.ok(home);
+ const inhabited=pioneerTerrainUseAt(empty,home.parcel.x,home.parcel.z);
+ assert.ok(inhabited.weight>.30,'real households must affect surrounding land');
+ assert.equal(pioneerTerrainUseAt(empty,creek[0],creek[1]).weight,0,
+  'the actual creek corridor may never be painted over');
+ const paid=applyPioneerTerrainUse(mesh,empty);
+ assert.ok(paid.alteredVertices>40&&paid.meanUse>.01,
+  'the new land-use layer must affect the full visible terrain, not one tiny decal');
+ const first=Array.from(colors.array);
+ assert.notDeepEqual(first,original);
+ applyPioneerTerrainUse(mesh,empty);
+ assert.deepEqual(Array.from(colors.array),first,
+  'repeated rendering cannot accumulate or drift soil colors');
+ const restored=createPioneerWorld(42,1000);
+ const gone=applyPioneerTerrainUse(mesh,restored);
+ assert.equal(gone.alteredVertices,0);
+ assert.deepEqual(Array.from(colors.array),original,
+  'new-game land must restore the actual unbuilt grassy island');
+ assert.equal(mesh.geometry.getAttribute('position'),verts,
+  'no decorative paint can move the riverbed or walkable terrain');
+});
+
+test('v0.6 Phase B ground is paid and registered, not a canned empty valley',()=>{
+ const s=createPioneerWorld(42,1000);
+ const empty=pioneerGroundUsePlan(s),emptyMesh=makePioneerGroundUseArt(s);
+ assert.equal(empty.plots.length,0);
+ assert.equal(empty.paths.length,0);
+ assert.equal(empty.sharedNodes.length,0);
+ assert.equal(emptyMesh.root.children.length,0,
+  'no permanent paths, private courtyards or paving before first construction');
+ advancePioneerWorld(s,(48*3*DAY_MINUTES-s.minutes)/3);
+ const plan=pioneerGroundUsePlan(s),scene=makePioneerGroundUseArt(s);
+ assert.ok(s.buildings.length>=5&&s.roads.length>=5);
+ assert.equal(plan.plots.length,s.buildings.length);
+ assert.equal(scene.signatures().paidGroundPlots,s.buildings.length);
+ assert.equal(scene.signatures().paintedRealRoads,s.roads.length);
+ assert.ok(scene.signatures().roadLength>20);
+ assert.ok(scene.root.getObjectByName('registered-road-shoulder-not-an-extra-path'));
+ assert.ok(scene.root.getObjectByName('paid-fields-soil-courts'));
+ assert.ok(scene.root.getObjectByName('paid-homes-soil-courts'));
+ const ids=new Set(s.buildings.map(b=>b.id));
+ assert.ok(plan.paths.every(road=>s.roads.some(r=>r.id===road.id&&ids.has(r.buildingId))),
+  'visible tracks must be actual registered roads to completed buildings');
+ // The soil meshes are formed only from the paid parcel interior, not from
+ // an arbitrary painted district that crosses other roofs, forest or river.
+ for(const child of scene.root.children){
+  if(!(child instanceof THREE.Mesh)||!child.name.startsWith('paid-'))continue;
+  const vertices=child.geometry.getAttribute('position');
+  for(let i=0;i<vertices.count;i++){
+   const x=vertices.getX(i),z=vertices.getZ(i);
+   const inside=s.buildings.some(b=>{
+    const p=b.parcel,dx=x-p.x,dz=z-p.z,
+     cs=Math.cos(p.rotation),sn=Math.sin(p.rotation);
+    const lx=dx*cs+dz*sn,lz=-dx*sn+dz*cs;
+    return Math.abs(lx)<=p.width/2+.001&&Math.abs(lz)<=p.depth/2+.001;
+   });
+   assert.ok(inside,'paid soil escaped legal built land at '+x+','+z);
+  }
+ }
+});
 
 test('v0.6 starts with three founders and no phantom houses or paid courtyards',()=>{
  const s=createPioneerWorld(42,1000);
@@ -69,6 +151,69 @@ test('v0.6 paid full-lot residential shapes and open workspace have actual gate 
    assert.equal(full.getObjectByName('mountain-double-leaf-door'),undefined);
   }
  }
+});
+
+test('v0.6 paid compound models are actually used by the real village renderer',()=>{
+ for(const entry of Object.values(PIONEER_V6_LOTS)){
+  const style=entry.styleId,kind=style==='W1-open-yard'?'wood-yard':'cottage';
+  const parcel={id:'live-'+style,kind:'dwelling' as const,x:-6,z:-3,
+   width:entry.width,depth:entry.depth,rotation:0,clearance:.30,
+   accessX:-6,accessZ:-3+entry.depth/2+.8,builtAt:100,homesteadStyle:style};
+  const root=new THREE.Group();
+  const unfinished=buildPioneerFacilityVisual(root,parcel,kind,'foundation',.3);
+  assert.ok(unfinished.getObjectByName('paid-foundation'),style+' actual builder floor missing');
+  assert.ok(!unfinished.getObjectByName('real-main-building-volume'),
+   style+' must not generate complete buildings during excavation');
+  const full=buildPioneerFacilityVisual(root,parcel,kind,'complete',1,98,
+   undefined,false,true);
+  assert.equal(full.userData.buildingId,parcel.id);
+  assert.ok(full.userData.staticBatchStats?.merged>=3&&
+   full.userData.staticBatchStats.after<full.userData.staticBatchStats.before,
+   style+' live authored house should batch repetitive wood geometry: '+
+   JSON.stringify(full.userData.staticBatchStats));
+  assert.ok(full.getObjectByName('paid-working-ground'));
+  assert.ok(full.getObjectByName('real-main-building-volume'),
+   style+' was replaced by the old generic roof despite saved homesteadStyle');
+  assert.ok(full.getObjectByName('paid-residential-loft')||
+   kind==='wood-yard',style+' paid loft missing');
+  if(kind==='cottage'){
+   assert.ok(full.getObjectByName('real-courtyard-gatewall'));
+   assert.ok(full.getObjectByName('household-footpath'));
+  }else{
+   assert.ok(full.getObjectByName('actual-wood-working-apron'));
+  }
+ }
+});
+
+test('v0.6 Phase B paid silhouette geometry distinguishes all three residential types',()=>{
+ const seen=new Set<string>();
+ const featureByStyle={
+  'H1-thatch':'low-thatch-roof-rhythm',
+  'H2-farmyard':'farmyard-attached-veranda',
+  'H3-wing':'paid-side-work-wing'
+ } as const;
+ for(const style of Object.keys(featureByStyle) as Array<keyof typeof featureByStyle>){
+  const lot=PIONEER_V6_LOTS[style];
+  const parcel={id:'paid-'+style,kind:'dwelling' as const,x:0,z:0,
+   width:lot.width,depth:lot.depth,rotation:0,clearance:.3,
+   accessX:0,accessZ:lot.depth/2+.8,builtAt:100,homesteadStyle:style};
+  const foundation=makeV6Homestead(new THREE.Group(),parcel,'foundation')!;
+  assert.equal(foundation.getObjectByName(featureByStyle[style]),undefined,
+   'silhouette additions cannot appear before a paid house is completed');
+  const full=makeV6Homestead(new THREE.Group(),parcel,'complete',94,true,true)!;
+  assert.equal(full.userData.buildingId,parcel.id);
+  const addition=full.getObjectByName(featureByStyle[style]);
+  assert.ok(addition,style+' must have a visibly distinct physical silhouette');
+  if(style!=='H1-thatch'){
+   const box=new THREE.Box3().setFromObject(addition!);
+   assert.ok(box.max.x<lot.width/2+.04&&box.min.x>-lot.width/2-.04,
+    style+' side-volume cannot protrude outside the surveyed paid lot');
+  }
+  assert.ok(full.getObjectByName('paid-residential-loft'));
+  const realProfile=pioneerV6Roof(style);
+  seen.add(realProfile.ridgeY.toFixed(2)+'/'+realProfile.eaveY.toFixed(2));
+ }
+ assert.equal(seen.size,3,'three homesteads need three different true roof heights');
 });
 
 test('v0.6 rotated full lot faces its saved A* entrance, not the opposite wall',()=>{
