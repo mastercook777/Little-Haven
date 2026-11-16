@@ -281,6 +281,7 @@ function replaceWorld(next:PioneerWorld){
   }
  });
  world=next;valley=buildPioneerVillage(scene,world);
+ setWestView(false);westView.hidden=true;
  selection=null;focusMotion=null;canvas.style.cursor='grab';
  lastLighting='';renderUI();
 }
@@ -327,7 +328,7 @@ $('pioneerBuildingChoices').addEventListener('click',event=>{
  if(clearing?.dataset.pickClearing){
   const id=clearing.dataset.pickClearing;
   const site=world.frontier.clearings.find(c=>c.id===id);
-  if(site&&site.x<PIONEER_VALLEY.westernHomesX)focusLocation(site.x,site.z);
+  if(site&&site.x<PIONEER_VALLEY.westernHomesX)focusWesternLocation(site.x,site.z);
   chooseInspection({kind:'clearing',id});return;
  }
  const button=target.closest<HTMLButtonElement>('button[data-pick-building]');
@@ -335,7 +336,7 @@ $('pioneerBuildingChoices').addEventListener('click',event=>{
  const building=world.buildings.find(b=>b.id===id);
  if(building){
   const {x,z}=building.parcel;
-  if(x<PIONEER_VALLEY.westernHomesX)focusLocation(x,z);
+  if(x<PIONEER_VALLEY.westernHomesX)focusWesternLocation(x,z);
   chooseInspection({kind:'building',id:building.id});
  }
 });
@@ -355,6 +356,20 @@ $('pioneerSpotlightFocus').addEventListener('click',()=>{
  focusLocation(x,z);
  chooseInspection(item);
 });
+const westView=$<HTMLButtonElement>('pioneerWestView');
+function setWestView(active:boolean){
+ $('pioneerApp').classList.toggle('pioneer-west-view',active);
+ westView.setAttribute('aria-pressed',String(active));
+ westView.textContent=active?'查看手记':'观景';
+}
+westView.addEventListener('click',()=>setWestView(westView.getAttribute('aria-pressed')!=='true'));
+function focusWesternLocation(x:number,z:number){
+ if(innerWidth<760){
+  westView.hidden=false;
+  setWestView(true);
+ }
+ focusLocation(x,z);
+}
 function focusLocation(x:number,z:number){
  focusMotion={from:orbit.target.clone(),to:new THREE.Vector3(x,0,z),
   started:performance.now(),fromZoom:camera.zoom,
@@ -426,6 +441,7 @@ $('pioneerSeasonSkip').addEventListener('click',()=>{
 $('pioneerPause').addEventListener('click',()=>{paused=!paused;renderUI();});
 $('pioneerCamera').addEventListener('click',()=>{
  focusMotion=null;camera.position.copy(defaultEye);orbit.target.set(-1.7,0,0);
+ setWestView(false);westView.hidden=true;
  camera.zoom=1;camera.updateProjectionMatrix();orbit.update();
 });
 $('pioneerZoomIn').addEventListener('click',()=>{camera.zoom=Math.min(2.3,camera.zoom*1.15);camera.updateProjectionMatrix();});
