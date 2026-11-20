@@ -1,7 +1,7 @@
 import type {PioneerWorld} from '../simulation/pioneerWorld.ts';
 import {pioneerCottageArchetype,pioneerCottageOrdinal} from './pioneerArchetypes.ts';
 import {pioneerV6HomesteadPlan} from '../simulation/homesteadPlan.ts';
-import {pioneerV6Roof} from './homesteadScene.ts';
+import {pioneerHomesteadPorchRoof,pioneerV6Roof} from './homesteadScene.ts';
 import {pioneerFacilityRoofDripProfile} from './pioneerFacilityArchetypes.ts';
 import {pioneerDeciduousLocations} from '../simulation/pioneerNaturalAnchors.ts';
 import {distanceToCreekSpline} from '../simulation/creekCorridor.ts';
@@ -67,6 +67,15 @@ export function pioneerRoofDrips(s:PioneerWorld):readonly (readonly [number,numb
    const lz=halfDepth*.96+(v6?.building.z??0);
    positions.push([p.x+lx*cos-lz*sin,eaveY+.18,
     p.z+lx*sin+lz*cos]);
+  }
+  const porch=built.homesteadImprovement?pioneerHomesteadPorchRoof(p):null;
+  if(porch&&v6){
+   const lx=porch.x-porch.profile.halfWidth;
+   for(const side of [-1,1]){
+    const lz=porch.z+side*porch.profile.halfDepth*.70;
+    positions.push([p.x+lx*cos-lz*sin,porch.profile.eaveY+v6.padY,
+     p.z+lx*sin+lz*cos]);
+   }
   }
  }
  return positions;

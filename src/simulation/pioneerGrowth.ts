@@ -6,11 +6,12 @@ import {makePioneerCandidate,welcomePioneerCandidate} from './livingFates/people
 import {nearestOnSegment,nearestRoad,type VillageParcel} from './villagePlanning.ts';
 import {pioneerNaturalParcels} from './pioneerNaturalAnchors.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
-import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
+import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
  PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
 import {pioneerV6LotFor,PIONEER_V6_LOTS} from './homesteadPlan.ts';
+import {PIONEER_HOMESTEAD_PORCH,pioneerHomesteadPorchPoint} from './pioneerHomesteadImprovement.ts';
 import {PIONEER_VALLEY} from './pioneerGeography.ts';
 import {pioneerClearingReachable,pioneerParcelOpened,requestPioneerExpansionClearing} from './pioneerFrontier.ts';
 
@@ -250,9 +251,59 @@ function nextProjectKind(s:PioneerWorld):Exclude<PioneerBuildKind,'shelter'>|'re
  if(travelers)return 'tea-stop';
  return null;
 }
+function beginPioneerLoft(s:PioneerWorld,home:PioneerBuilding,approach?:WalkPoint[]){
+ const id='pioneer-loft-'+s.nextEventId;
+ const reason=approach?
+  '住户多次补屋后打算留出木阁，收放干粮和旧物，也为家里多留一处睡铺。':
+  '平地已满，新邻居仍需要能遮雨的住处。乡邻决定在原有山居内加一道稳固木阁。';
+ s.intent={id,kind:'loft',targetBuildingId:home.id,reason,
+  createdAt:s.minutes,requestedBy:s.founders.filter(f=>f.homeBuildingId===home.id).map(f=>f.id),
+  parcel:home.parcel,path:approach??s.roads.find(r=>r.buildingId===home.id)?.points??[],
+  phase:'materials',woodRequired:4,woodCommitted:0,workDone:0,
+  workRequired:8,pauseReason:'改阁楼仍需四份木料和八小时真实施工'};
+ record(s,'商议山居加阁',reason,id);
+ return true;
+}
+
+/** A maintained home becomes a project only after its residents have put
+ * its road and roof to use. Wait between finished upgrades so households
+ * can replenish supplies and work on the rest of the village. */
+function schedulePioneerEstablishedHome(s:PioneerWorld){
+ if(s.commons.stage!==3||s.founders.length<9||
+  s.resources.food<s.founders.length*1.5||s.resources.water<3.5||
+  s.resources.wood<PIONEER_HOMESTEAD_PORCH.wood+2)return false;
+ const lastBuildingWork=Math.max(0,...s.buildings.map(b=>Math.max(
+  b.loftAddedAt??0,b.homesteadImprovement?.completedAt??0)));
+ if(s.minutes-lastBuildingWork<34*DAY_MINUTES)return false;
+ const candidates=s.buildings.filter(b=>b.kind==='cottage'&&!b.homesteadImprovement&&
+  s.minutes-b.completedAt>=112*DAY_MINUTES&&(b.condition??100)>=76&&
+  (b.lastRepairAt??0)>b.completedAt&&pioneerHomesteadPorchPoint(b.parcel)&&
+  b.occupants.some(id=>s.founders.some(f=>f.id===id&&f.homeBuildingId===b.id)));
+ for(const home of candidates.sort((a,b)=>
+  Number(a.loftAddedAt===undefined)-Number(b.loftAddedAt===undefined)||a.completedAt-b.completedAt)){
+  const road=s.roads.find(r=>r.buildingId===home.id&&r.grade==='dirt'&&r.points.length>=2);
+  if(!road)continue;
+  const blockers=[...natural(s),...s.buildings.map(b=>b.parcel)];
+  const approach=roadSegmentsSafe(road.points,blockers)?road.points:
+   findPioneerWalk([s.camp.x,s.camp.z],pioneerEntrance(home.parcel),blockers);
+  if(!approach)continue;
+  if(home.loftAddedAt===undefined)return beginPioneerLoft(s,home,approach);
+  const id='pioneer-porch-'+s.nextEventId;
+  const reason='住户要给常用的前院加一段雨廊，雨天也有地方整理家什。';
+  s.intent={id,kind:'homestead-improvement',targetBuildingId:home.id,reason,
+   createdAt:s.minutes,requestedBy:s.founders.filter(f=>f.homeBuildingId===home.id).map(f=>f.id),
+   parcel:home.parcel,path:approach,phase:'materials',
+   woodRequired:PIONEER_HOMESTEAD_PORCH.wood,woodCommitted:0,workDone:0,
+   workRequired:PIONEER_HOMESTEAD_PORCH.hours,pauseReason:'雨廊需备六份木料，由村民出工搭建'};
+  record(s,'商议山居添雨廊',reason,id);
+  return true;
+ }
+ return false;
+}
+
 export function schedulePioneerProject(s:PioneerWorld){
  if(s.intent||s.minutes<s.nextSurveyAt)return false;
- const kind=nextProjectKind(s);if(!kind)return false;
+ const kind=nextProjectKind(s);
  const previous=s.buildings.at(-1);
  if(previous&&s.minutes-previous.completedAt<DAY_MINUTES*.70)return false;
  if(kind==='repair'){
@@ -268,6 +319,8 @@ export function schedulePioneerProject(s:PioneerWorld){
   record(s,'修屋工单',pioneerBuildingLabel(target.kind)+'屋面老化，乡邻主动讨论补梁和换顶。',id);
   return true;
  }
+ if(schedulePioneerEstablishedHome(s))return true;
+ if(!kind)return false;
  const westward=kind==='cottage'&&s.buildings.filter(b=>b.kind==='cottage').length>=2;
  let proposal=westward?surveyPioneerPlot(s,kind,undefined,false,true):null;
  if(westward&&!proposal){
@@ -301,17 +354,7 @@ export function schedulePioneerProject(s:PioneerWorld){
   if(kind==='cottage'&&s.founders.length>=9){
    const home=s.buildings.find(b=>b.kind==='cottage'&&
     b.loftAddedAt===undefined&&(b.condition??100)>=60);
-   if(home){
-    const id='pioneer-loft-'+s.nextEventId;
-    s.intent={id,kind:'loft',targetBuildingId:home.id,
-     reason:'平地已满，新邻居仍需要能遮雨的住处。乡邻决定在原有山居内加一道稳固木阁。',
-     createdAt:s.minutes,requestedBy:s.founders.filter(f=>f.homeBuildingId===home.id).map(f=>f.id),
-     parcel:home.parcel,path:s.roads.find(r=>r.buildingId===home.id)?.points??[],
-     phase:'materials',woodRequired:4,woodCommitted:0,workDone:0,
-     workRequired:8,pauseReason:'改阁楼仍需四份木料和八小时真实施工'};
-    record(s,'商议山居加阁','新屋址不够，村民决定在已有安全屋界内增加一处睡铺；仍需木料和施工。',id);
-    return true;
-   }
+   if(home)return beginPioneerLoft(s,home);
   }
   s.nextSurveyAt=s.minutes+3*DAY_MINUTES;
   // An unavailable riverside parcel remains actionable, but repeated
@@ -348,7 +391,20 @@ export function completePioneerProject(s:PioneerWorld){
   home.loftWoodSpent=intent.woodCommitted;
   home.loftWorkHours=intent.workDone;home.loftCauseId=intent.id;
   const cause=intent.id;s.intent=null;
-  record(s,'山居木阁落成','村民在'+home.id+'原有安全屋界内耗四份木料与八工时，加出一处能住人的木阁；并没有凭空另盖屋。',cause);
+  record(s,'山居木阁落成','乡邻在自家梁架上用四份木料和八个工时添了木阁，屋里多出一处睡铺和放家什的地方。',cause);
+  return true;
+ }
+ if(intent.kind==='homestead-improvement'){
+  const home=s.buildings.find(b=>b.id===intent.targetBuildingId&&b.kind==='cottage');
+  if(!home||home.homesteadImprovement||home.loftAddedAt===undefined||
+   !pioneerHomesteadPorchPoint(home.parcel)||home.parcel.id!==intent.parcel?.id||
+   intent.woodRequired!==PIONEER_HOMESTEAD_PORCH.wood||intent.woodCommitted!==intent.woodRequired||
+   intent.workRequired!==PIONEER_HOMESTEAD_PORCH.hours||intent.workDone!==intent.workRequired||
+   !['foundation','frame'].includes(intent.phase))return false;
+  home.homesteadImprovement={completedAt:s.minutes,woodSpent:intent.woodCommitted,
+   workHours:intent.workDone,causeId:intent.id};
+  s.intent=null;
+  record(s,'山居雨廊落成','村民用了六份木料和十二个工时，给前院搭起能避雨的木廊。雨水从院墙边排开，房屋在风雨和雪季的损耗也会减少。',intent.id);
   return true;
  }
  if(intent.kind==='repair'){
@@ -436,7 +492,8 @@ export function agePioneerBuildings(s:PioneerWorld){
  const winter=Math.floor((s.minutes/DAY_MINUTES)%48/12)===3;
  for(const b of s.buildings){
   const wear=b.kind==='garden'?.20:b.kind==='cottage'?.52:.61;
-  b.condition=round(Math.max(0,(b.condition??100)-wear-(winter?.22:0)-(rain?.16:0)));
+  const exposure=(winter?.22:0)+(rain?.16:0);
+  b.condition=round(Math.max(0,(b.condition??100)-wear-exposure*(b.homesteadImprovement?.4:1)));
  }
 }
 export function registerPioneerTrip(s:PioneerWorld,roadId:string|undefined){

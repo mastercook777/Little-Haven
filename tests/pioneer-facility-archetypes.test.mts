@@ -135,7 +135,8 @@ test('v0.5.6C: mature autonomous village has genuine paid facility profiles and 
   [...PIONEER_GARDEN_STYLES],'three completed fields must show three different silhouettes');
  const drip=pioneerRoofDrips(s);
  assert.equal(drip.length,s.buildings.filter(b=>
-  b.kind!=='shelter'&&b.kind!=='garden').length*5);
+  b.kind!=='shelter'&&b.kind!=='garden').length*5+
+  s.buildings.filter(b=>b.homesteadImprovement).length*2);
  for(const f of facilities){
   const kind=f.kind as PioneerFacilityKind;
   const height=f.parcel.homesteadStyle?

@@ -9,6 +9,8 @@ import {nearestRoad,validateVillageParcel,
  type VillageParcel} from './villagePlanning.ts';
 import {findPioneerWalk,pioneerBuildingPath,pioneerEntrance,pioneerWalkable,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import {settlePioneerResidentMotion,validPioneerResidentMotion,type PioneerResidentMotion} from './pioneerResidentMotion.ts';
+import {pioneerHomesteadPorchPoint,validPioneerHomesteadImprovement,
+ validPioneerHomesteadImprovementIntent,type PioneerHomesteadImprovement} from './pioneerHomesteadImprovement.ts';
 import {pioneerV6CourtyardPoint,pioneerV6YardWalkable} from './homesteadPlan.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
@@ -47,7 +49,7 @@ const hash=(n:number)=>{
  let k=n>>>0;k=Math.imul(k^(k>>>16),0x85ebca6b);
  k=Math.imul(k^(k>>>13),0xc2b2ae35);return ((k^(k>>>16))>>>0)/4294967296;
 };
-export type PioneerWork='rest'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'eat-break'|'socialize'|'commons-build'|'clear-land'|'fish'|'haul-fish'|'craft'|'host-guest';
+export type PioneerWork='rest'|'tend-yard'|'collect-wood'|'forage'|'fetch-water'|'build'|'tend-fire'|'shelter'|'farm'|'seed-trial'|'repair'|'cook'|'eat'|'eat-home'|'eat-break'|'socialize'|'commons-build'|'clear-land'|'fish'|'haul-fish'|'craft'|'host-guest';
 export type PioneerBuildKind='shelter'|'cottage'|'garden'|'wood-yard'|'fish-hut'|'granary'|'tea-stop';
 export type PioneerPolicy='balanced'|'shelter'|'food';
 export interface PioneerFounder{
@@ -65,7 +67,7 @@ export interface PioneerJournal{
 }
 export interface PioneerIntent{
  id:string;reason:string;createdAt:number;requestedBy:number[];
- kind?:PioneerBuildKind|'repair'|'loft';targetBuildingId?:string;path?:WalkPoint[];
+ kind?:PioneerBuildKind|'repair'|'loft'|'homestead-improvement';targetBuildingId?:string;path?:WalkPoint[];
  parcel:VillageParcel|null;phase:'survey'|'materials'|'foundation'|'frame';
  woodRequired:number;woodCommitted:number;workDone:number;workRequired:number;
  pauseReason:string|null;
@@ -75,6 +77,7 @@ export interface PioneerBuilding{
  causeId:string;occupants:number[];materialsSpent:{wood:number};workHours:number;
  condition?:number;lastRepairAt?:number;
   loftAddedAt?:number;loftWoodSpent?:number;loftWorkHours?:number;loftCauseId?:string;
+ homesteadImprovement?:PioneerHomesteadImprovement;
  operating?:boolean;productionMode?:'harvest'|'seed'|'timber'|'repair';
 }
 export interface PioneerWorld{
@@ -220,7 +223,7 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
  const home=s.buildings.find(b=>b.id===f.homeBuildingId);
  const fieldBuilding=site?.kind==='field'?
   s.buildings.find(b=>site.id==='field-'+b.id):undefined;
- const shelter=activity==='shelter'||activity==='eat-home'?home:undefined;
+ const shelter=activity==='shelter'||activity==='eat-home'||activity==='tend-yard'?home:undefined;
  const atCommons=['eat','cook','socialize','commons-build'].includes(activity);
  const workClearing=activity==='clear-land'?
   s.frontier.clearings.find(c=>c.phase==='clearing'):undefined;
@@ -254,6 +257,8 @@ function allocate(s:PioneerWorld,f:PioneerFounder,activity:PioneerWork,site?:Pio
   const place=pioneerV6CourtyardPoint(shelter.parcel,offset);
   if(place&&pioneerV6YardWalkable(shelter.parcel,place[0],place[1]))goal=place;
  }
+ if(activity==='tend-yard'&&shelter?.homesteadImprovement)
+  goal=pioneerHomesteadPorchPoint(shelter.parcel)??goal;
  const isSame=f.activity===activity&&f.target[0]===goal[0]&&f.target[1]===goal[1];
  if(isSame&&f.commute?.length)return;
  const from:WalkPoint=activity==='haul-fish'&&site?
@@ -603,7 +608,12 @@ function step(s:PioneerWorld){
   else if(s.resources.wood<Math.max(11,intent?.woodRequired??11)){
    if(!gather(s,f,'forest',.85,'collect-wood'))
     allocate(s,f,'rest');
-  }else allocate(s,f,'shelter');
+  }else{
+   const home=s.buildings.find(b=>b.id===f.homeBuildingId&&b.kind==='cottage');
+   const yardTurn=home&&home.occupants[day%home.occupants.length]===f.id&&
+    [10,14,16][(f.id+day)%3]===hour&&pioneerV6CourtyardPoint(home.parcel);
+   allocate(s,f,yardTurn?'tend-yard':'shelter');
+  }
  }
  if(intent?.phase==='materials'){
   if(s.resources.wood>=intent.woodRequired&&s.resources.food>=Math.min(2,s.founders.length*.5)&&s.resources.water>=.5){
@@ -720,6 +730,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
   const occupied=[...landscape(s),campParcel(s)];
   for(const b of s.buildings){
    if(!b||!['shelter','garden','cottage','wood-yard','fish-hut','granary','tea-stop'].includes(b.kind)||!validatePioneerFacilityConfiguration(b)||
+    !validPioneerHomesteadImprovement(b,s.minutes)||
     (b.loftAddedAt!==undefined&&(b.kind!=='cottage'||!Number.isFinite(b.loftAddedAt)||
       b.loftAddedAt<b.completedAt||b.loftAddedAt>s.minutes||
       b.loftWoodSpent!==4||typeof b.loftCauseId!=='string'||
@@ -734,6 +745,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    ids.add(b.id);occupied.push(b.parcel);
   }
   if(s.intent){
+   if(!validPioneerHomesteadImprovementIntent(s))return null;
    if(s.intent.kind==='loft'&&(
     s.intent.woodRequired!==4||s.intent.workRequired!==8||
     ![0,4].includes(s.intent.woodCommitted)||
@@ -746,7 +758,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
     !Number.isFinite(s.intent.woodCommitted)||!Number.isFinite(s.intent.workDone)||
     s.intent.woodCommitted<0||s.intent.woodCommitted>20||
     s.intent.workDone<0||s.intent.workDone>30)return null;
-   if(s.intent.parcel&&s.intent.kind!=='repair'&&s.intent.kind!=='loft'&&
+   if(s.intent.parcel&&s.intent.kind!=='repair'&&s.intent.kind!=='loft'&&s.intent.kind!=='homestead-improvement'&&
     !validatePioneerParcel(s.intent.parcel,occupied,s.roads).ok)return null;
   }
   return s;
@@ -766,7 +778,7 @@ export function loadPioneerWorld(storage:Pick<Storage,'getItem'>,now=Date.now(),
 export function pioneerSummary(s:PioneerWorld){
  const project=s.intent;
  if(project){
-  const label=project.kind==='repair'?'修缮旧屋':project.kind==='loft'?'山居木阁改造':pioneerBuildingLabel(project.kind??'shelter');
+  const label=project.kind==='repair'?'修缮旧屋':project.kind==='loft'?'山居木阁改造':project.kind==='homestead-improvement'?'山居加雨廊':pioneerBuildingLabel(project.kind??'shelter');
   if(project.phase==='survey')return project.pauseReason||'正在寻找安全可达的屋址';
   if(project.phase==='materials')return '筹建'+label+' · '+(project.pauseReason||'正在备料');
   if(project.phase==='foundation')return label+' · 地基施工中';

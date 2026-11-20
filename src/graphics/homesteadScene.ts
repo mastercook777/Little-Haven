@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type {VillageParcel} from '../simulation/villagePlanning.ts';
-import {pioneerV6HomesteadPlan,type PioneerV6Style} from '../simulation/homesteadPlan.ts';
+import {pioneerV6HomesteadPlan,type PioneerHomesteadPlan,type PioneerV6Style} from '../simulation/homesteadPlan.ts';
+import {pioneerHomesteadPorchLocalX} from '../simulation/pioneerHomesteadImprovement.ts';
 import {makePioneerMountainRoof,dressPioneerCottage} from './pioneerHeritageArt.ts';
 import {buildPioneerRoof,type PioneerRoofProfile} from './pioneerRoof.ts';
 import {batchStaticSubtree} from './batchStatic.ts';
@@ -14,6 +15,7 @@ const earth=mat('#a98e69'),track=mat('#c1a57b'),stone=mat('#948b76');
 const mortar=mat('#bfb09a'),darkTimber=mat('#67513d'),wood=mat('#997454');
 const thatch=mat('#a99562'),reed=mat('#ceb983'),paper=mat('#e9d9b5');
 const slab=mat('#b9ab91'),clay=mat('#c9aa8c'),winter=mat('#d9d6ca');
+const porchTile=mat('#526e66');
 function part(parent:THREE.Object3D,x:number,y:number,z:number,w:number,h:number,d:number,m:THREE.Material,name?:string){
  const o=new THREE.Mesh(cube,m);o.position.set(x,y,z);o.scale.set(w,h,d);
  if(name)o.name=name;o.castShadow=true;o.receiveShadow=true;parent.add(o);return o;
@@ -32,10 +34,35 @@ export function pioneerV6Roof(style:PioneerV6Style):PioneerRoofProfile{
  if(style==='W1-open-yard')return {halfWidth:1.67,halfDepth:1.28,eaveY:1.96,ridgeY:2.38,thickness:.10};
  return {halfWidth:1.68,halfDepth:1.34,eaveY:2.17,ridgeY:2.78,thickness:.10};
 }
+export function pioneerHomesteadPorchRoof(parcel:VillageParcel){
+ const plan=pioneerV6HomesteadPlan(parcel),x=pioneerHomesteadPorchLocalX(parcel);
+ if(!plan||x===null)return null;
+ return {x,z:plan.yard.z,profile:{halfWidth:.54,halfDepth:plan.yard.depth*.50-.02,
+  eaveY:2.08,ridgeY:2.38,thickness:.085} satisfies PioneerRoofProfile};
+}
+function addResidencePorch(parent:THREE.Group,parcel:VillageParcel,plan:PioneerHomesteadPlan){
+ const roof=pioneerHomesteadPorchRoof(parcel);
+ if(!roof)return;
+ const {x,z,profile}=roof;
+ const porch=group(parent,x,0,z,'paid-residential-work-porch');
+ part(porch,0,.024,0,.99,.035,plan.yard.depth-.10,slab,'porch-packed-work-floor');
+ for(const px of [-.43,.42])for(const pz of [-profile.halfDepth+.13,profile.halfDepth-.13]){
+  part(porch,px,.12,pz,.18,.24,.17,stone);
+  upright(porch,px,1.06,pz,.058,1.91);
+ }
+ for(const px of [-.43,.42])
+  part(porch,px,1.94,0,.085,.12,profile.halfDepth*1.88,wood);
+ const low=plan.styleId==='H1-thatch';
+ buildPioneerRoof(porch,profile,low?thatch:porchTile,darkTimber,wood,low?reed:undefined);
+ // Leave the middle of the covered floor in line with the approach.
+ for(const pz of [-.18,.18])upright(porch,-.30,.31,pz,.036,.48);
+ part(porch,-.30,.57,0,.26,.09,.57,wood,'porch-household-workbench');
+ part(porch,-.43,.10,-profile.halfDepth,.18,.065,.20,stone,'porch-outer-drain');
+}
 /** Returns null for legacy model test samples: no visual overlap. */
 export function makeV6Homestead(
  parent:THREE.Object3D,parcel:VillageParcel,phase:'foundation'|'frame'|'complete',
- condition=100,craftReady=false,loftReady=false):THREE.Group|null{
+ condition=100,craftReady=false,loftReady=false,porchReady=false):THREE.Group|null{
  const plan=pioneerV6HomesteadPlan(parcel);if(!plan)return null;
  const g=group(parent,parcel.x,plan.padY,parcel.z,'v06-'+plan.styleId+'-'+phase);
  // Three.js +Y rotates local +Z toward +X; zoning/entrance uses the
@@ -124,9 +151,11 @@ export function makeV6Homestead(
     const tie=part(ribs,side*.81,2.065,z,.092,.085,.16,reed,'real-thatch-ridge-tie');
     tie.rotation.z=side===1?-.27:.27;
    }
-   // The rail runs beside the gate-to-door lane so residents can pass.
-   for(const z of [yard.z-.23,yard.z+.23])upright(g,-1.06,.69,z,.049,.98);
-   part(g,-1.06,1.20,yard.z,.10,.09,.57,wood,'thatched-house-drying-rail');
+   if(!porchReady){
+    // The later paid work porch takes over this drying position.
+    for(const z of [yard.z-.23,yard.z+.23])upright(g,-1.06,.69,z,.049,.98);
+    part(g,-1.06,1.20,yard.z,.10,.09,.57,wood,'thatched-house-drying-rail');
+   }
   }else if(style==='H2-farmyard'){
    // A broad low side veranda breaks the H2 house into a main tiled volume
    // and a sheltered working edge, instead of another identical blue box.
@@ -172,6 +201,7 @@ export function makeV6Homestead(
     lid.rotation.z=side===1?-.27:.27;
    }
   }
+  if(porchReady)addResidencePorch(g,parcel,plan);
  }else{
   // Raw logs, work apron and two open racks; the advanced saw appears ONLY
   // when the separate real crafting work is saved as complete.
