@@ -50,6 +50,7 @@ export function inspectPioneerSelection(s:PioneerWorld,
    {label:'此刻正在',value:motion.indoors?
     f.activity==='eat-home'?'在屋内用早饭':'已进屋歇息':
     motion.moving&&f.activity==='shelter'?'沿路回家':
+    f.activity==='tend-yard'?'收拾自家院落':
     f.activity==='eat-break'?'在附近歇脚用餐':
     f.activity==='seed-trial'?'留种照料试田':f.activity==='fish'?'河岸捕鱼':
      f.activity==='haul-fish'?'背鱼归仓':f.activity==='craft'?'木坊锯作':f.activity==='host-guest'?'在茶棚接待过客':f.activity==='farm'?'实际耕作':f.activity==='collect-wood'?'入林采木':
@@ -124,7 +125,9 @@ export function inspectPioneerSelection(s:PioneerWorld,
   if(b.kind==='cottage'){
    facts.push({label:'现有安居容量',value:(b.loftAddedAt!==undefined?'3':'2')+' 人'});
    if(b.loftAddedAt!==undefined)facts.push({label:'木阁改造',value:
-    date(b.loftAddedAt)+' · 4 份木料 / 8 工时 · 屋界未扩张'});
+    date(b.loftAddedAt)+' · 4 份木料 / 8 工时'});
+   if(b.homesteadImprovement)facts.push({label:'庭院雨廊',
+    value:date(b.homesteadImprovement.completedAt)+' · 6 份木料 / 12 工时 · 为屋舍挡风雨'});
   }
   if(b.kind==='tea-stop'){
    const c=s.commerce,v=c.activeVisitor;
@@ -176,7 +179,8 @@ export function inspectPioneerSelection(s:PioneerWorld,
  }
  if(selection.kind==='intent'){
   const intent=s.intent;if(!intent||intent.id!==selection.id)return null;
-  const title=intent.kind==='repair'?'修缮中的旧屋':intent.kind==='loft'?'山居木阁改造':pioneerBuildingLabel(intent.kind??'shelter')+'工地';
+  const title=intent.kind==='repair'?'修缮中的旧屋':intent.kind==='loft'?'山居木阁改造':
+   intent.kind==='homestead-improvement'?'山居雨廊工地':pioneerBuildingLabel(intent.kind??'shelter')+'工地';
   return {title,kicker:'真实施工 · '+intent.phase,description:intent.reason,
    facts:[
     {label:'申请时间',value:date(intent.createdAt)},

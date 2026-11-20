@@ -76,7 +76,7 @@ let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number;
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
 let clickStart:{x:number;y:number;at:number}|null=null,lastHover=0;
 const labels:Record<PioneerWork,string>={
- rest:'照看营地', 'collect-wood':'林缘拾柴','forage':'入林采食',
+ rest:'照看营地','tend-yard':'收拾自家院落', 'collect-wood':'林缘拾柴','forage':'入林采食',
  'fetch-water':'溪边取水','build':'搭棚施工','tend-fire':'照料营火',
  'shelter':'回家休息','farm':'耕作收菜','seed-trial':'试种留种','repair':'修屋补梁',
  'cook':'公共灶台做饭','eat':'火塘边用餐','eat-home':'在自家庭院用餐','eat-break':'在手边歇脚用餐',

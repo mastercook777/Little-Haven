@@ -318,7 +318,7 @@ function shelterVisual(root:THREE.Group,parcel:VillageParcel,phase:'foundation'|
  plinth.name='shelter-plinth';
  return g;
 }
-interface Figure{root:THREE.Group;upper:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;fishBasket:THREE.Group;rod:THREE.Group;}
+interface Figure{root:THREE.Group;upper:THREE.Group;arms:THREE.Mesh[];legs:THREE.Mesh[];head:THREE.Mesh;tool:THREE.Group;mealBowl:THREE.Group;axe:THREE.Group;cargo:THREE.Group;fishBasket:THREE.Group;rod:THREE.Group;broom:THREE.Group;}
 function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  const g=group(parent,0,.19,0);g.name='pioneer-'+founder.id;
  g.userData.founderId=founder.id;
@@ -377,19 +377,23 @@ function makeFigure(parent:THREE.Group,founder:PioneerFounder):Figure{
  box(rod,0,.92,.23,.016,.50,.018,cloth);
  const reel=orb(rod,-.07,.22,0,.09,wood,.45,.80,1.3);
  reel.name='fisher-reel';rod.visible=false;
- return {root:g,upper,arms,legs,head,tool,mealBowl,axe,cargo,fishBasket,rod};
+ const broom=group(g,.23,.65,.29);broom.name='household-yard-broom';
+ pole(broom,0,.10,0,.031,1.27,wood);
+ box(broom,0,-.45,.065,.29,.33,.14,material('#bfa16a'));
+ broom.visible=false;
+ return {root:g,upper,arms,legs,head,tool,mealBowl,axe,cargo,fishBasket,rod,broom};
 }
 /** The facility models share eave limits with the space planner while
  * changing the actual silhouette, not merely swapping a material. */
 function facilityVisual(parent:THREE.Group,p:VillageParcel,kind:PioneerBuildKind,
  phase:'foundation'|'frame'|'complete',progress:number,condition=100,
  seedMark?:'working'|'resolved'|'abandoned',craftReady=false,loftReady=false,
- pioneerVariant=0){
+ pioneerVariant=0,porchReady=false){
  if(kind==='shelter')return shelterVisual(parent,p,phase,progress);
  // This factory must be the REAL runtime renderer, not merely a unit-test
  // asset. Phase A imported it but never called it: saved H1/H2/H3/W1 lots
  // were silently drawn with the old v0.5 small-box models.
- const authored=makeV6Homestead(parent,p,phase,condition,craftReady,loftReady);
+ const authored=makeV6Homestead(parent,p,phase,condition,craftReady,loftReady,porchReady);
  if(authored){
   authored.name='pioneer-'+kind+'-'+phase;
   return authored;
@@ -820,6 +824,7 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
   const progressIndex=Math.floor(progress*2);
   const signature=s.buildings.map(b=>b.id+':'+((b.condition??100)<78?'w':'c')+
     (b.kind==='cottage'&&b.loftAddedAt!==undefined?':loft':'')+
+    (b.homesteadImprovement?':porch':'')+
     (b.kind==='wood-yard'?':'+s.livelihood.craft.phase:'')+
     (b.kind==='garden'?':'+(s.livingFates.seedTrials.filter(t=>t.gardenId===b.id).at(-1)?.phase??''):'' )).join(',')+
    '/'+(s.intent?.id??'')+'/'+phase+'/'+(s.intent?.parcel?.x??'')+'/'+
@@ -836,7 +841,8 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     const plot=facilityVisual(constructionLayer,built.parcel,built.kind,'complete',1,built.condition,
      trial?.phase,s.livelihood.craft.phase==='complete',built.loftAddedAt!==undefined,
       built.kind==='cottage'?pioneerCottageOrdinal(s.buildings,built.id):
-       built.kind==='garden'?pioneerGardenOrdinal(s.buildings,built.id):0);
+       built.kind==='garden'?pioneerGardenOrdinal(s.buildings,built.id):0,
+     !!built.homesteadImprovement);
     if(built.kind==='cottage'||built.kind==='shelter'){
      const hinges:THREE.Object3D[]=[],lamps:THREE.MeshStandardMaterial[]=[];
      plot.traverse(child=>{
@@ -868,9 +874,11 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
     }
    }
    if(s.intent?.parcel&&s.intent.phase!=='survey'&&s.intent.phase!=='materials'){
-    if(s.intent.kind==='repair'||s.intent.kind==='loft'){
+    if(s.intent.kind==='repair'||s.intent.kind==='loft'||s.intent.kind==='homestead-improvement'){
      const p=s.intent.parcel,g=group(constructionLayer,p.x,.19,p.z);
-     g.rotation.y=p.rotation;g.name=s.intent.kind==='loft'?'pioneer-loft-scaffold':'pioneer-repair-scaffold';
+     g.rotation.y=p.rotation;
+     g.name=s.intent.kind==='loft'?'pioneer-loft-scaffold':
+      s.intent.kind==='homestead-improvement'?'pioneer-porch-scaffold':'pioneer-repair-scaffold';
      for(const x of [-p.width*.41,p.width*.41])for(const z of [-p.depth*.43,p.depth*.43])
       pole(g,x,.9,z,.04,1.72,lightWood);
      box(g,0,1.68,0,p.width*.88,.07,.12,lightWood);
@@ -975,11 +983,12 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    if(doorway)doorway.opening=Math.max(doorway.opening,Math.max(0,Math.min(1,(1.55-doorDistance)/.82)));
    const household=indoors?homes.get(indoors):undefined;
    if(household&&(dayHour>=19||dayHour<7))household.lit=true;
-   const bob=moving?Math.abs(Math.sin(seconds*7+i))*.045:0;
+   const gait=seconds*(7.8+(f.id%5)*.43)+f.id*1.71;
+   const bob=moving?Math.abs(Math.sin(gait))*.045:0;
    visual.root.position.set(x,.19+bob,z);
    if(moving&&Math.hypot(ahead[0]-x,ahead[1]-z)>.001)
     visual.root.rotation.y=Math.atan2(ahead[0]-x,ahead[1]-z);
-   const swing=moving?Math.sin(seconds*9+i)*.35:.04*Math.sin(seconds*2+i);
+   const swing=moving?Math.sin(gait)*.35:.04*Math.sin(seconds*2+i);
    visual.arms[0].rotation.x=swing;visual.arms[1].rotation.x=-swing;
    visual.legs[0].rotation.x=-swing;visual.legs[1].rotation.x=swing;
    const bodyScale=i<3?1:.95;
@@ -994,11 +1003,19 @@ export function buildPioneerVillage(scene:THREE.Scene,world:PioneerWorld):Pionee
    visual.rod.visible=f.activity==='fish'&&arrived;
    visual.cargo.visible=f.activity!=='collect-wood'&&moving&&f.motion?.carryingWood===true;
    visual.fishBasket.visible=carryingFish;
+   visual.broom.visible=f.activity==='tend-yard'&&arrived;
+   if(visual.broom.visible){
+    visual.broom.rotation.z=.52+.27*Math.sin(seconds*4+i);
+    visual.broom.rotation.x=-.29;
+   }
    visual.axe.rotation.z=forester&&arrived?
     .32*Math.sin(seconds*6+i):0;
    if((f.activity==='build'||f.activity==='repair'||f.activity==='commons-build'||f.activity==='craft')&&arrived){
     const effort=Math.sin(seconds*5+i)*.20;
     visual.arms[0].rotation.x=-.72+effort;visual.arms[1].rotation.x=-.72-effort;
+   }else if(f.activity==='tend-yard'&&arrived){
+    visual.arms[0].rotation.x=-.49;visual.arms[1].rotation.x=-.72+.14*Math.sin(seconds*4+i);
+    visual.head.rotation.x=.18;
    }else if(forester&&arrived){
     visual.arms[0].rotation.x=-1.03+.35*Math.sin(seconds*7+i);
     visual.arms[1].rotation.x=-.38;

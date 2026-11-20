@@ -63,7 +63,7 @@ test('v0.5.6B: actual mature valley gains different roofs, keeps all paid beds a
  const runoff=pioneerRoofDrips(s);
  const expected=s.buildings.filter(b=>
   ['cottage','granary','wood-yard','fish-hut','tea-stop'].includes(b.kind));
- assert.equal(runoff.length,expected.length*5);
+ assert.equal(runoff.length,expected.length*5+cottages.filter(b=>b.homesteadImprovement).length*2);
  // Each cottage has five attached roof drips following the family eave
  // height, rather than inheriting v0.5.5's hard-coded 1.97 y.
  for(const b of cottages){
