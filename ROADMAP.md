@@ -267,3 +267,11 @@
 ## Design guardrail
 
 Keep ordinary lives as the visual and simulation center. In **v0.3 classic mode**, the tavern is the visual center; in **v0.4 pioneer mode**, it must emerge from authentic resident needs and available building plots, never exist at game start. No elaborate martial arts combat, distant open-world rendering, AI API or faction simulator until the first life arc is enjoyable to **watch**.
+
+
+## v0.6.5 · 守谷人议事簿（首个主动玩法切片，开发分支）
+
+- [x] [设计与验收合同](docs/V065_GUARDIAN_PROJECTS.md)：一项具体村务、真实材料工时、合法路径、可撤销排队、自治回退。
+- [x] 现有建设工单与持久化委托状态、进度入口与完成设施定位的代码已提交开发分支。
+- [ ] 运行新增模拟回归、完整 CI、桌面/手机真实按钮与 Pages 验收；不可把分支实现当成已上线。
+- [ ] 后续：人物委托、困境与资源机会成本、山路商旅与江湖人物命运的主动决策。
