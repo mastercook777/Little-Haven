@@ -614,6 +614,28 @@ try{
   throw Error('No visible falling-tree window during actual cutting: '+JSON.stringify(fallingRun));
  await screenshot(page,'06-harvest-driven-tree-fall');
  results.push({fallingTree:true,render:fallingRun.render});
+ // A new independent save exercises the actual player proposal button.
+ await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__;d.reset(42);
+  for(let i=0;i<200&&!d.getState().buildings.length;i++)d.advance(20);
+ });
+ if(!await page.locator('#pioneerGuardianPanel').evaluate(e=>e.open))
+  await page.locator('#pioneerGuardianPanel summary').click();
+ await page.locator('[data-guardian-project="garden"]').click();
+ const queued=await page.evaluate(()=>window.__PIONEER_DEBUG__.getState().guardianProject);
+ if(!queued||queued.kind!=='garden')throw Error('Guardian button did not queue a real project');
+ await page.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__;
+  for(let i=0;i<1000&&['queued','building'].includes(d.getState().guardianProject?.status);i++)d.advance(20);
+ });
+ const guardian=await page.evaluate(()=>{
+  const s=window.__PIONEER_DEBUG__.getState();
+  return {project:s.guardianProject,building:s.buildings.find(b=>b.causeId===s.guardianProject?.causeId)};
+ });
+ if(guardian.project?.status!=='completed'||guardian.building?.kind!=='garden'||guardian.building.materialsSpent.wood!==3)
+  throw Error('Guardian project failed actual construction: '+JSON.stringify(guardian));
+ await screenshot(page,'guardian-project-completed');
+ results.push({guardianProject:guardian});
  await page.goto(base,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__HAVEN_DEBUG__?.getState);
  const classic=await page.evaluate(()=>window.__HAVEN_DEBUG__.getState());
@@ -725,6 +747,18 @@ try{
  results.push({mobileGuestPolicy:mobileGuest});
  results.push({mobile:sizing,touchInspection:true,touchMethod:canvasVisible?'3d-canvas':'accessible-facility-list',
   commonsCard:true,frontmost});
+ await mpage.evaluate(()=>{
+  const d=window.__PIONEER_DEBUG__;d.reset(42);
+  for(let i=0;i<200&&!d.getState().buildings.length;i++)d.advance(20);
+ });
+ if(await mpage.locator('#pioneerLivelihoodPanel').evaluate(e=>e.open))
+  await mpage.locator('#pioneerCouncilOpen').tap();
+ if(!await mpage.locator('#pioneerGuardianPanel').evaluate(e=>e.open))
+  await mpage.locator('#pioneerGuardianPanel summary').tap();
+ await mpage.locator('[data-guardian-project="garden"]').tap();
+ if((await mpage.evaluate(()=>window.__PIONEER_DEBUG__.getState().guardianProject?.kind))!=='garden')
+  throw Error('Guardian proposal is not touch reachable');
+ await screenshot(mpage,'guardian-project-mobile-queued');
  await mobile.close();
  if(errors.length)throw Error('Pioneer browser errors: '+errors.join('\n').slice(0,1500));
  await writeFile(output+'/report.json',JSON.stringify({pass:true,results,errors},null,2));
