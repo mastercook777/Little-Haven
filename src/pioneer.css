@@ -270,3 +270,14 @@ button:hover{background:#eceddf}button:focus-visible,a:focus-visible,summary:foc
  .pioneer-west-view .pioneer-panel,
  .pioneer-west-view .pioneer-chronicle{display:none}
 }
+
+/* Guardian proposals: compact, collapsible, same village-paper palette. */
+.guardian-projects{margin-top:8px}
+.guardian-choices{display:grid;gap:6px}
+.guardian-choices button{min-height:44px;display:grid;text-align:left;padding:7px 9px;gap:3px;white-space:normal}
+.guardian-choices b{font-size:12px}.guardian-choices span,.guardian-choices small{font-size:10px;line-height:1.4}
+.guardian-choices small{color:#788475}.guardian-choices button:disabled{opacity:.58;cursor:default}
+.guardian-progress{font-size:11px;line-height:1.55;margin:5px 0}
+.guardian-progress p{margin:4px 0}.guardian-progress progress{width:100%;accent-color:#708775}
+.guardian-progress button{min-height:44px;padding:6px 9px;width:100%;margin:4px 0}
+@media(max-width:760px){.guardian-choices{max-height:180px;overflow:auto}.guardian-choices b{font-size:11px}.guardian-choices small{font-size:10px}}
