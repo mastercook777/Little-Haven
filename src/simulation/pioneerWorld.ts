@@ -18,7 +18,7 @@ import {PIONEER_BASE_NATURAL_ANCHORS,pioneerNaturalParcels,
  type PioneerNaturalAnchor} from './pioneerNaturalAnchors.ts';
 import {agePioneerBuildings,completePioneerProject,considerPioneerMigration,
  pioneerHasFacility,pioneerHousingCapacity,pioneerBuildingLabel,
- registerPioneerTrip,schedulePioneerProject} from './pioneerGrowth.ts';
+ registerPioneerTrip,schedulePioneerProject,validGuardianProject} from './pioneerGrowth.ts';
 import {createPioneerCommons,schedulePioneerCommons,reservePioneerCommonsMaterials,
  performPioneerCommonsWork,servePioneerMeal,validatePioneerCommons,
  type PioneerCommons} from './pioneerCommons.ts';
@@ -80,6 +80,11 @@ export interface PioneerBuilding{
  homesteadImprovement?:PioneerHomesteadImprovement;
  operating?:boolean;productionMode?:'harvest'|'seed'|'timber'|'repair';
 }
+export type PioneerGuardianKind=Exclude<PioneerBuildKind,'shelter'>;
+export interface PioneerGuardianProject{
+ kind:PioneerGuardianKind;requestedAt:number;
+ status:'queued'|'building'|'completed'|'blocked';causeId?:string;message?:string;
+}
 export interface PioneerWorld{
  schemaVersion:6;mode:'pioneer';seed:number;minutes:number;lastSavedAt:number;
  /** Persist once on legacy import; planting must not jump beneath buildings. */
@@ -87,6 +92,7 @@ export interface PioneerWorld{
  camp:{x:number;z:number};founders:PioneerFounder[];
  resources:{wood:number;food:number;water:number};
  sites:PioneerResourceSite[];intent:PioneerIntent|null;buildings:PioneerBuilding[];
+ guardianProject?:PioneerGuardianProject;
  journal:PioneerJournal[];nextEventId:number;policy:PioneerPolicy;comfort:number;
  roads:PioneerRoad[];nextResidentId:number;nextSurveyAt:number;lastArrivalAt:number;
  commons:PioneerCommons;frontier:PioneerFrontier;livingFates:LivingFatesState;
@@ -761,6 +767,7 @@ export function importPioneerWorld(raw:string):PioneerWorld|null{
    if(s.intent.parcel&&s.intent.kind!=='repair'&&s.intent.kind!=='loft'&&s.intent.kind!=='homestead-improvement'&&
     !validatePioneerParcel(s.intent.parcel,occupied,s.roads).ok)return null;
   }
+  if(!validGuardianProject(s))return null;
   return s;
  }catch{return null;}
 }

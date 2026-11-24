@@ -5,7 +5,7 @@ import {inspectPioneerSelection,type PioneerSelection} from './ui/pioneerInspect
 import {getPioneerSpotlight,type PioneerSpotlight} from './ui/pioneerSpotlight.ts';
 import {samplePioneerResident} from './simulation/pioneerResidentMotion.ts';
 import {PIONEER_VALLEY} from './simulation/pioneerGeography.ts';
-import {pioneerBuildingLabel} from './simulation/pioneerGrowth.ts';
+import {pioneerBuildingLabel,pioneerGuardianChoices,requestGuardianProject,cancelGuardianProject} from './simulation/pioneerGrowth.ts';
 import {PIONEER_GUEST_POLICIES,setPioneerGuestPolicy,
  type PioneerGuestPolicy} from './simulation/pioneerCommerce.ts';
 import {PIONEER_DIRECTIONS,pioneerMilestoneBoard,setPioneerDirection,
@@ -18,7 +18,7 @@ import {WEATHER_NAMES} from './simulation/weather.ts';
 import {advancePioneerWorld,advancePioneerToSeason,createPioneerWorld,
  getPioneerCalendar,getPioneerWeather,importPioneerWorld,loadPioneerWorld,
  pioneerSummary,savePioneerWorld,setPioneerPolicy,PIONEER_ACTIVE_SLOT,
- type PioneerPolicy,type PioneerWork,type PioneerWorld} from './simulation/pioneerWorld.ts';
+ type PioneerPolicy,type PioneerWork,type PioneerWorld,type PioneerGuardianKind} from './simulation/pioneerWorld.ts';
 import './pioneer.css';
 
 const $=<T extends HTMLElement=HTMLElement>(id:string):T=>{
@@ -69,7 +69,7 @@ try{world=loadPioneerWorld(localStorage,Date.now(),slot);}catch{
 let valley=buildPioneerVillage(scene,world);
 let speed=1,paused=false,last=performance.now(),lastSave=performance.now(),lastUI=0,lastLighting='',lastToast=0;
 let selection:PioneerSelection|null=null;
-let lastLivelihoodMarkup='',lastMilestoneMarkup='',lastGuestMarkup='';
+let lastLivelihoodMarkup='',lastMilestoneMarkup='',lastGuestMarkup='',lastGuardianMarkup='';
 let spotlight:PioneerSpotlight=getPioneerSpotlight(world);
 let focusMotion:{from:THREE.Vector3;to:THREE.Vector3;started:number;
  fromZoom:number;toZoom:number}|null=null;
@@ -149,7 +149,32 @@ function foodBalanceLabel(){
  return '上一日净口粮 '+prefix+amount(net)+
   '（收 '+amount(stats.previousCollected)+' / 用 '+amount(stats.previousConsumed)+')'+warning;
 }
+function renderGuardianProjects(){
+ const g=world.guardianProject;
+ const label=g?pioneerBuildingLabel(g.kind):'尚无委托';
+ const phase=g?.status==='queued'?'排队':g?.status==='building'?'施工':g?.status==='completed'?'落成':g?.status==='blocked'?'暂缓':'';
+ $('pioneerGuardianPreview').textContent=label+(phase?' · '+phase:'');
+ const intent=g?.status==='building'&&world.intent?.id===g.causeId?world.intent:null;
+ const progress=intent?
+  '木料 '+amount(intent.woodCommitted)+'/'+amount(intent.woodRequired)+' · 工时 '+amount(intent.workDone)+'/'+amount(intent.workRequired):
+  g?.status==='queued'?'等待现有工程、粮水储备和安全勘地。':
+  g?.status==='completed'?'已实际落成，设施开始参与村庄生计。':
+  g?.status==='blocked'?g.message??'暂缓，未扣材料。':'先观察村庄，再选下一项具体工程。';
+ const progressEl=$('pioneerGuardianProgress');
+ const progressMarkup='<p>'+safe(progress)+'</p>'+
+  (intent?'<progress aria-label="施工工时" max="'+intent.workRequired+'" value="'+intent.workDone+'"></progress>':'')+
+  (g?.status==='queued'?'<button type="button" data-guardian-cancel>撤回尚未动工的委托</button>':'')+
+  (g?.status==='completed'?'<button type="button" data-guardian-focus>查看落成设施</button>':'');
+ if(progressEl.innerHTML!==progressMarkup)progressEl.innerHTML=progressMarkup;
+ const choices=pioneerGuardianChoices(world).map(c=>
+  '<button type="button" data-guardian-project="'+c.kind+'" '+(c.disabledReason?'disabled':'')+'>'+
+  '<b>'+safe(c.label)+'</b><span>'+safe(c.benefit)+'</span><small>'+
+  (c.variable?'基准 ':'')+c.wood+' 木料 · '+c.hours+' 工时'+
+  (c.disabledReason?' · '+safe(c.disabledReason):'')+'</small></button>').join('');
+ if(lastGuardianMarkup!==choices){$('pioneerGuardianChoices').innerHTML=choices;lastGuardianMarkup=choices;}
+}
 function renderUI(){
+ renderGuardianProjects();
  const cal=getPioneerCalendar(world),weather=getPioneerWeather(world);
  spotlight=getPioneerSpotlight(world);
  $('pioneerIntroChapter').textContent=spotlight.chapter;
@@ -411,6 +436,23 @@ councilOpen.addEventListener('click',()=>{
 });
 councilPanel.addEventListener('toggle',()=>{
  councilOpen.setAttribute('aria-expanded',String(councilPanel.open));
+});
+$('pioneerGuardianChoices').addEventListener('click',event=>{
+ const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-guardian-project]');
+ if(!btn||btn.disabled)return;
+ if(requestGuardianProject(world,btn.dataset.guardianProject as PioneerGuardianKind)){
+  renderUI();persist();toast('村务已列入议事簿，乡邻将在合适的施工窗口安排。');
+ }
+});
+$('pioneerGuardianProgress').addEventListener('click',event=>{
+ const target=event.target as HTMLElement;
+ if(target.closest('[data-guardian-cancel]')&&cancelGuardianProject(world)){
+  renderUI();persist();toast('尚未动工的委托已经撤回。');
+ }else if(target.closest('[data-guardian-focus]')){
+  const g=world.guardianProject;
+  const b=g?.status==='completed'?world.buildings.find(b=>b.causeId===g.causeId):null;
+  if(b)focusLocation(b.parcel.x,b.parcel.z);
+ }
 });
 $('pioneerGuestChoices').addEventListener('click',event=>{
  const btn=(event.target as HTMLElement).closest<HTMLButtonElement>('button[data-guest-policy]');

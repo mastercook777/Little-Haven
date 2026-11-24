@@ -8,7 +8,7 @@ import {pioneerNaturalParcels} from './pioneerNaturalAnchors.ts';
 import {validatePioneerParcel} from './pioneerParcelRules.ts';
 import {pioneerBuildingPath,pioneerEntrance,findPioneerWalk,roadSegmentsSafe,type WalkPoint,type PioneerRoad} from './pioneerPaths.ts';
 import type {PioneerWorld,PioneerBuilding,PioneerIntent,PioneerFounder,
- PioneerResourceSite,PioneerBuildKind} from './pioneerWorld.ts';
+ PioneerResourceSite,PioneerBuildKind,PioneerGuardianKind} from './pioneerWorld.ts';
 import {pioneerRepairPriority} from './pioneerFacilities.ts';
 import {pioneerV6LotFor,PIONEER_V6_LOTS} from './homesteadPlan.ts';
 import {PIONEER_HOMESTEAD_PORCH,pioneerHomesteadPorchPoint} from './pioneerHomesteadImprovement.ts';
@@ -301,6 +301,95 @@ function schedulePioneerEstablishedHome(s:PioneerWorld){
  return false;
 }
 
+/** Player proposals use the same survey, escrow and work loop as autonomous projects. */
+export const PIONEER_GUARDIAN_KINDS:readonly PioneerGuardianKind[]=['garden','cottage','wood-yard','fish-hut','granary','tea-stop'];
+const guardianBenefits:Record<PioneerGuardianKind,string>={
+ garden:'增添可耕作的粮源',cottage:'新增住处，等待真实迁入',
+ 'wood-yard':'为后续木作与工具提供场所','fish-hut':'新增季节性捕鱼与运输',
+ granary:'粮食储存上限增加十八份','tea-stop':'开启真实山路来客与交换'
+};
+function guardianEligibility(s:PioneerWorld,kind:PioneerGuardianKind):string|null{
+ if(!pioneerHasFacility(s,'shelter'))return '先由乡邻建成避雨棚';
+ if(s.buildings.length>=20||s.roads.length>=20)return '村庄设施已达当前容量';
+ const gardens=s.buildings.filter(b=>b.kind==='garden').length;
+ const pop=s.founders.length;
+ if(kind==='garden')return gardens>=3?'已有三块菜圃':null;
+ if(kind==='cottage')return pop>=12||pioneerHousingCapacity(s)>pop?'已有空床或人口已满':
+  s.buildings.filter(b=>b.kind==='cottage').length>=5?'山居已达当前上限':null;
+ if(pioneerHasFacility(s,kind))return '已有此设施';
+ if(kind==='wood-yard')return s.buildings.length<3?'先建成三处设施':null;
+ if(kind==='fish-hut')return gardens<1?'先开垦一块菜圃':null;
+ if(kind==='granary')return pop<5||gardens<2||s.commons.stage<2?'需五位居民、两块菜圃和公共灶台':null;
+ return pop<8||s.commons.stage<3||s.roads.length<7||
+  !(pioneerHasFacility(s,'granary')||pioneerHasFacility(s,'fish-hut'))?'需八位居民、村心空地、七条路及粮仓或渔棚':null;
+}
+export function pioneerGuardianChoices(s:PioneerWorld){
+ const busy=s.guardianProject?.status==='queued'||s.guardianProject?.status==='building';
+ return PIONEER_GUARDIAN_KINDS.map(kind=>({kind,label:pioneerBuildingLabel(kind),
+  benefit:guardianBenefits[kind],wood:woodFor(kind),hours:hoursFor(kind),
+  variable:kind==='cottage'||kind==='wood-yard',
+  disabledReason:busy?'已有守谷人委托':guardianEligibility(s,kind)}));
+}
+export function requestGuardianProject(s:PioneerWorld,kind:PioneerGuardianKind){
+ if(!PIONEER_GUARDIAN_KINDS.includes(kind)||s.guardianProject?.status==='queued'||
+  s.guardianProject?.status==='building'||guardianEligibility(s,kind))return false;
+ s.guardianProject={kind,requestedAt:s.minutes,status:'queued'};
+ record(s,'守谷人提议',pioneerBuildingLabel(kind)+'列入下一项村务；不打断已经开始的工程。');
+ return true;
+}
+export function cancelGuardianProject(s:PioneerWorld){
+ if(s.guardianProject?.status!=='queued')return false;
+ record(s,'守谷人撤回提议',pioneerBuildingLabel(s.guardianProject.kind)+'尚未动工，乡邻继续自治。');
+ delete s.guardianProject;
+ return true;
+}
+export function validGuardianProject(s:PioneerWorld){
+ const g=s.guardianProject;if(g===undefined)return true;
+ if(!g||!PIONEER_GUARDIAN_KINDS.includes(g.kind)||!Number.isFinite(g.requestedAt)||
+  g.requestedAt<0||g.requestedAt>s.minutes)return false;
+ if(g.status==='queued')return g.causeId===undefined;
+ if(g.status==='blocked')return g.causeId===undefined&&typeof g.message==='string';
+ if(typeof g.causeId!=='string'||!g.causeId.startsWith('pioneer-guardian-'))return false;
+ if(g.status==='building')return s.intent?.id===g.causeId&&s.intent.kind===g.kind;
+ if(g.status==='completed')return s.buildings.some(b=>b.causeId===g.causeId&&b.kind===g.kind);
+ return false;
+}
+function beginPioneerProject(s:PioneerWorld,kind:PioneerGuardianKind,
+ proposal:{parcel:VillageParcel;path:WalkPoint[]},guardian=false){
+ const id=(guardian?'pioneer-guardian-':'pioneer-need-')+s.nextEventId;
+ const data=spec[kind];
+ const v6=proposal.parcel.homesteadStyle?PIONEER_V6_LOTS[proposal.parcel.homesteadStyle]:null;
+ const wood=v6?.wood??data.wood,hours=v6?.hours??data.hours;
+ const reason=(guardian?'守谷人提议：':'')+data.why;
+ s.intent={id,kind,reason,createdAt:s.minutes,
+  requestedBy:s.founders.filter(f=>f.homeBuildingId).map(f=>f.id),
+  parcel:proposal.parcel,path:proposal.path,phase:'materials',
+  woodRequired:wood,woodCommitted:0,workDone:0,
+  workRequired:hours,pauseReason:'需要 '+wood+' 份木料和 '+hours+' 工时'};
+ if(guardian&&s.guardianProject){
+  s.guardianProject.status='building';s.guardianProject.causeId=id;
+ }
+ record(s,'乡邻谋划'+data.label,reason+(proposal.parcel.x<PIONEER_VALLEY.westernHomesX?
+  ' 西麓已经清障，乡邻沿勘定的小路前往新工地。':' 梁伯勘定了从营地到新工地的可走线路。'),id);
+ return true;
+}
+function tryGuardianProject(s:PioneerWorld){
+ const g=s.guardianProject;
+ if(g?.status!=='queued')return false;
+ const reason=guardianEligibility(s,g.kind);
+ if(reason){g.status='blocked';g.message=reason;record(s,'村务暂缓',reason);return false;}
+ // Do not reserve the construction window at the expense of survival.
+ if(s.resources.food<Math.max(2,s.founders.length*.5)||s.resources.water<1.5)return false;
+ const west=g.kind==='cottage'&&s.buildings.filter(b=>b.kind==='cottage').length>=2;
+ const proposal=(west?surveyPioneerPlot(s,g.kind,undefined,false,true):null)??surveyPioneerPlot(s,g.kind);
+ if(!proposal){
+  g.status='blocked';g.message='没有安全可达的用地，未扣材料；可另选村务';
+  record(s,'村务暂缓',pioneerBuildingLabel(g.kind)+'：'+g.message);
+  return false;
+ }
+ return beginPioneerProject(s,g.kind,proposal,true);
+}
+
 export function schedulePioneerProject(s:PioneerWorld){
  if(s.intent||s.minutes<s.nextSurveyAt)return false;
  const kind=nextProjectKind(s);
@@ -319,6 +408,7 @@ export function schedulePioneerProject(s:PioneerWorld){
   record(s,'修屋工单',pioneerBuildingLabel(target.kind)+'屋面老化，乡邻主动讨论补梁和换顶。',id);
   return true;
  }
+ if(tryGuardianProject(s))return true;
  if(schedulePioneerEstablishedHome(s))return true;
  if(!kind)return false;
  const westward=kind==='cottage'&&s.buildings.filter(b=>b.kind==='cottage').length>=2;
@@ -366,18 +456,7 @@ export function schedulePioneerProject(s:PioneerWorld){
   if(!recently)record(s,'勘地暂缓',message);
   return false;
  }
- const id='pioneer-need-'+s.nextEventId;
- const data=spec[kind];
- const v6=proposal.parcel.homesteadStyle?PIONEER_V6_LOTS[proposal.parcel.homesteadStyle]:null;
- const wood=v6?.wood??data.wood,hours=v6?.hours??data.hours;
- s.intent={id,kind,reason:data.why,createdAt:s.minutes,
-  requestedBy:s.founders.filter(f=>f.homeBuildingId).map(f=>f.id),
-  parcel:proposal.parcel,path:proposal.path,phase:'materials',
-  woodRequired:wood,woodCommitted:0,workDone:0,
-  workRequired:hours,pauseReason:'需要 '+wood+' 份木料和 '+hours+' 工时'};
- record(s,'乡邻谋划'+data.label,data.why+(proposal.parcel.x<PIONEER_VALLEY.westernHomesX?
-  ' 西麓已经清障，乡邻沿勘定的小路前往新工地。':' 梁伯勘定了从营地到新工地的可走线路。'),id);
- return true;
+ return beginPioneerProject(s,kind,proposal);
 }
 export function completePioneerProject(s:PioneerWorld){
  const intent=s.intent;if(!intent)return false;
@@ -425,6 +504,8 @@ export function completePioneerProject(s:PioneerWorld){
  if(kind==='cottage')b.occupants=[];
  else if(kind==='shelter')b.occupants=s.founders.slice(0,3).map(f=>f.id);
  s.buildings.push(b);s.intent=null;
+ if(s.guardianProject?.status==='building'&&s.guardianProject.causeId===intent.id)
+  s.guardianProject.status='completed';
  if(intent.path&&intent.path.length>=2){
   const road:PioneerRoad={id:'road-'+b.id,buildingId:b.id,
    createdAt:s.minutes,grade:'track',points:intent.path,uses:0};
